@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时聊天室</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; display: flex; justify-content: center; padding: 20px; }
+        #chat-container { width: 100%; max-width: 500px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        #messages { height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .msg { padding: 8px 12px; border-radius: 15px; max-width: 80%; }
+        .msg.mine { align-self: flex-end; background: #007bff; color: white; }
+        .msg.others { align-self: flex-start; background: #e9e9eb; color: black; }
+        input, button { padding: 10px; margin-top: 5px; border-radius: 5px; border: 1px solid #ddd; }
+        button { background: #007bff; color: white; cursor: pointer; border: none; }
+    </style>
+</head>
+<body>
+
+<div id="chat-container">
+    <h2>实时聊天室</h2>
+    <div id="setup-area">
+        <input type="text" id="room-input" placeholder="输入房间代码 (如: Room1)">
+        <button onclick="joinRoom()">进入房间</button>
+    </div>
+
+    <div id="chat-area" style="display:none;">
+        <p>当前房间: <span id="current-room-display"></span></p>
+        <div id="messages"></div>
+        <input type="text" id="message-input" placeholder="输入消息..." style="width: 80%;">
+        <button onclick="sendMessage()">发送</button>
+    </div>
+</div>
+
+<script>
+    // --- 配置你的 Supabase 信息 ---
+    const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
+    
+    // 使用 let 确保不会因为重复定义报错
+    let supabaseClient;
+
+    // 初始化客户端 (确保只运行一次)
+    if (!supabaseClient) {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
+    let currentRoomCode = "";
+    let chatChannel;
+    window.mySender = "用户_" + Math.floor(Math.random() * 1000);
+
+    // 1. 进入房间逻辑
+    async function joinRoom() {
+        const input = document.getElementById('room-input');
+        currentRoomCode = input.value.trim();
+        if (!currentRoomCode) return alert("请输入房间代码");
+
+        document.getElementById('setup-area').style.display = 'none';
+        document.getElementById('chat-area').style.display = 'block';
+        document.getElementById('current-room-display').innerText = currentRoomCode;
+
+        // 加载历史消息
+        loadHistory();
+
+        // 启动实时订阅
+        initRealtime();
+    }
+
+    // 2. 加载历史消息
+    async function loadHistory() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('messages')
+                .select('*')
+                .eq('room_code', currentRoomCode)
+                .order('created_at', { ascending: true });
+
+            if (error) console.error("加载历史失败:", error);
+            else {
+                const msgDiv = document.getElementById('messages');
+                msgDiv.innerHTML = ""; 
+                data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false));
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    // 3. 发送消息逻辑
+    async function sendMessage() {
+        const input = document.getElementById('message-input');
+        const content = input.value.trim();
+        if (!content) return;
+
+        const sender = window.mySender;
+
+        try {
+            const { error } = await supabaseClient
+                .from('messages')
+                .insert([{ room_code: currentRoomCode, content: content, sender: sender }]);
+
+            if (error) console.error("发送失败:", error);
+            else {
+                input.value = ""; 
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    // 4. 【核心】实时订阅逻辑
+    function initRealtime() {
+        if (chatChannel) chatChannel.unsubscribe();
+
+        chatChannel = supabaseClient
+            .channel(`room_${currentRoomCode}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'messages',
+                    filter: `room_code=eq.${currentRoomCode}`
+                },
+                (payload) => {
+                    console.log("收到实时消息:", payload);
+                    appendMessageToUI(payload.new.sender, payload.new.content, true);
+                }
+            )
+            .subscribe((status) => {
+                console.log("订阅状态:", status);
+                if (status === 'SUBSCRIBED') {
+                    console.log("✅ 已成功连接到房间：" + currentRoomCode);
+                }
+            });
+    }
+
+    // 5. 更新 UI 函数
+    function appendMessageToUI(sender, content, isNew) {
+        const msgDiv = document.getElementById('messages');
+        const msgElement = document.createElement('div');
+        
+        // 如果是自己的消息，用蓝色背景
+        if (sender === window.mySender) {
+            msgElement.className = "msg mine";
+        } else {
+            msgElement.className = "msg others";
+        }
+        
+        msgElement.innerHTML = `<strong>${sender}:</strong> ${content}`;
+        msgDiv.appendChild(msgElement);
+        
+        // 自动滚动到底部
+        msgDiv.scrollTop = msgDiv.scrollHeight;
+    }
+</script>
+
+
+</body>
+</html>
