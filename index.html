@@ -34,29 +34,27 @@
 </div>
 
 <script>
-    // 1. 配置信息 (放在最前面)
+    // --- 配置你的 Supabase 信息 ---
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
-    // 2. 初始化客户端
-    let supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // 使用 let 确保不会因为重复定义报错
+    let supabaseClient;
 
-    // 3. 定义全局变量 (确保它们在函数运行前就存在)
-    let currentRoomCode = ""; 
+    // 初始化客户端 (确保只运行一次)
+    if (!supabaseClient) {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+
+    let currentRoomCode = "";
     let chatChannel;
     window.mySender = "用户_" + Math.floor(Math.random() * 1000);
 
-    // 4. 函数定义
+    // 1. 进入房间逻辑
     async function joinRoom() {
         const input = document.getElementById('room-input');
-        currentRoomCode = input.value.trim(); // 这里现在可以安全访问了
-        
-        if (!currentRoomCode) {
-            alert("请输入房间代码");
-            return;
-        }
-
-        console.log("正在进入房间:", currentRoomCode);
+        currentRoomCode = input.value.trim();
+        if (!currentRoomCode) return alert("请输入房间代码");
 
         document.getElementById('setup-area').style.display = 'none';
         document.getElementById('chat-area').style.display = 'block';
@@ -69,6 +67,7 @@
         initRealtime();
     }
 
+    // 2. 加载历史消息
     async function loadHistory() {
         try {
             const { data, error } = await supabaseClient
@@ -83,31 +82,32 @@
                 msgDiv.innerHTML = ""; 
                 data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false));
             }
-        } catch (e) { console.error("loadHistory Error:", e); }
+        } catch (e) { console.error(e); }
     }
 
+    // 3. 发送消息逻辑
     async function sendMessage() {
         const input = document.getElementById('message-input');
         const content = input.value.trim();
         if (!content) return;
 
+        const sender = window.mySender;
+
         try {
             const { error } = await supabaseClient
                 .from('messages')
-                .insert([{ room_code: currentRoomCode, content: content, sender: window.mySender }]);
+                .insert([{ room_code: currentRoomCode, content: content, sender: sender }]);
 
             if (error) console.error("发送失败:", error);
             else {
                 input.value = ""; 
             }
-        } catch (e) { console.error("sendMessage Error:", e); }
+        } catch (e) { console.error(e); }
     }
 
+    // 4. 【核心】实时订阅逻辑
     function initRealtime() {
-        // 如果已经存在订阅，先取消之前的
-        if (chatChannel) {
-            chatChannel.unsubscribe();
-        }
+        if (chatChannel) chatChannel.unsubscribe();
 
         chatChannel = supabaseClient
             .channel(`room_${currentRoomCode}`)
@@ -132,10 +132,12 @@
             });
     }
 
+    // 5. 更新 UI 函数
     function appendMessageToUI(sender, content, isNew) {
         const msgDiv = document.getElementById('messages');
         const msgElement = document.createElement('div');
         
+        // 如果是自己的消息，用蓝色背景
         if (sender === window.mySender) {
             msgElement.className = "msg mine";
         } else {
@@ -144,10 +146,11 @@
         
         msgElement.innerHTML = `<strong>${sender}:</strong> ${content}`;
         msgDiv.appendChild(msgElement);
+        
+        // 自动滚动到底部
         msgDiv.scrollTop = msgDiv.scrollHeight;
     }
 </script>
-
 
 
 </body>
