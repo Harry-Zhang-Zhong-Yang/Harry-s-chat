@@ -6,8 +6,10 @@
     <title>极简高级聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        /* 定义变量 */
         :root {
-            --primary-color: #0084ff; 
+            --btn-color: #0084ff; /* 统一的功能按钮颜色 */
+            --bubble-color: #0084ff; /* 仅用于聊天气泡的颜色 */
             --bg-color: #f0f2f5; 
             --msg-others: #ffffff;
             --text-main: #333333;
@@ -39,8 +41,8 @@
         .login-box { width: 100%; max-width: 400px; padding: 40px; border: 1px solid #eee; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
         .login-box h2 { margin-bottom: 30px; text-align: center; color: #333; }
         input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; transition: all 0.2s; }
-        input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(0,132,255,0.1); }
-        button { width: 100%; padding: 14px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: opacity 0.2s; }
+        input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(0,132,255,0.1); }
+        button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: opacity 0.2s; }
         button:active { opacity: 0.8; }
 
         /* --- 聊天主容器 --- */
@@ -86,8 +88,9 @@
             padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; 
             position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.03);
         }
+        /* 这里使用了独立的 --bubble-color 变量 */
         .left .msg-content { background: var(--msg-others); color: #333; border: 1px solid #eef0f2; border-bottom-left-radius: 4px; }
-        .right .msg-content { background: var(--primary-color); color: white; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(0,132,255,0.2); }
+        .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
 
         .sender-name { font-size: 12px; font-weight: bold; margin-bottom: 4px; display: block; opacity: 0.8; }
         .msg-time { font-size: 10px; margin-top: 6px; display: block; opacity: 0.5; }
@@ -102,7 +105,7 @@
         /* 输入区域 */
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
         #message-input { width: 100%; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
-        #send-btn { background: var(--primary-color); color: white; padding: 8px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin-left: 10px; height: 45px; }
+        #send-btn { background: var(--btn-color); color: white; padding: 8px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin-left: 10px; height: 45px; }
 
         /* 设置弹窗 (功能2) */
         #settings-modal {
@@ -110,7 +113,9 @@
             align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
         }
         .modal-content { background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; text-align: left; position: relative; }
-        .close-settings { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; border: none; background: none; }
+        /* 精确定位右上角X */
+        .close-settings { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; border: none; background: none; line-height: 1; }
+        
         .setting-item { margin-bottom: 20px; }
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
@@ -160,7 +165,6 @@
             <button id="send-btn" onclick="sendMessage()">发送</button>
         </div>
     </div>
-</div>
 
 <!-- 综合设置弹窗 -->
 <div id="settings-modal" onclick="toggleSettings(event)">
@@ -175,7 +179,7 @@
         </div>
 
         <div class="setting-item">
-            <label>选择气泡颜色</label>
+            <label>选择气泡颜色 (仅影响聊天内容)</label>
             <input type="color" id="color-selector" value="#0084ff">
         </div>
 
@@ -211,7 +215,7 @@
 
         document.getElementById('login-area').style.display = 'none';
         document.getElementById('chat-container').style.display = 'flex';
-        document.getElementById('room-title').innerText = currentRoomCode; // 直接显示房间号，去掉“房间:”字样
+        document.getElementById('room-title').innerText = currentRoomCode; 
         
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
@@ -297,7 +301,7 @@
         // 处理回复显示逻辑 (引用文字在下方)
         if (content.includes("[回复:")) {
             const parts = content.split("\n\n");
-            displayContent = parts[0] || content; // 现在的正文是第一部分
+            displayContent = parts[0] || content; 
             replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : ""}</div>`;
         }
 
@@ -361,15 +365,17 @@
     function updateRoomName() {
         const newName = document.getElementById('custom-room-name').value.trim();
         if (!newName) return alert("请输入新名字");
-        document.getElementById('room-title').innerText = newName; // 直接更新导航栏文字
+        document.getElementById('room-title').innerText = newName; 
         alert("名称已更新（仅本地显示）");
     }
 
     function saveSettings() {
+        // 保存气泡颜色 (使用独立的 --bubble-color 变量)
         const color = document.getElementById('color-selector').value;
-        document.documentElement.style.setProperty('--primary-color', color);
+        document.documentElement.style.setProperty('--bubble-color', color);
         localStorage.setItem('chat_theme_color', color);
 
+        // 保存背景图片 URL
         const bgUrl = document.getElementById('bg-url-input').value;
         if (bgUrl) {
             document.documentElement.style.setProperty('--chat-bg', `url('${bgUrl}')`);
@@ -388,8 +394,7 @@
             currentRoomCode = "";
             document.getElementById('login-area').style.display = 'flex';
             document.getElementById('chat-container').style.display = 'none';
-            // 清除所有状态
-            location.reload(); // 最彻底的重置方式，确保回到初始登录页
+            location.reload(); 
         }
     }
 
@@ -397,7 +402,7 @@
     window.onload = () => {
         const savedColor = localStorage.getItem('chat_theme_color');
         if (savedColor) {
-            document.documentElement.style.setProperty('--primary-color', savedColor);
+            document.documentElement.style.setProperty('--bubble-color', savedColor);
             document.getElementById('color-selector').value = savedColor;
         }
 
@@ -426,5 +431,5 @@
         }
     });
 </script>
-</body
+</body>
 </html>
