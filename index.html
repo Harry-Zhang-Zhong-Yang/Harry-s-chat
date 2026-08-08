@@ -8,10 +8,10 @@
     <style>
         :root {
             --primary-color: #0084ff; 
-            --bg-color: #f0f2f5; /* 页面最外层背景 */
+            --bg-color: #f0f2f5; 
             --msg-others: #ffffff;
             --text-main: #333333;
-            --chat-bg: url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80'); /* 默认背景图 */
+            --chat-bg: url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80'); 
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -53,9 +53,10 @@
         #nav-bar { 
             height: 65px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
             border-bottom: 1px solid #eee; display: flex; align-items: center; 
-            padding: 0 20px; justify-content: space-between; z-index: 10;
+            padding: 0 15px; justify-content: space-between; z-index: 10;
         }
-        #room-title { font-weight: bold; font-size: 17px; color: #333; }
+        #back-btn { font-size: 24px; cursor: pointer; padding: 5px; }
+        #room-title { font-weight: bold; font-size: 17px; color: #333; flex: 1; text-align: center; }
 
         /* 聊天框 */
         #chat-box { 
@@ -69,7 +70,6 @@
             scroll-behavior: smooth;
         }
 
-        /* 为了保证在有背景图时文字清晰，给聊天框加一个微弱的遮罩层 */
         #chat-box::before {
             content: ""; position: absolute; inset: 0;
             background: rgba(255, 255, 255, 0.1); z-index: -1;
@@ -109,10 +109,11 @@
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
             align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
         }
-        .modal-content { background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; text-align: left; }
+        .modal-content { background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; text-align: left; position: relative; }
+        .close-settings { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; border: none; background: none; }
         .setting-item { margin-bottom: 20px; }
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
-        .setting-item input { margin: 5px 0; }
+        .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
 
         .system-msg { text-align: center; font-size: 13px; color: #999; padding: 8px; background: rgba(0,0,0,0.04); border-radius: 10px; margin: 5px 0; }
     </style>
@@ -127,7 +128,7 @@
             • 引入智能回复系统（长按/右键消息）<br>
             • 支持个性化气泡颜色选择<br>
             • 支持更换聊天背景图片<br>
-            • 支持修改群聊显示名称<br>
+            • 支持修改群聊名称<br>
             • 全新的响应式UI布局与平滑动画
         </p>
         <button onclick="closeUpdateModal()">我知道了</button>
@@ -145,10 +146,9 @@
 
 <div id="chat-container" style="display:none;">
     <div id="nav-bar">
+        <span id="back-btn" onclick="leaveRoom()">←</span>
         <span id="room-title">正在加载...</span>
-        <div>
-            <span id="settings-btn" style="cursor:pointer; font-size:20px;" onclick="toggleSettings()">⚙️</span>
-        </div>
+        <span id="settings-btn" style="cursor:pointer; font-size:20px;" onclick="toggleSettings()">⚙️</span>
     </div>
 
     <div id="chat-box"></div>
@@ -165,22 +165,20 @@
 <!-- 综合设置弹窗 -->
 <div id="settings-modal" onclick="toggleSettings(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
+        <button class="close-settings" onclick="toggleSettings()">&times;</button>
         <h3 style="margin-bottom:20px; text-align:center;">个性化设置</h3>
         
-        <!-- 更改群名 -->
         <div class="setting-item">
             <label>修改当前房间名称</label>
             <input type="text" id="custom-room-name" placeholder="输入新名字...">
             <button style="padding:8px; font-size:14px;" onclick="updateRoomName()">确认更改</button>
         </div>
 
-        <!-- 气泡颜色 -->
         <div class="setting-item">
             <label>选择气泡颜色</label>
             <input type="color" id="color-selector" value="#0084ff">
         </div>
 
-        <!-- 背景图片 -->
         <div class="setting-item">
             <label>更换背景图片 (输入URL地址)</label>
             <input type="text" id="bg-url-input" placeholder="https://example.com/image.jpg">
@@ -213,7 +211,7 @@
 
         document.getElementById('login-area').style.display = 'none';
         document.getElementById('chat-container').style.display = 'flex';
-        document.getElementById('room-title').innerText = `房间: ${currentRoomCode}`;
+        document.getElementById('room-title').innerText = currentRoomCode; // 直接显示房间号，去掉“房间:”字样
         
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
@@ -253,9 +251,10 @@
         let content = inputEl.value.trim();
         if (!content) return;
 
+        // 功能1：处理回复逻辑 (引用文字在下方)
         let finalContent = content;
         if (replyData) {
-            finalContent = `[回复: ${replyData.content}]\n\n${content}`;
+            finalContent = `${content}\n\n[回复: ${replyData.content}]`;
         }
 
         const btn = document.getElementById('send-btn');
@@ -295,18 +294,19 @@
         let displayContent = content;
         let replyTagHtml = "";
 
+        // 处理回复显示逻辑 (引用文字在下方)
         if (content.includes("[回复:")) {
             const parts = content.split("\n\n");
-            displayContent = parts[1] || content;
-            replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-bottom:5px; color:#555;">${parts[0].replace("[回复:", "").replace("]", "")}</div>`;
+            displayContent = parts[0] || content; // 现在的正文是第一部分
+            replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : ""}</div>`;
         }
 
         wrapper.innerHTML = `
             <div class="msg-content">
                 ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
-                ${replyTagHtml}
                 <div style="white-space: pre-wrap;">${displayContent}</div>
-                <span class="msg-time">${timeStr}</span>
+                ${replyTagHtml}
+                <span class.msg-time">${timeStr}</span>
             </div>
         `;
 
@@ -361,17 +361,15 @@
     function updateRoomName() {
         const newName = document.getElementById('custom-room-name').value.trim();
         if (!newName) return alert("请输入新名字");
-        document.getElementById('room-title').innerText = `房间: ${newName}`;
+        document.getElementById('room-title').innerText = newName; // 直接更新导航栏文字
         alert("名称已更新（仅本地显示）");
     }
 
     function saveSettings() {
-        // 1. 保存气泡颜色
         const color = document.getElementById('color-selector').value;
         document.documentElement.style.setProperty('--primary-color', color);
         localStorage.setItem('chat_theme_color', color);
 
-        // 2. 保存背景图片 URL
         const bgUrl = document.getElementById('bg-url-input').value;
         if (bgUrl) {
             document.documentElement.style.setProperty('--chat-bg', `url('${bgUrl}')`);
@@ -382,6 +380,17 @@
         }
 
         toggleSettings();
+    }
+
+    // 退出房间功能
+    function leaveRoom() {
+        if(confirm("确定要退出当前房间吗？")) {
+            currentRoomCode = "";
+            document.getElementById('login-area').style.display = 'flex';
+            document.getElementById('chat-container').style.display = 'none';
+            // 清除所有状态
+            location.reload(); // 最彻底的重置方式，确保回到初始登录页
+        }
     }
 
     // 初始化加载数据
@@ -417,5 +426,5 @@
         }
     });
 </script>
-</body>
+</body
 </html>
