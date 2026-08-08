@@ -6,10 +6,9 @@
     <title>极简高级聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* 定义变量 */
         :root {
-            --btn-color: #0084ff; /* 统一的功能按钮颜色 */
-            --bubble-color: #0084ff; /* 仅用于聊天气泡的颜色 */
+            --btn-color: #0084ff; 
+            --bubble-color: #0084ff; 
             --bg-color: #f0f2f5; 
             --msg-others: #ffffff;
             --text-main: #333333;
@@ -58,7 +57,7 @@
             padding: 0 15px; justify-content: space-between; z-index: 10;
         }
         #back-btn { font-size: 24px; cursor: pointer; padding: 5px; }
-        #room-title { font-weight: bold; font-size: 17px; color: #333; flex: 1; text-align: center; }
+        #room-title { font-weight: bold; font-size: 17px; color: #333; flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         /* 聊天框 */
         #chat-box { 
@@ -88,7 +87,6 @@
             padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; 
             position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.03);
         }
-        /* 这里使用了独立的 --bubble-color 变量 */
         .left .msg-content { background: var(--msg-others); color: #333; border: 1px solid #eef0f2; border-bottom-left-radius: 4px; }
         .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
 
@@ -113,7 +111,6 @@
             align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
         }
         .modal-content { background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; text-align: left; position: relative; }
-        /* 精确定位右上角X */
         .close-settings { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; border: none; background: none; line-height: 1; }
         
         .setting-item { margin-bottom: 20px; }
@@ -130,11 +127,10 @@
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
             本次优化内容：<br>
-            • 引入智能回复系统（长按/右键消息）<br>
-            • 支持个性化气泡颜色选择<br>
+            • 全局房间名称修改（所有人可见）<br>
             • 支持更换聊天背景图片<br>
-            • 支持修改群聊名称<br>
-            • 全新的响应式UI布局与平滑动画
+            • 引用文字位置优化至正文下方<br>
+            • 严格的房间代码校验系统
         </p>
         <button onclick="closeUpdateModal()">我知道了</button>
     </div>
@@ -144,7 +140,7 @@
     <div class="login-box">
         <h2>进入聊天室</h2>
         <input type="text" id="username" placeholder="输入你的名字" autocomplete="off">
-        <input type="text" id="room-input" placeholder="输入房间代码 (如: Room1)">
+        <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off">
         <button onclick="joinRoom()">开始聊天</button>
     </div>
 </div>
@@ -205,12 +201,18 @@
     let currentRoomCode = "";
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
+    let roomSubscription = null;
 
     // --- 进入房间逻辑 ---
     async function joinRoom() {
         const nameInput = document.getElementById('username').value.trim();
         currentRoomCode = document.getElementById('room-input').value.trim();
         
+        // 校验：只能包含字母、数字和符号 (正则)
+        if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
+            return alert("房间代码格式不正确，请只使用字母、数字或符号。");
+        }
+
         if (!nameInput || !currentRoomCode) return alert("请输入名字和房间代码");
 
         document.getElementById('login-area').style.display = 'none';
@@ -219,8 +221,30 @@
         
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
+        // 初始化房间数据（如果不存在则创建）
+        await ensureRoomExists();
         loadHistory();
         initRealtime();
+    }
+
+    async function ensureRoomExists() {
+        const { data: room, error } = await supabaseClient
+            .from('rooms')
+            .select('*')
+            .eq('room_code', currentRoomCode)
+            .single();
+
+        if (error || !room) {
+            // 如果房间不存在，则插入新房间
+            const { error: insertError } = await supabaseClient
+                .from('rooms')
+                .insert([{ room_code: currentRoomCode, room_name: currentRoomCode }]);
+            if (insertError) console.error("创建房间失败:", insertError);
+        } else {
+            // 如果存在，获取当前名称和背景图
+            document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
+            document.documentElement.style.setProperty('--chat-bg', `url('${room.bg_url || ""}')`);
+        }
     }
 
     async function loadHistory() {
@@ -238,7 +262,11 @@
     }
 
     function initRealtime() {
-        supabaseClient.channel(`room_${currentRoomCode}`)
+        // 取消之前的订阅
+        if (roomSubscription) roomSubscription.unsubscribe();
+
+        // 1. 订阅消息变化
+        roomSubscription = supabaseClient.channel(`room_${currentRoomCode}`)
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -246,6 +274,17 @@
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
                 appendMessageToUI(payload.new.sender, payload.new.content, true);
+            })
+            // 2. 订阅房间属性变化（改名、换背景）
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'rooms',
+                filter: `room_code=eq.${currentRoomCode}`
+            }, (payload) => {
+                const room = payload.new;
+                document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
+                document.documentElement.style.setProperty('--chat-bg', `url('${room.bg_url || ""}')`);
             })
             .subscribe();
     }
@@ -361,23 +400,35 @@
         modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
     }
 
-    // 修改房间名称功能
-    function updateRoomName() {
+    // 修改房间名称功能（全局同步）
+    async function updateRoomName() {
         const newName = document.getElementById('custom-room-name').value.trim();
         if (!newName) return alert("请输入新名字");
-        document.getElementById('room-title').innerText = newName; 
-        alert("名称已更新（仅本地显示）");
+        
+        try {
+            const { error } = await supabaseClient
+                .from('rooms')
+                .update({ room_name: newName })
+                .eq('room_code', currentRoomCode);
+
+            if (error) throw error;
+            alert("名称已更新，所有人可见");
+        } catch (e) {
+            console.error(e);
+            alert("修改失败，请检查权限。");
+        }
     }
 
     function saveSettings() {
-        // 保存气泡颜色 (使用独立的 --bubble-color 变量)
+        // 保存气泡颜色
         const color = document.getElementById('color-selector').value;
         document.documentElement.style.setProperty('--bubble-color', color);
         localStorage.setItem('chat_theme_color', color);
 
-        // 保存背景图片 URL
+        // 保存背景图片 URL (全局同步)
         const bgUrl = document.getElementById('bg-url-input').value;
         if (bgUrl) {
+            supabaseClient.from('rooms').update({ bg_url: bgUrl }).eq('room_code', currentRoomCode);
             document.documentElement.style.setProperty('--chat-bg', `url('${bgUrl}')`);
             localStorage.setItem('chat_bg_url', bgUrl);
         } else {
