@@ -76,7 +76,7 @@
             background: rgba(255, 255, 255, 0.1); z-index: -1;
         }
 
-        /* 消息气泡 (功能17) */
+        /* 消息气泡 */
         .msg-wrapper { max-width: 85%; position: relative; animation: msgIn 0.3s ease-out; }
         @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -93,7 +93,7 @@
         .sender-name { font-size: 12px; font-weight: bold; margin-bottom: 4px; display: block; opacity: 0.8; }
         .msg-time { font-size: 10px; margin-top: 6px; display: block; opacity: 0.5; }
 
-        /* 回复预览 (功能1) */
+        /* 回复预览 */
         #reply-preview {
             height: auto; min-height: 40px; display: flex; align-items: center; justify-content: space-between;
             padding: 8px 12px; font-size: 13px; color: #666; background: #eef0f2;
@@ -105,13 +105,20 @@
         #message-input { width: 100%; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
         #send-btn { background: var(--btn-color); color: white; padding: 8px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin-left: 10px; height: 45px; }
 
-        /* 设置弹窗 (功能2) */
+        /* 设置弹窗 */
         #settings-modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
             align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
         }
-        .modal-content { background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; text-align: left; position: relative; }
-        .close-settings { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; border: none; background: none; line-height: 1; }
+        .modal-content { 
+            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; 
+            position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        /* 强制定位到右上角 */
+        .close-settings { 
+            position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; 
+            color: #999; border: none; background: none; line-height: 1; padding: 0;
+        }
         
         .setting-item { margin-bottom: 20px; }
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
@@ -126,9 +133,8 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            本次优化内容：<br>
             • 全局房间名称修改（所有人可见）<br>
-            • 支持更换聊天背景图片<br>
+            • 支持更换背景图片<br>
             • 引用文字位置优化至正文下方<br>
             • 严格的房间代码校验系统
         </p>
@@ -189,7 +195,6 @@
 </div>
 
 <script>
-    // --- 配置你的 Supabase 信息 ---
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -203,12 +208,10 @@
     let replyData = null;
     let roomSubscription = null;
 
-    // --- 进入房间逻辑 ---
     async function joinRoom() {
         const nameInput = document.getElementById('username').value.trim();
         currentRoomCode = document.getElementById('room-input').value.trim();
         
-        // 校验：只能包含字母、数字和符号 (正则)
         if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
             return alert("房间代码格式不正确，请只使用字母、数字或符号。");
         }
@@ -221,7 +224,6 @@
         
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
-        // 初始化房间数据（如果不存在则创建）
         await ensureRoomExists();
         loadHistory();
         initRealtime();
@@ -235,13 +237,11 @@
             .single();
 
         if (error || !room) {
-            // 如果房间不存在，则插入新房间
             const { error: insertError } = await supabaseClient
                 .from('rooms')
                 .insert([{ room_code: currentRoomCode, room_name: currentRoomCode }]);
             if (insertError) console.error("创建房间失败:", insertError);
         } else {
-            // 如果存在，获取当前名称和背景图
             document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
             document.documentElement.style.setProperty('--chat-bg', `url('${room.bg_url || ""}')`);
         }
@@ -262,10 +262,8 @@
     }
 
     function initRealtime() {
-        // 取消之前的订阅
         if (roomSubscription) roomSubscription.unsubscribe();
 
-        // 1. 订阅消息变化
         roomSubscription = supabaseClient.channel(`room_${currentRoomCode}`)
             .on('postgres_changes', {
                 event: 'INSERT',
@@ -275,7 +273,6 @@
             }, (payload) => {
                 appendMessageToUI(payload.new.sender, payload.new.content, true);
             })
-            // 2. 订阅房间属性变化（改名、换背景）
             .on('postgres_changes', {
                 event: 'UPDATE',
                 schema: 'public',
@@ -294,7 +291,6 @@
         let content = inputEl.value.trim();
         if (!content) return;
 
-        // 功能1：处理回复逻辑 (引用文字在下方)
         let finalContent = content;
         if (replyData) {
             finalContent = `${content}\n\n[回复: ${replyData.content}]`;
@@ -337,7 +333,6 @@
         let displayContent = content;
         let replyTagHtml = "";
 
-        // 处理回复显示逻辑 (引用文字在下方)
         if (content.includes("[回复:")) {
             const parts = content.split("\n\n");
             displayContent = parts[0] || content; 
@@ -356,8 +351,6 @@
         chatBox.appendChild(wrapper);
         chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
     }
-
-    // --- 交互功能 ---
 
     const chatBox = document.getElementById('chat-box');
     let pressTimer;
@@ -392,15 +385,12 @@
         }
     });
 
-    // --- 设置逻辑 ---
-
     function toggleSettings(e) {
         const modal = document.getElementById('settings-modal');
         if (e) return; 
         modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
     }
 
-    // 修改房间名称功能（全局同步）
     async function updateRoomName() {
         const newName = document.getElementById('custom-room-name').value.trim();
         if (!newName) return alert("请输入新名字");
@@ -415,17 +405,15 @@
             alert("名称已更新，所有人可见");
         } catch (e) {
             console.error(e);
-            alert("修改失败，请检查权限。");
+            alert("修改失败，请确保数据库权限已正确开启。");
         }
     }
 
     function saveSettings() {
-        // 保存气泡颜色
         const color = document.getElementById('color-selector').value;
         document.documentElement.style.setProperty('--bubble-color', color);
         localStorage.setItem('chat_theme_color', color);
 
-        // 保存背景图片 URL (全局同步)
         const bgUrl = document.getElementById('bg-url-input').value;
         if (bgUrl) {
             supabaseClient.from('rooms').update({ bg_url: bgUrl }).eq('room_code', currentRoomCode);
@@ -439,7 +427,6 @@
         toggleSettings();
     }
 
-    // 退出房间功能
     function leaveRoom() {
         if(confirm("确定要退出当前房间吗？")) {
             currentRoomCode = "";
@@ -449,7 +436,6 @@
         }
     }
 
-    // 初始化加载数据
     window.onload = () => {
         const savedColor = localStorage.getItem('chat_theme_color');
         if (savedColor) {
@@ -474,7 +460,6 @@
         localStorage.setItem('has_seen_update', 'true');
     }
 
-    // 回车发送
     document.getElementById('message-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
