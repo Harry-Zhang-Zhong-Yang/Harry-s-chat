@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>极简高级聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -93,7 +93,7 @@
             border-radius: 10px; margin-bottom: 5px; display: none; border: 1px solid #ddd;
         }
 
-        /* 输入区域 - 修改对齐逻辑 */
+        /* 输入区域 */
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
         .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
         #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
@@ -108,7 +108,7 @@
         /* 图片预览样式 */
         .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
 
-        /* 设置弹窗 - 修改叉号位置 */
+        /* 设置弹窗 */
         #settings-modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
             align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
@@ -230,7 +230,7 @@
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
                 ensureRoomExists();
-                loadHistory(); // 初始加载最新消息
+                loadHistory(); // 加载第一页（最新消息）
                 initRealtime();
             } else {
                 localStorage.clear();
@@ -244,8 +244,8 @@
             document.getElementById('color-selector').value = savedColor;
         }
 
-        // 版本校验逻辑
-        const APP_VERSION = "1.0.4"; // 修改此数字可强制弹出公告
+        // 版本校验逻辑：修改 APP_VERSION 即可触发公告
+        const APP_VERSION = "1.0.5"; 
         const lastVersion = localStorage.getItem('app_version');
         if (lastVersion !== APP_VERSION) {
             document.getElementById('update-modal').style.display = 'flex';
@@ -311,27 +311,41 @@
                 .from('messages')
                 .select('*')
                 .eq('room_code', currentRoomCode)
-                .order('created_at', { ascending: false }); // 先按时间倒序排，方便拿最新的
+                .order('created_at', { ascending: false }); // 始终按时间倒序排，方便拿最新的
 
             if (lastMessageId) {
-                // 如果已经加载过一部分，就找比最后一条消息更早的
+                // 如果已经加载过一部分，就找比最后一条消息ID更小的（即更早的）
                 query = query.lt('id', lastMessageId);
             }
 
             const { data, error } = await query.limit(PAGE_SIZE);
 
             if (!error && data) {
-                // 因为是倒序查出来的，需要反转数组变回正序显示
+                // 核心修复：反转数组，确保消息按时间正序排列（旧的在上面）
                 data.reverse();
                 
                 if (data.length > 0) {
                     lastMessageId = data[0].id; // 更新最后一条消息ID作为分页标记
                     const chatBox = document.getElementById('chat-box');
-                    // 将新加载的消息插入到最前面（因为是历史消息）
-                    data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at));
-                } else {
-                    // 如果没数据了，说明到底了
-                    console.log("已到达最早消息");
+                    
+                    // 如果是第一次加载（即没有 lastMessageId），直接渲染
+                    if (!localStorage.getItem('chat_auth_token') || !lastMessageId) {
+                        data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at));
+                    } else {
+                        // 如果是上拉加载，将新消息插入到当前内容的最前面
+                        const currentHtml = chatBox.innerHTML;
+                        let newHtml = "";
+                        data.forEach(msg => {
+                            newHtml += `<div class="msg-wrapper ${msg.sender === mySender ? 'right' : 'left'}">
+                                        <div class="msg-content">
+                                            ${msg.sender !== mySender ? `<span class="sender-name">${msg.sender}</span>` : ''}
+                                            <div style="white-space: pre-wrap; word-break: break-word;">${msg.content}</div>
+                                            <span class="msg-time">${new Date(msg.created_at).getHours().toString().padStart(2, '0') + ":" + new Date(msg.created_at).getMinutes().toString().padStart(2, '0')}</span>
+                                        </div>
+                                      </div>`;
+                        });
+                        chatBox.innerHTML = newHtml + currentHtml;
+                    }
                 }
             }
         } catch (e) { console.error(e); }
