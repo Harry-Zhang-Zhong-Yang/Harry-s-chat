@@ -8,9 +8,8 @@
     <style>
         :root {
             --btn-color: #07c475; 
-            --bubble-color: #95ec69; 
+            --bubble-me: #dcf8c6; 
             --bg-gray: #f5f5f5;
-            --msg-others: #ffffff;
             --text-main: #333333;
         }
 
@@ -33,8 +32,10 @@
         #main-app { display: none; flex-direction: column; height: 100vh; width: 100%; max-width: 800px; margin: 0 auto; background: white; position: relative; border-left: 1px solid #eee; border-right: 1px solid #eee; }
 
         /* --- 顶部导航栏 --- */
-        #top-nav { height: 60px; background: #f9f9f9; border-bottom: 1px solid #eee; display: flex; align-items: center; padding: 0 15px; justify-content: space-between; }
+        #top-nav { height: 60px; background: #f9f9f9; border-bottom: 1px solid #eee; display: flex; align-items: center; padding: 0 15px; }
+        #back-btn { display: none; cursor: pointer; font-size: 24px; margin-right: 10px; } /* 默认隐藏，进入房间才显示 */
         #room-title { font-weight: bold; font-size: 18px; color: #333; flex: 1; text-align: center; }
+        #nav-right-icons { display: flex; align-items: center; gap: 15px; }
 
         /* --- 视图容器 --- */
         .view-container { flex: 1; overflow-y: auto; position: relative; background: white; }
@@ -48,41 +49,41 @@
         .contact-info .last-msg { color: #999; font-size: 13px; }
 
         /* --- 聊天界面样式 --- */
-        #chat-box { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 15px; background-color: #f3f3f3; overflow-y: auto; }
+        #chat-box { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 15px; background-color: #ffffff; overflow-y: auto; }
         .msg-wrapper { max-width: 80%; position: relative; animation: msgIn 0.2s ease-out; }
         @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .left { align-self: flex-start; }
         .right { align-self: flex-end; text-align: right; }
         .msg-content { padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; word-break: break-word; position: relative; }
         .left .msg-content { background: white; color: #333; border: 1px solid #e0e0e0; border-radius: 8px 8px 8px 2px; }
-        .right .msg-content { background: var(--bubble-color); color: #000; border-radius: 8px 8px 2px 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .right .msg-content { background: var(--bubble-me); color: #000; border-radius: 8px 8px 2px 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
         .sender-name { font-size: 12px; margin-bottom: 4px; display: block; color: #666; }
         .msg-time { font-size: 10px; color: #999; margin-top: 4px; display: block; }
 
-        /* --- 输入区域 (彻底修复电脑端布局) --- */
+        /* --- 输入区域 (对标第二张图风格) --- */
         #input-area { padding: 15px; background: white; border-top: 1px solid #eee; }
         .input-wrapper { 
             display: flex; 
             align-items: center; 
-            gap: 10px; 
-            height: 48px; /* 固定高度 */
-            max-width: 100%;
+            gap: 8px; 
+            height: 46px; 
+            background: white;
         }
         #message-input { 
-            flex: 1; /* 让输入框占据所有剩余空间 */
-            padding: 0 15px; 
+            flex: 1; 
+            padding: 0 20px; 
             border: 1px solid #ddd; 
-            border-radius: 24px; 
+            border-radius: 23px; /* 圆角胶囊 */
             outline: none; 
             font-size: 16px;
         }
         #send-btn { 
-            flex: 0 0 auto; /* 禁止按钮伸缩 */
-            width: 80px;    /* 固定按钮宽度 */
+            flex: 0 0 auto; 
+            width: 85px;    /* 固定宽度 */
             background: var(--btn-color); 
             color: white; 
             border: none; 
-            border-radius: 24px; 
+            border-radius: 23px; /* 圆角胶囊 */
             font-weight: bold; 
             height: 40px; 
             display: flex; 
@@ -96,22 +97,11 @@
         .nav-item { text-align: center; font-size: 12px; color: #999; cursor: pointer; }
         .nav-item.active { color: var(--btn-color); }
 
-        /* --- 弹窗样式 (彻底修复×号) --- */
-        .modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
-            align-items: center; justify-content: center; z-index: 5000; backdrop-filter: blur(2px);
-        }
-        .modal-content { 
-            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; 
-            position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-        }
-        /* ×号绝对定位到右上角 */
-        .close-x { 
-            position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; 
-            color: #999; border: none; background: none; line-height: 1; padding: 0; z-index: 10;
-        }
+        /* --- 弹窗样式 --- */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 5000; backdrop-filter: blur(2px); }
+        .modal-content { background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .close-x { position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; color: #999; border: none; background: none; line-height: 1; padding: 0; z-index: 10; }
 
-        /* 隐藏元素 */
         .hidden { display: none !important; }
     </style>
 </head>
@@ -129,10 +119,9 @@
 <!-- 主应用 -->
 <div id="main-app">
     <div id="top-nav">
-        <span id="back-btn" style="cursor:pointer; font-size: 24px;" onclick="goBack()">←</span>
+        <span id="back-btn" onclick="goBack()">←</span>
         <span id="room-title">消息</span>
-        <div id="nav-right-icons" style="display: flex; align-items: center; gap: 15px;">
-            <!-- 创建按钮：仅在联系人列表显示 -->
+        <div id="nav-right-icons">
             <span id="add-room-btn" style="font-size: 24px; cursor:pointer;" onclick="showCreateRoomModal()">➕</span>
             <span style="font-size: 20px; cursor:pointer;" onclick="toggleSettings()">⚙️</span>
         </div>
@@ -146,6 +135,7 @@
     <!-- 聊天窗口视图 -->
     <div id="view-chat" class="view-container hidden">
         <div id="chat-box"></div>
+        <!-- 输入区域在底部，且包含消息列表内容 -->
         <div id="input-area">
             <div class="input-wrapper">
                 <input type="text" id="message-input" placeholder="输入消息...">
@@ -181,6 +171,7 @@
             <button onclick="updateRoomName()">保存更改</button>
         </div>
     </div>
+</div>
 
 <script>
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
@@ -192,7 +183,6 @@
     let currentRoomId = null;
     let roomSubscription = null;
 
-    // --- 认证逻辑：持久化登录 ---
     async function handleAuth() {
         const usernameInput = document.getElementById('reg-username').value.trim();
         if (!usernameInput) return alert("请输入用户名");
@@ -228,7 +218,6 @@
         }
     };
 
-    // --- 房间逻辑 ---
     async function loadRooms() {
         const { data: rooms } = await supabaseClient.from('rooms').select('*');
         const list = document.getElementById('contact-list');
@@ -274,7 +263,6 @@
         initRealtime();
     }
 
-    // --- 消息逻辑 (修复 undefined 问题) ---
     async function loadHistory() {
         const chatBox = document.getElementById('chat-box');
         chatBox.innerHTML = "";
@@ -300,7 +288,6 @@
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, 
             (payload) => {
                 const msg = payload.new;
-                // 由于实时订阅不带 Join，这里先显示内容。若需名字可在此处发起一次查询。
                 appendMessageToUI("系统", msg.content); 
             })
             .subscribe();
@@ -334,22 +321,22 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // --- UI 辅助逻辑 (彻底解决排版问题) ---
     function switchView(view) {
         const contactView = document.getElementById('view-contacts');
         const chatView = document.getElementById('view-chat');
         const addBtn = document.getElementById('add-room-btn');
+        const backBtn = document.getElementById('back-btn');
 
         if (view === 'contacts') {
             contactView.classList.remove('hidden');
             chatView.classList.add('hidden');
-            // 只有在联系人列表页才显示“创建房间”按钮
             addBtn.style.display = 'block'; 
+            backBtn.style.display = 'none'; // 列表页隐藏箭头
         } else {
             contactView.classList.add('hidden');
             chatView.classList.remove('hidden');
-            // 在聊天详情页隐藏“创建房间”按钮，只保留设置图标
             addBtn.style.display = 'none'; 
+            backBtn.style.display = 'block'; // 进入房间显示箭头
         }
 
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
@@ -373,10 +360,9 @@
         hideModal('settings-modal');
     }
 
-    // 监听回车发送
     document.getElementById('message-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
     });
 </script>
-</body
+</body>
 </html>
