@@ -3,98 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>极简高级聊天室</title>
+    <title>微信极简版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --btn-color: #0084ff; 
-            --bubble-color: #0084ff; 
-            --bg-color: #f0f2f5; 
-            --msg-others: #ffffff;
-            --text-main: #333333;
+            --primary-color: #07c475;
+            --bg-gray: #f5f5f5;
+            --msg-self: #95ec69;
+            --msg-other: #ffffff;
+            --nav-bg: #f7f7f7;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: var(--bg-color); 
-            height: 100vh; width: 100vw;
-            display: flex; flex-direction: column; overflow: hidden;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-gray); height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; }
 
-        /* --- 登录区域 --- */
-        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+        /* --- 登录界面 --- */
+        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 3000; padding: 20px; }
         .login-box { width: 100%; max-width: 400px; padding: 40px; border: 1px solid #eee; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
         .login-box h2 { margin-bottom: 30px; text-align: center; color: #333; }
         input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; }
-        button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; }
+        button { width: 100%; padding: 14px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; }
 
-        /* --- 主应用容器 --- */
-        #main-app { display: none; flex-direction: column; height: 100vh; width: 100vw; background: white; position: relative; }
+        /* --- 主应用布局 --- */
+        #main-app { display: none; flex-direction: column; height: 100vh; width: 100%; max-width: 600px; margin: 0 auto; background: white; position: relative; }
 
-        /* --- 通用导航栏 --- */
-        #top-nav { 
-            height: 60px; background: #f9f9f9; border-bottom: 1px solid #eee; 
-            display: flex; align-items: center; padding: 0 15px; justify-content: space-between; z-index: 100;
-        }
+        /* --- 顶部导航栏 --- */
+        #top-nav { height: 55px; background: #f7f7f7; border-bottom: 1px solid #ddd; display: flex; align-items: center; padding: 0 15px; justify-content: space-between; }
         #room-title { font-weight: bold; font-size: 18px; color: #333; flex: 1; text-align: center; }
 
         /* --- 视图容器 --- */
-        .view-container { flex: 1; overflow-y: auto; position: relative; }
+        .view-container { flex: 1; overflow-y: auto; position: relative; background: white; }
         .hidden { display: none !important; }
 
         /* --- 联系人列表样式 --- */
-        .contact-item { 
-            display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer;
-        }
+        #contact-list { padding: 10px; }
+        .contact-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
         .avatar { width: 48px; height: 48px; background: #ddd; border-radius: 50%; margin-right: 15px; }
         .contact-info .name { display: block; font-weight: bold; font-size: 16px; }
         .contact-info .last-msg { color: #999; font-size: 13px; }
 
         /* --- 聊天界面样式 --- */
-        #chat-box { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 12px; background-color: #f5f5f5; overflow-y: auto; }
-        .msg-wrapper { max-width: 80%; position: relative; animation: msgIn 0.3s ease-out; }
+        #chat-box { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 15px; background-color: #f3f3f3; overflow-y: auto; }
+        .msg-wrapper { max-width: 80%; position: relative; animation: msgIn 0.2s ease-out; }
         @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .left { align-self: flex-start; }
         .right { align-self: flex-end; text-align: right; }
-        .msg-content { padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; position: relative; }
-        .left .msg-content { background: white; color: #333; border: 1px solid #e0e0e0; border-bottom-left-radius: 4px; }
-        .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; }
-        .sender-name { font-size: 12px; margin-bottom: 4px; display: block; opacity: 0.8; }
-        .msg-time { font-size: 10px; margin-top: 6px; display: block; opacity: 0.5; }
+        .msg-content { padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; word-break: break-word; position: relative; }
+        .left .msg-content { background: white; color: #333; border: 1px solid #e0e0e0; border-radius: 8px 8px 8px 2px; }
+        .right .msg-content { background: var(--msg-self); color: #000; border-radius: 8px 8px 2px 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .sender-name { font-size: 12px; margin-bottom: 4px; display: block; color: #666; }
+        .msg-time { font-size: 10px; color: #999; margin-top: 4px; display: block; }
 
-        /* --- 输入区域 --- */
-        #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
-        .input-wrapper { display: flex; align-items: center; gap: 10px; }
-        #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; }
-        #send-btn { background: var(--btn-color); color: white; padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; height: 45px; }
+        /* --- 输入区域 (微信风格) --- */
+        #input-area { padding: 10px 15px; background: white; border-top: 1px solid #eee; }
+        .input-wrapper { display: flex; align-items: center; gap: 10px; height: 48px; }
+        #message-input { flex: 1; padding: 0 15px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; }
+        #send-btn { background: var(--primary-color); color: white; padding: 0 20px; border: none; border-radius: 24px; font-weight: bold; height: 40px; display: flex; align-items: center; justify-content: center; }
 
         /* --- 底部导航栏 --- */
-        #bottom-nav { 
-            height: 65px; background: white; border-top: 1px solid #eee; 
-            display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom);
-        }
+        #bottom-nav { height: 65px; background: white; border-top: 1px solid #eee; display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); }
         .nav-item { text-align: center; font-size: 12px; color: #999; cursor: pointer; }
-        .nav-item.active { color: var(--btn-color); }
+        .nav-item.active { color: var(--primary-color); }
 
-        /* --- 弹窗样式优化 --- */
+        /* --- 弹窗样式 (彻底修复×号) --- */
         .modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
-            align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none;
+            align-items: center; justify-content: center; z-index: 5000; backdrop-filter: blur(2px);
         }
         .modal-content { 
             background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; 
             position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
         }
-        /* 绝对定位到右上角 */
         .close-x { 
             position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; 
-            color: #999; border: none; background: none; line-height: 1; padding: 0;
+            color: #999; border: none; background: none; line-height: 1; padding: 0; z-index: 10;
         }
+
+        /* 隐藏元素 */
+        .hidden { display: none !important; }
     </style>
 </head>
 <body id="app-body">
 
+<!-- 登录界面 -->
 <div id="login-area">
     <div class="login-box">
         <h2>欢迎进入</h2>
@@ -103,8 +94,8 @@
     </div>
 </div>
 
+<!-- 主应用 -->
 <div id="main-app">
-    <!-- 顶部导航 -->
     <div id="top-nav">
         <span id="back-btn" style="cursor:pointer; font-size: 24px;" onclick="goBack()">←</span>
         <span id="room-title">消息</span>
@@ -170,7 +161,7 @@
     let currentRoomId = null;
     let roomSubscription = null;
 
-    // --- 认证逻辑 ---
+    // --- 核心逻辑：持久化登录 ---
     async function handleAuth() {
         const usernameInput = document.getElementById('reg-username').value.trim();
         if (!usernameInput) return alert("请输入用户名");
@@ -184,6 +175,10 @@
             if (error) throw error;
 
             currentUser = { id: data[0].id, username: data[0].username };
+            
+            // 将用户信息存入本地缓存，实现下次打开自动登录
+            localStorage.setItem('chat_user', JSON.stringify(currentUser));
+
             document.getElementById('login-area').style.display = 'none';
             document.getElementById('main-app').style.display = 'flex';
             loadRooms();
@@ -193,6 +188,17 @@
             else alert("操作失败，请检查数据库权限或网络连接。");
         }
     }
+
+    // 页面加载时自动读取缓存登录状态
+    window.onload = () => {
+        const savedUser = localStorage.getItem('chat_user');
+        if (savedUser) {
+            currentUser = JSON.parse(savedUser);
+            document.getElementById('login-area').style.display = 'none';
+            document.getElementById('main-app').style.display = 'flex';
+            loadRooms();
+        }
+    };
 
     // --- 房间逻辑 ---
     async function loadRooms() {
@@ -284,7 +290,7 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // --- UI 辅助逻辑 (核心修复点) ---
+    // --- UI 辅助逻辑 (彻底解决你的排版问题) ---
     function switchView(view) {
         const contactView = document.getElementById('view-contacts');
         const chatView = document.getElementById('view-chat');
@@ -293,12 +299,12 @@
         if (view === 'contacts') {
             contactView.classList.remove('hidden');
             chatView.classList.add('hidden');
-            // 在联系人列表显示“创建房间”按钮
+            // 只有在消息列表页才显示“创建房间”按钮
             addBtn.style.display = 'block'; 
         } else {
             contactView.classList.add('hidden');
             chatView.classList.remove('hidden');
-            // 在聊天界面隐藏“创建房间”按钮，只保留设置图标
+            // 在聊天详情页隐藏“创建房间”按钮，只保留设置图标
             addBtn.style.display = 'none'; 
         }
 
