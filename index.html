@@ -28,17 +28,34 @@
         input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; }
         button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; }
 
-        /* --- 主应用容器 --- */
-        #main-app { display: none; flex-direction: column; height: 100vh; width: 100%; max-width: 800px; margin: 0 auto; background: white; position: relative; border-left: 1px solid #eee; border-right: 1px solid #eee; }
+        /* --- 主应用容器 (电脑端优化) --- */
+        #main-app { 
+            display: none; 
+            flex-direction: column; 
+            height: 100vh; 
+            width: 100%; 
+            max-width: 900px; /* 限制电脑端最大宽度 */
+            margin: 0 auto; 
+            background: white; 
+            position: relative; 
+            border-left: 1px solid #eee; 
+            border-right: 1px solid #eee; 
+        }
 
         /* --- 顶部导航栏 --- */
         #top-nav { height: 60px; background: #f9f9f9; border-bottom: 1px solid #eee; display: flex; align-items: center; padding: 0 15px; }
-        #back-btn { display: none; cursor: pointer; font-size: 24px; margin-right: 10px; } /* 默认隐藏，进入房间才显示 */
+        #back-btn { display: none; cursor: pointer; font-size: 24px; margin-right: 10px; } 
         #room-title { font-weight: bold; font-size: 18px; color: #333; flex: 1; text-align: center; }
         #nav-right-icons { display: flex; align-items: center; gap: 15px; }
 
-        /* --- 视图容器 --- */
-        .view-container { flex: 1; overflow-y: auto; position: relative; background: white; }
+        /* --- 视图容器 (核心修复：flex: 1 确保占据上方空间) --- */
+        .view-container { 
+            flex: 1; /* 这行保证了聊天内容区域会撑开，把输入框挤到最下面 */
+            overflow-y: auto; 
+            position: relative; 
+            background: white; 
+            padding: 20px;
+        }
         .hidden { display: none !important; }
 
         /* --- 联系人列表样式 --- */
@@ -49,7 +66,13 @@
         .contact-info .last-msg { color: #999; font-size: 13px; }
 
         /* --- 聊天界面样式 --- */
-        #chat-box { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 15px; background-color: #ffffff; overflow-y: auto; }
+        #chat-box { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            background-color: #ffffff; 
+            padding: 10px; /* 稍微减小内边距让内容更充实 */
+        }
         .msg-wrapper { max-width: 80%; position: relative; animation: msgIn 0.2s ease-out; }
         @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .left { align-self: flex-start; }
@@ -60,7 +83,7 @@
         .sender-name { font-size: 12px; margin-bottom: 4px; display: block; color: #666; }
         .msg-time { font-size: 10px; color: #999; margin-top: 4px; display: block; }
 
-        /* --- 输入区域 (对标第二张图风格) --- */
+        /* --- 输入区域 (固定在底部) --- */
         #input-area { padding: 15px; background: white; border-top: 1px solid #eee; }
         .input-wrapper { 
             display: flex; 
@@ -135,7 +158,7 @@
     <!-- 聊天窗口视图 -->
     <div id="view-chat" class="view-container hidden">
         <div id="chat-box"></div>
-        <!-- 输入区域在底部，且包含消息列表内容 -->
+        <!-- 输入区域在最底部，且独立于消息列表容器外（或作为其兄弟节点） -->
         <div id="input-area">
             <div class="input-wrapper">
                 <input type="text" id="message-input" placeholder="输入消息...">
