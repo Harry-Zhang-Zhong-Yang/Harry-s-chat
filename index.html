@@ -12,7 +12,6 @@
             --bg-color: #f0f2f5; 
             --msg-others: #ffffff;
             --text-main: #333333;
-            --chat-bg: url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80'); 
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -44,16 +43,13 @@
         button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: opacity 0.2s; }
         button:active { opacity: 0.8; }
 
-        /* 免登录勾选框样式 */
-        .remember-me { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; color: #666; cursor: pointer; }
-        .remember-me input { width: auto; margin: 0; }
-
         /* --- 聊天主容器 --- */
         #chat-container { 
             display: flex; flex-direction: column; max-width: 900px; margin: 0 auto; 
             width: 100%; height: 100vh; background: white; position: relative;
         }
 
+        /* 导航栏 */
         #nav-bar { 
             height: 65px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
             border-bottom: 1px solid #eee; display: flex; align-items: center; 
@@ -66,17 +62,8 @@
         #chat-box { 
             flex: 1; overflow-y: auto; padding: 20px; display: flex; 
             flex-direction: column; gap: 12px; 
-            background-color: var(--bg-color); 
-            background-image: var(--chat-bg);
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
+            background-color: #f8f9fa; /* 固定浅灰色背景 */
             scroll-behavior: smooth;
-        }
-
-        #chat-box::before {
-            content: ""; position: absolute; inset: 0;
-            background: rgba(255, 255, 255, 0.1); z-index: -1;
         }
 
         /* 消息气泡 */
@@ -102,10 +89,11 @@
             border-radius: 10px; margin-bottom: 5px; display: none; border: 1px solid #ddd;
         }
 
+        /* 输入区域 */
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
         #message-input { width: 100%; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
         #send-btn { background: var(--btn-color); color: white; padding: 8px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin-left: 10px; height: 45px; }
-        #send-btn:disabled { background: #ccc; cursor: not-allowed; }
+        #send-btn:disabled { background: #ccc; }
 
         /* 设置弹窗 */
         #settings-modal {
@@ -124,7 +112,6 @@
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
 
-        .system-msg { text-align: center; font-size: 13px; color: #999; padding: 8px; background: rgba(0,0,0,0.04); border-radius: 10px; margin: 5px 0; }
     </style>
 </head>
 <body id="app-body">
@@ -133,10 +120,9 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 全局房间名称修改（所有人可见）<br>
-            • 支持更换背景图片<br>
-            • 引用文字位置优化至正文下方<br>
-            • 严格的房间代码校验系统
+            • 优化了退出房间逻辑，现在可彻底清除自动登录<br>
+            • 移除了背景图片功能以提升加载速度<br>
+            • 修复了无痕模式下的用户名显示问题
         </p>
         <button onclick="closeUpdateModal()">我知道了</button>
     </div>
@@ -147,9 +133,8 @@
         <h2>进入聊天室</h2>
         <input type="text" id="username" placeholder="输入你的名字" autocomplete="off">
         <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off">
-        <div class="remember-me">
-            <input type="checkbox" id="auto-login-check">
-            <label for="auto-login-check">10天内免登录（自动进入上次房间）</label>
+        <div style="font-size: 13px; color: #888; margin-top: -5px; margin-bottom: 10px;">
+            <input type="checkbox" id="auto-login-check" style="width: auto; margin-right: 5px;"> 10天内免登录（自动进入上次房间）
         </div>
         <button onclick="joinRoom()">开始聊天</button>
     </div>
@@ -170,31 +155,26 @@
             <input type="text" id="message-input" placeholder="输入消息并按回车..." autocomplete="off">
             <button id="send-btn" onclick="sendMessage()">发送</button>
         </div>
-    </div>
 
-    <!-- 设置弹窗 -->
-    <div id="settings-modal" onclick="toggleSettings(event)">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <button class="close-settings" onclick="toggleSettings()">&times;</button>
-            <h3 style="margin-bottom:20px; text-align:center;">个性化设置</h3>
-            
-            <div class="setting-item">
-                <label>修改当前房间名称</label>
-                <input type="text" id="custom-room-name" placeholder="输入新名字...">
-                <button style="padding:8px; font-size:14px;" onclick="updateRoomName()">确认更改</button>
+        <!-- 设置弹窗 -->
+        <div id="settings-modal" onclick="toggleSettings(event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <button class="close-settings" onclick="toggleSettings()">&times;</button>
+                <h3 style="margin-bottom:20px; text-align:center;">个性化设置</h3>
+                
+                <div class="setting-item">
+                    <label>修改当前房间名称</label>
+                    <input type="text" id="custom-room-name" placeholder="输入新名字...">
+                    <button style="padding:8px; font-size:14px;" onclick="updateRoomName()">确认更改</button>
+                </div>
+
+                <div class="setting-item">
+                    <label>选择气泡颜色 (仅影响聊天内容)</label>
+                    <input type="color" id="color-selector" value="#0084ff">
+                </div>
+
+                <button onclick="saveSettings()" style="margin-top:20px;">保存并应用</button>
             </div>
-
-            <div class="setting-item">
-                <label>选择气泡颜色 (仅影响聊天内容)</label>
-                <input type="color" id="color-selector" value="#0084ff">
-            </div>
-
-            <div class="setting-item">
-                <label>更换背景图片 (输入URL地址)</label>
-                <input type="text" id="bg-url-input" placeholder="https://example.com/image.jpg">
-            </div>
-
-            <button onclick="saveSettings()" style="margin-top:20px;">保存并应用</button>
         </div>
     </div>
 </div>
@@ -213,18 +193,17 @@
     let replyData = null;
     let roomSubscription = null;
 
-    // --- 核心逻辑：自动登录检查 ---
     window.onload = () => {
-        const savedToken = localStorage.getItem('chat_auth_token'); // 存储用户ID/名字
-        const savedRoom = localStorage.getItem('chat_last_room');     // 存储上次房间代码
-        const expiry = localStorage.getItem('chat_auth_expiry');         // 存储过期时间戳
+        const savedToken = localStorage.getItem('chat_auth_token');
+        const savedRoom = localStorage.getItem('chat_last_room');
+        const expiry = localStorage.getItem('chat_auth_expiry');
 
+        // 自动登录逻辑：只有当所有数据都存在且未过期时才进入
         if (savedToken && savedRoom && expiry) {
             const now = new Date().getTime();
             if (now < parseInt(expiry)) {
-                // 在10天内，直接进入上次房间
                 currentRoomCode = savedRoom;
-                mySender = savedToken; // 使用之前保存的名字作为ID
+                mySender = savedToken; 
                 document.getElementById('login-area').style.display = 'none';
                 document.getElementById('chat-container').style.display = 'flex';
                 document.getElementById('room-title').innerText = currentRoomCode;
@@ -235,23 +214,18 @@
                 loadHistory();
                 initRealtime();
             } else {
-                // 过期了，清除数据让用户重新登录
-                localStorage.clear();
+                // 过期或数据异常，清除并重置
+                localStorage.removeItem('chat_auth_token');
+                localStorage.removeItem('chat_last_room');
+                localStorage.removeItem('chat_auth_expiry');
                 location.reload();
             }
         }
 
-        // 加载本地主题设置
         const savedColor = localStorage.getItem('chat_theme_color');
         if (savedColor) {
             document.documentElement.style.setProperty('--bubble-color', savedColor);
             document.getElementById('color-selector').value = savedColor;
-        }
-
-        const savedBg = localStorage.getItem('chat_bg_url');
-        if (savedBg) {
-            document.documentElement.style.setProperty('--chat-bg', `url('${savedBg}')`);
-            document.getElementById('bg-url-input').value = savedBg;
         }
 
         const hasSeenUpdate = localStorage.getItem('has_seen_update');
@@ -271,9 +245,9 @@
 
         if (!nameInput || !currentRoomCode) return alert("请输入名字和房间代码");
 
-        // 如果勾选了免登录
+        // 如果勾选了免登录，则存入本地
         if (isAutoLogin) {
-            const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000); // 10天后的时间戳
+            const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000); // 10天后过期
             localStorage.setItem('chat_auth_token', nameInput);
             localStorage.setItem('chat_last_room', currentRoomCode);
             localStorage.setItem('chat_auth_expiry', expiryTime.toString());
@@ -298,13 +272,11 @@
             .single();
 
         if (error || !room) {
-            const { error: insertError } = await supabaseClient
+            await supabaseClient
                 .from('rooms')
                 .insert([{ room_code: currentRoomCode, room_name: currentRoomCode }]);
-            if (insertError) console.error("创建房间失败:", insertError);
         } else {
             document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
-            document.documentElement.style.setProperty('--chat-bg', `url('${room.bg_url || ""}')`);
         }
     }
 
@@ -342,179 +314,10 @@
             }, (payload) => {
                 const room = payload.new;
                 document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
-                document.documentElement.style.setProperty('--chat-bg', `url('${room.bg_url || ""}')`);
             })
             .subscribe();
     }
 
     async function sendMessage() {
         const inputEl = document.getElementById('message-input');
-        let content = inputEl.value.trim();
-        if (!content) return;
-
-        let finalContent = content;
-        if (replyData) {
-            finalContent = `${content}\n\n[回复: ${replyData.content}]`;
-        }
-
-        const btn = document.getElementById('send-btn');
-        btn.innerText = "发送中...";
-        btn.disabled = true;
-
-        try {
-            const { error } = await supabaseClient
-                .from('messages')
-                .insert([{ 
-                    room_code: currentRoomCode, 
-                    content: finalContent, 
-                    sender: mySender,
-                    created_at: new Date().toISOString()
-                }]);
-
-            if (error) {
-                console.error("发送失败:", error);
-                alert("消息发送失败，请检查网络或权限。");
-            } else {
-                inputEl.value = ""; 
-                cancelReply();
-            }
-        } catch (e) { console.error(e); }
-        finally {
-            btn.innerText = "发送";
-            btn.disabled = false;
-        }
-    }
-
-    function appendMessageToUI(sender, content, isNew) {
-        const chatBox = document.getElementById('chat-box');
-        const wrapper = document.createElement('div');
-        wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
-
-        const now = new Date();
-        const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-
-        let displayContent = content;
-        let replyTagHtml = "";
-
-        if (content.includes("[回复:")) {
-            const parts = content.split("\n\n");
-            displayContent = parts[0] || content; 
-            const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
-            replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${rawReply}</div>`;
-        }
-
-        wrapper.innerHTML = `
-            <div class="msg-content">
-                ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
-                <div style="white-space: pre-wrap; word-break: break-word;">${displayContent}</div>
-                ${replyTagHtml}
-                <span class="msg-time">${timeStr}</span>
-            </div>
-        `;
-
-        chatBox.appendChild(wrapper);
-        setTimeout(() => {
-            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
-        }, 50);
-    }
-
-    const chatBox = document.getElementById('chat-box');
-    let pressTimer;
-
-    function handleLongPress(element) {
-        const contentEl = element.querySelector('.msg-content');
-        if (!contentEl) return;
-        const content = contentEl.innerText;
-        replyData = { content };
-        const preview = document.getElementById('reply-preview');
-        preview.style.display = 'flex';
-        preview.innerHTML = `正在回复：${content} <span style="cursor:pointer; color:#07c475;" onclick="cancelReply()">✕</span>`;
-    }
-
-    function cancelReply() {
-        replyData = null;
-        document.getElementById('reply-preview').style.display = 'none';
-    }
-
-    chatBox.addEventListener('touchstart', (e) => {
-        const target = e.target.closest('.msg-wrapper');
-        if (target && !target.classList.contains('system-msg')) {
-            pressTimer = setTimeout(() => handleLongPress(target), 500);
-        }
-    }, {passive: true});
-
-    chatBox.addEventListener('touchend', () => clearTimeout(pressTimer));
-
-    chatBox.addEventListener('contextmenu', (e) => {
-        const target = e.target.closest('.msg-wrapper');
-        if (target && !target.classList.contains('system-msg')) {
-            e.preventDefault(); 
-            handleLongPress(target);
-        }
-    });
-
-    function toggleSettings(e) {
-        const modal = document.getElementById('settings-modal');
-        if (e) return; 
-        modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
-    }
-
-    async function updateRoomName() {
-        const newName = document.getElementById('custom-room-name').value.trim();
-        if (!newName) return alert("请输入新名字");
-        
-        try {
-            const { error } = await supabaseClient
-                .from('rooms')
-                .update({ room_name: newName })
-                .eq('room_code', currentRoomCode);
-
-            if (error) throw error;
-            alert("名称已更新，所有人可见");
-        } catch (e) {
-            console.error(e);
-            alert("修改失败，请确保数据库权限已正确开启。");
-        }
-    }
-
-    function saveSettings() {
-        const color = document.getElementById('color-selector').value;
-        document.documentElement.style.setProperty('--bubble-color', color);
-        localStorage.setItem('chat_theme_color', color);
-
-        const bgUrl = document.getElementById('bg-url-input').value;
-        if (bgUrl) {
-            supabaseClient.from('rooms').update({ bg_url: bgUrl }).eq('room_code', currentRoomCode);
-            document.documentElement.style.setProperty('--chat-bg', `url('${bgUrl}')`);
-            localStorage.setItem('chat_bg_url', bgUrl);
-        } else {
-            document.documentElement.style.setProperty('--chat-bg', 'none');
-            localStorage.removeItem('chat_bg_url');
-        }
-
-        toggleSettings();
-    }
-
-    function leaveRoom() {
-        if(confirm("确定要退出当前房间吗？")) {
-            currentRoomCode = "";
-            document.getElementById('login-area').style.display = 'flex';
-            document.getElementById('chat-container').style.display = 'none';
-            location.reload(); 
-        }
-    }
-
-    function closeUpdateModal() {
-        document.getElementById('update-modal').style.display = 'none';
-        localStorage.setItem('has_seen_update', 'true');
-    }
-
-    document.getElementById('message-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
-</script>
-</body>
-</html>
+        let content = input
