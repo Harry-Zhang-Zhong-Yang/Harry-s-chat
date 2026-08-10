@@ -95,7 +95,7 @@
 
         /* 输入区域 */
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
-        .input-wrapper { display: flex; align-items: center; gap: 8px; position: relative; }
+        .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
         #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
         
         /* 加号圆圈按钮 */
@@ -103,6 +103,7 @@
             width: 45px; height: 45px; border-radius: 50%; background: #eee; 
             display: flex; align-items: center; justify-content: center; 
             font-size: 24px; cursor: pointer; transition: all 0.2s; border: none;
+            flex-shrink: 0; /* 防止被压缩 */
         }
         #add-btn:active { transform: scale(0.9); background: #ddd; }
 
@@ -130,19 +131,20 @@
 </head>
 <body id="app-body">
 
+<!-- 更新公告 -->
 <div id="update-modal" onclick="window.closeUpdateModal()">
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 新增图片发送功能（支持手机相册/相机）<br>
-            • 优化了图片自动压缩逻辑，确保大图也能成功发出<br>
-            • UI重构：采用更符合直觉的加号图标布局<br>
-            • 时间戳修复：消息现在显示真实的数据库发送时间
+            • 支持手机端图片发送（自动压缩画质）<br>
+            • UI重构：加号按钮与输入框完美对齐<br>
+            • 修复了时间戳显示问题，现在消息显示真实发送时刻
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
 </div>
 
+<!-- 登录区域 -->
 <div id="login-area">
     <div class="login-box">
         <h2>进入聊天室</h2>
@@ -156,6 +158,7 @@
     </div>
 </div>
 
+<!-- 聊天主容器 -->
 <div id="chat-container" style="display:none;">
     <div id="nav-bar">
         <span id="back-btn" onclick="window.leaveRoom()">←</span>
@@ -181,18 +184,15 @@
             <div class="modal-content" onclick="event.stopPropagation()">
                 <button class="close-settings" onclick="window.toggleSettings()">&times;</button>
                 <h3 style="margin-bottom:20px; text-align:center;">个性化设置</h3>
-                
                 <div class="setting-item">
                     <label>修改当前房间名称</label>
                     <input type="text" id="custom-room-name" placeholder="输入新名字...">
                     <button style="padding:8px; font-size:14px;" onclick="window.updateRoomName()">确认更改</button>
                 </div>
-
                 <div class="setting-item">
                     <label>选择气泡颜色 (仅影响聊天内容)</label>
                     <input type="color" id="color-selector" value="#0084ff">
                 </div>
-
                 <button onclick="window.saveSettings()" style="margin-top:20px;">保存并应用</button>
             </div>
         </div>
@@ -200,6 +200,9 @@
 </div>
 
 <script>
+    // 版本控制：每次更新代码时，手动修改此数字即可触发公告
+    const APP_VERSION = "1.0.3"; 
+    
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -212,7 +215,7 @@
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
-    let pendingImage = null; // 用于暂存压缩后的图片Base64
+    let pendingImage = null;
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -227,9 +230,7 @@
                 document.getElementById('login-area').style.display = 'none';
                 document.getElementById('chat-container').style.display = 'flex';
                 document.getElementById('room-title').innerText = currentRoomCode;
-                
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
-
                 ensureRoomExists();
                 loadHistory();
                 initRealtime();
@@ -245,10 +246,11 @@
             document.getElementById('color-selector').value = savedColor;
         }
 
-        // 修复公告显示问题：如果没看到过更新，就显示。每次代码变动手动修改版本号或清除本地缓存即可触发。
-        const hasSeenUpdate = localStorage.getItem('has_seen_update');
-        if (!hasSeenUpdate) {
+        // 强制公告逻辑：如果版本号不匹配，显示弹窗
+        const lastVersion = localStorage.getItem('app_version');
+        if (lastVersion !== APP_VERSION) {
             document.getElementById('update-modal').style.display = 'flex';
+            localStorage.setItem('app_version', APP_VERSION);
         }
     };
 
@@ -263,7 +265,6 @@
 
         if (!nameInput || !currentRoomCode) return alert("请输入名字和房间代码");
 
-        // 核心：只要输入了名字就持久化到本地
         localStorage.setItem('chat_auth_token', nameInput);
         mySender = nameInput; 
 
@@ -276,7 +277,6 @@
         document.getElementById('login-area').style.display = 'none';
         document.getElementById('chat-container').style.display = 'flex';
         document.getElementById('room-title').innerText = currentRoomCode; 
-        
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
         await ensureRoomExists();
@@ -338,9 +338,6 @@
             .subscribe();
     }
 
-    /**
-     * 图片处理逻辑：包含自动压缩功能
-     */
     window.triggerImageUpload = function() {
         document.getElementById('file-input').click();
     };
@@ -349,9 +346,8 @@
         const file = event.target.files[0];
         if (!file) return;
 
-        // 限制文件大小（例如超过10MB提示）
-        if (file.size > 10 * 1024 * 1024) {
-            alert("图片太大啦！请选择小于10MB的图片。");
+        if (file.size > 15 * 1024 * 1024) { // 限制15MB
+            alert("图片太大啦！请选择小于15MB的图片。");
             return;
         }
 
@@ -360,12 +356,11 @@
             const img = new Image();
             img.src = e.target.result;
             img.onload = function() {
-                // 创建 Canvas 进行压缩
+                // 自动压缩逻辑：确保图片宽度不超过800px，并降低质量到0.7
                 const canvas = document.createElement('canvas');
                 let width = img.width;
                 let height = img.height;
 
-                // 如果图片宽度超过 800px，则按比例缩小
                 if (width > 800) {
                     const ratio = 800 / width;
                     width *= ratio;
@@ -377,9 +372,9 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // 转为 Base64，质量设为 0.7 (平衡清晰度和体积)
                 pendingImage = canvas.toDataURL('image/jpeg', 0.7);
-                document.getElementById('message-input').placeholder = "图片已就绪，点击发送即可";
+                // 选择完图片后直接发送消息
+                window.sendMessage();
             };
         };
         reader.readAsDataURL(file);
@@ -395,15 +390,11 @@
             finalContent = `${content}\n\n[回复: ${replyData.content}]`;
         }
 
-        // 如果有图片，拼接到消息最前面
         let messageToSave = finalContent;
         if (pendingImage) {
             messageToSave = `[IMAGE_DATA:${pendingImage}]\n${finalContent}`;
         }
 
-        const btn = document.getElementById('send-btn'); // 注意：现在按钮被隐藏了，但逻辑保留以防万一
-        // 因为你要求删掉发送按钮，所以我们直接操作 UI 状态
-        
         try {
             const { error } = await supabaseClient
                 .from('messages')
@@ -442,7 +433,6 @@
         let displayContent = content;
         let replyTagHtml = "";
 
-        // 处理图片显示逻辑
         if (content.includes("[IMAGE_DATA:")) {
             const parts = content.split("\n");
             const imgPart = parts[0].replace("[IMAGE_DATA:", "").replace("]", "");
@@ -551,10 +541,8 @@
 
     window.closeUpdateModal = function() {
         document.getElementById('update-modal').style.display = 'none';
-        localStorage.setItem('has_seen_update', 'true');
     };
 
-    // 回车键发送监听
     document.getElementById('message-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
