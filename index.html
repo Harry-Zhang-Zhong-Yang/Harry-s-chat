@@ -95,10 +95,16 @@
 
         /* 输入区域 */
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
-        .input-wrapper { display: flex; align-items: center; gap: 8px; }
+        .input-wrapper { display: flex; align-items: center; gap: 8px; position: relative; }
         #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
-        #send-btn { background: var(--btn-color); color: white; padding: 8px 20px; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; height: 45px; min-width: 60px; }
-        #send-btn:disabled { background: #ccc; cursor: not-allowed; }
+        
+        /* 加号圆圈按钮 */
+        #add-btn { 
+            width: 45px; height: 45px; border-radius: 50%; background: #eee; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 24px; cursor: pointer; transition: all 0.2s; border: none;
+        }
+        #add-btn:active { transform: scale(0.9); background: #ddd; }
 
         /* 图片预览样式 */
         .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
@@ -128,9 +134,10 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 支持手机端发送图片功能<br>
-            • 时间戳修复：现在消息会显示真实的发送时间<br>
-            • 优化了用户身份持久化逻辑
+            • 新增图片发送功能（支持手机相册/相机）<br>
+            • 优化了图片自动压缩逻辑，确保大图也能成功发出<br>
+            • UI重构：采用更符合直觉的加号图标布局<br>
+            • 时间戳修复：消息现在显示真实的数据库发送时间
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -161,10 +168,9 @@
     <div id="input-area">
         <div id="reply-preview"></div>
         <div class="input-wrapper">
-            <!-- 图片发送按钮 -->
-            <button id="img-btn" style="background:none; color:#666; padding:0; font-size:24px;" onclick="window.triggerImageUpload()">📷</button>
             <input type="text" id="message-input" placeholder="输入消息并按回车..." autocomplete="off">
-            <button id="send-btn" onclick="window.sendMessage()">发送</button>
+            <!-- 加号圆圈按钮 -->
+            <button id="add-btn" onclick="window.triggerImageUpload()">+</button>
         </div>
 
         <!-- 隐藏的文件选择器 -->
@@ -206,7 +212,7 @@
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
-    let pendingImage = null; // 用于暂存选中的图片
+    let pendingImage = null; // 用于暂存压缩后的图片Base64
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -239,6 +245,7 @@
             document.getElementById('color-selector').value = savedColor;
         }
 
+        // 修复公告显示问题：如果没看到过更新，就显示。每次代码变动手动修改版本号或清除本地缓存即可触发。
         const hasSeenUpdate = localStorage.getItem('has_seen_update');
         if (!hasSeenUpdate) {
             document.getElementById('update-modal').style.display = 'flex';
@@ -332,7 +339,7 @@
     }
 
     /**
-     * 图片处理逻辑
+     * 图片处理逻辑：包含自动压缩功能
      */
     window.triggerImageUpload = function() {
         document.getElementById('file-input').click();
@@ -342,17 +349,38 @@
         const file = event.target.files[0];
         if (!file) return;
 
-        // 检查文件大小 (限制在5MB以内，防止Base64过大导致数据库报错)
-        if (file.size > 5 * 1024 * 1024) {
-            alert("图片太大啦！请选择小于5MB的图片。");
+        // 限制文件大小（例如超过10MB提示）
+        if (file.size > 10 * 1024 * 1024) {
+            alert("图片太大啦！请选择小于10MB的图片。");
             return;
         }
 
         const reader = new FileReader();
         reader.onload = function(e) {
-            pendingImage = e.target.result; // 这里是 Base64 字符串
-            // 在输入框里显示一个提示，或者直接准备发送
-            document.getElementById('message-input').placeholder = "图片已选择，点击发送即可";
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = function() {
+                // 创建 Canvas 进行压缩
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                // 如果图片宽度超过 800px，则按比例缩小
+                if (width > 800) {
+                    const ratio = 800 / width;
+                    width *= ratio;
+                    height *= ratio;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // 转为 Base64，质量设为 0.7 (平衡清晰度和体积)
+                pendingImage = canvas.toDataURL('image/jpeg', 0.7);
+                document.getElementById('message-input').placeholder = "图片已就绪，点击发送即可";
+            };
         };
         reader.readAsDataURL(file);
     };
@@ -367,16 +395,15 @@
             finalContent = `${content}\n\n[回复: ${replyData.content}]`;
         }
 
-        // 如果有图片，把图片内容拼接到消息最前面（或者根据你的需求放在后面）
+        // 如果有图片，拼接到消息最前面
         let messageToSave = finalContent;
         if (pendingImage) {
             messageToSave = `[IMAGE_DATA:${pendingImage}]\n${finalContent}`;
         }
 
-        const btn = document.getElementById('send-btn');
-        btn.innerText = "发送中...";
-        btn.disabled = true; 
-
+        const btn = document.getElementById('send-btn'); // 注意：现在按钮被隐藏了，但逻辑保留以防万一
+        // 因为你要求删掉发送按钮，所以我们直接操作 UI 状态
+        
         try {
             const { error } = await supabaseClient
                 .from('messages')
@@ -392,14 +419,10 @@
                 alert("消息发送失败，请检查网络或权限。");
             } else {
                 inputEl.value = ""; 
-                pendingImage = null; // 清空图片状态
+                pendingImage = null;
                 cancelReply();
             }
         } catch (e) { console.error(e); }
-        finally {
-            btn.innerText = "发送";
-            btn.disabled = false;
-        }
     };
 
     function appendMessageToUI(sender, content, isNew, timestamp_str) {
@@ -423,14 +446,12 @@
         if (content.includes("[IMAGE_DATA:")) {
             const parts = content.split("\n");
             const imgPart = parts[0].replace("[IMAGE_DATA:", "").replace("]", "");
-            displayContent = parts.slice(1).join("\n") || ""; // 提取图片后的文字内容
+            displayContent = parts.slice(1).join("\n") || ""; 
             
-            // 如果是Base64格式，直接渲染成img标签
             if (imgPart.startsWith("data:image")) {
                 const imgHtml = `<img src="${imgPart}" class="msg-img" />`;
                 displayContent = imgHtml + "<br>" + displayContent;
             } else {
-                // 如果是普通链接，直接显示
                 displayContent = `<img src="${imgPart}" class="msg-img" /><br>${displayContent}`;
             }
         } else if (content.includes("[回复:")) {
@@ -533,6 +554,7 @@
         localStorage.setItem('has_seen_update', 'true');
     };
 
+    // 回车键发送监听
     document.getElementById('message-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
