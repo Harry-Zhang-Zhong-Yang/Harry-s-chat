@@ -7,167 +7,190 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --btn-color: #07c475; 
-            --bubble-me: #dcf8c6; 
-            --bg-gray: #f5f5f5;
+            --btn-color: #0084ff; 
+            --bubble-color: #0084ff; 
+            --bg-color: #f0f2f5; 
+            --msg-others: #ffffff;
             --text-main: #333333;
+            --chat-bg: url('https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80'); 
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: var(--bg-gray); 
+            background-color: var(--bg-color); 
             height: 100vh; width: 100vw;
             display: flex; flex-direction: column; overflow: hidden;
         }
 
+        /* --- 更新公告弹窗 --- */
+        #update-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            display: none; align-items: center; justify-content: center; z-index: 5000;
+            backdrop-filter: blur(4px);
+        }
+        .update-modal-content {
+            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; text-align: center;
+            animation: modalIn 0.3s ease-out;
+        }
+        @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
         /* --- 登录区域 --- */
-        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 3000; padding: 20px; }
+        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
         .login-box { width: 100%; max-width: 400px; padding: 40px; border: 1px solid #eee; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
         .login-box h2 { margin-bottom: 30px; text-align: center; color: #333; }
-        input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; }
-        button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; }
+        input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; transition: all 0.2s; }
+        input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(0,132,255,0.1); }
+        button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: opacity 0.2s; }
+        button:active { opacity: 0.8; }
 
-        /* --- 主应用容器 --- */
-        #main-app { display: none; flex-direction: column; height: 100vh; width: 100%; max-width: 900px; margin: 0 auto; background: white; position: relative; border-left: 1px solid #eee; border-right: 1px solid #eee; }
+        /* --- 聊天主容器 --- */
+        #chat-container { 
+            display: flex; flex-direction: column; max-width: 900px; margin: 0 auto; 
+            width: 100%; height: 100vh; background: white; position: relative;
+        }
 
-        /* --- 顶部导航栏 --- */
-        #top-nav { height: 60px; background: #f9f9f9; border-bottom: 1px solid #eee; display: flex; align-items: center; padding: 0 15px; }
-        #back-btn { display: none; cursor: pointer; font-size: 24px; margin-right: 10px; } 
-        #room-title { font-weight: bold; font-size: 18px; color: #333; flex: 1; text-align: center; }
-        #nav-right-icons { display: flex; align-items: center; gap: 15px; }
+        /* 导航栏 */
+        #nav-bar { 
+            height: 65px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
+            border-bottom: 1px solid #eee; display: flex; align-items: center; 
+            padding: 0 15px; justify-content: space-between; z-index: 10;
+        }
+        #back-btn { font-size: 24px; cursor: pointer; padding: 5px; }
+        #room-title { font-weight: bold; font-size: 17px; color: #333; flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* --- 内容区域 (消息列表) --- */
-        .content-area { flex: 1; overflow-y: auto; background: white; padding: 20px; position: relative; }
-        .hidden { display: none !important; }
+        /* 聊天框 */
+        #chat-box { 
+            flex: 1; overflow-y: auto; padding: 20px; display: flex; 
+            flex-direction: column; gap: 12px; 
+            background-color: var(--bg-color); 
+            background-image: var(--chat-bg);
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            scroll-behavior: smooth;
+        }
 
-        /* --- 联系人列表样式 --- */
-        #contact-list { padding: 10px; }
-        .contact-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
-        .avatar { width: 48px; height: 48px; background: #ddd; border-radius: 50%; margin-right: 15px; }
-        .contact-info .name { display: block; font-weight: bold; font-size: 16px; }
-        .contact-info .last-msg { color: #999; font-size: 13px; }
+        #chat-box::before {
+            content: ""; position: absolute; inset: 0;
+            background: rgba(255, 255, 255, 0.1); z-index: -1;
+        }
 
-        /* --- 聊天界面样式 --- */
-        #chat-box { display: flex; flex-direction: column; gap: 15px; }
-        .msg-wrapper { max-width: 80%; position: relative; animation: msgIn 0.2s ease-out; }
+        /* 消息气泡 */
+        .msg-wrapper { max-width: 85%; position: relative; animation: msgIn 0.3s ease-out; }
         @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
         .left { align-self: flex-start; }
         .right { align-self: flex-end; text-align: right; }
-        .msg-content { padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; word-break: break-word; position: relative; }
-        .left .msg-content { background: white; color: #333; border: 1px solid #e0e0e0; border-radius: 8px 8px 8px 2px; }
-        .right .msg-content { background: var(--bubble-me); color: #000; border-radius: 8px 8px 2px 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .sender-name { font-size: 12px; margin-bottom: 4px; display: block; color: #666; }
-        .msg-time { font-size: 10px; color: #999; margin-top: 4px; display: block; }
 
-        /* --- 输入区域 (独立容器，固定在底部) --- */
-        #input-area { padding: 15px; background: white; border-top: 1px solid #eee; }
-        .input-wrapper { 
-            display: flex; 
-            align-items: center; 
-            gap: 8px; 
-            height: 46px; 
+        .msg-content { 
+            padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; 
+            position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.03);
         }
-        #message-input { 
-            flex: 1; 
-            padding: 0 20px; 
-            border: 1px solid #ddd; 
-            border-radius: 23px; 
-            outline: none; 
-            font-size: 16px;
-        }
-        #send-btn { 
-            flex: 0 0 auto; 
-            width: 85px;    
-            background: var(--btn-color); 
-            color: white; 
-            border: none; 
-            border-radius: 23px; 
-            font-weight: bold; 
-            height: 40px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            cursor: pointer;
+        .left .msg-content { background: var(--msg-others); color: #333; border: 1px solid #eef0f2; border-bottom-left-radius: 4px; }
+        .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+        .sender-name { font-size: 12px; font-weight: bold; margin-bottom: 4px; display: block; opacity: 0.8; }
+        .msg-time { font-size: 10px; margin-top: 6px; display: block; opacity: 0.5; }
+
+        /* 回复预览 */
+        #reply-preview {
+            height: auto; min-height: 40px; display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px; font-size: 13px; color: #666; background: #eef0f2;
+            border-radius: 10px; margin-bottom: 5px; display: none; border: 1px solid #ddd;
         }
 
-        /* --- 底部导航栏 --- */
-        #bottom-nav { height: 65px; background: white; border-top: 1px solid #eee; display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); }
-        .nav-item { text-align: center; font-size: 12px; color: #999; cursor: pointer; }
-        .nav-item.active { color: var(--btn-color); }
+        /* 输入区域 */
+        #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
+        #message-input { width: 100%; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
+        #send-btn { background: var(--btn-color); color: white; padding: 8px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin-left: 10px; height: 45px; }
+        #send-btn:disabled { background: #ccc; cursor: not-allowed; }
 
-        /* --- 弹窗样式 --- */
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 5000; backdrop-filter: blur(2px); }
-        .modal-content { background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
-        .close-x { position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; color: #999; border: none; background: none; line-height: 1; padding: 0; z-index: 10; }
+        /* 设置弹窗 */
+        #settings-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
+            align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
+        }
+        .modal-content { 
+            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; 
+            position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .close-settings { 
+            position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; 
+            color: #999; border: none; background: none; line-height: 1; padding: 0;
+        }
+        
+        .setting-item { margin-bottom: 20px; }
+        .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
+        .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
 
-        .hidden { display: none !important; }
+        .system-msg { text-align: center; font-size: 13px; color: #999; padding: 8px; background: rgba(0,0,0,0.04); border-radius: 10px; margin: 5px 0; }
     </style>
 </head>
 <body id="app-body">
 
-<!-- 登录界面 -->
-<div id="login-area">
-    <div class="login-box">
-        <h2 style="margin-bottom:30px;">欢迎进入</h2>
-        <input type="text" id="reg-username" placeholder="输入用户名注册/登录">
-        <button onclick="handleAuth()">开始使用</button>
+<div id="update-modal" onclick="closeUpdateModal()">
+    <div class="update-modal-content">
+        <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
+        <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
+            • 全局房间名称修改（所有人可见）<br>
+            • 支持更换背景图片<br>
+            • 引用文字位置优化至正文下方<br>
+            • 严格的房间代码校验系统
+        </p>
+        <button onclick="closeUpdateModal()">我知道了</button>
     </div>
 </div>
 
-<!-- 主应用 -->
-<div id="main-app">
-    <div id="top-nav">
-        <span id="back-btn" onclick="goBack()">←</span>
-        <span id="room-title">消息</span>
-        <div id="nav-right-icons">
-            <span id="add-room-btn" style="font-size: 24px; cursor:pointer;" onclick="showCreateRoomModal()">➕</span>
-            <span style="font-size: 20px; cursor:pointer;" onclick="toggleSettings()">⚙️</span>
-        </div>
+<div id="login-area">
+    <div class="login-box">
+        <h2>进入聊天室</h2>
+        <input type="text" id="username" placeholder="输入你的名字" autocomplete="off">
+        <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off">
+        <button onclick="joinRoom()">开始聊天</button>
+    </div>
+</div>
+
+<div id="chat-container" style="display:none;">
+    <div id="nav-bar">
+        <span id="back-btn" onclick="leaveRoom()">←</span>
+        <span id="room-title">正在加载...</span>
+        <span id="settings-btn" style="cursor:pointer; font-size:20px;" onclick="toggleSettings()">⚙️</span>
     </div>
 
-    <!-- 内容区域：这里包含消息列表或联系人列表 -->
-    <div id="view-contacts" class="content-area">
-        <div id="contact-list"></div>
-    </div>
+    <div id="chat-box"></div>
 
-    <!-- 聊天窗口视图 (独立于输入框) -->
-    <div id="view-chat" class="content-area hidden">
-        <div id="chat-box"></div>
-    </div>
-
-    <!-- 输入区域：固定在底部，不随内容滚动 -->
     <div id="input-area">
-        <div class="input-wrapper">
-            <input type="text" id="message-input" placeholder="输入消息...">
+        <div id="reply-preview"></div>
+        <div style="display: flex; align-items: center;">
+            <input type="text" id="message-input" placeholder="输入消息并按回车..." autocomplete="off">
             <button id="send-btn" onclick="sendMessage()">发送</button>
         </div>
     </div>
 
-    <!-- 底部导航 -->
-    <div id="bottom-nav">
-        <div class="nav-item active" id="nav-msg" onclick="switchView('contacts')">💬<br>消息</div>
-        <div class="nav-item" id="nav-list" onclick="alert('通讯录功能开发中')">👥<br>通讯录</div>
-        <div class="nav-item" id="nav-me" onclick="alert('我的设置')">👤<br>我</div>
-    </div>
-
-    <!-- 弹窗 -->
-    <div id="create-room-modal" class="modal">
-        <div class="modal-content">
-            <button class="close-x" onclick="hideModal('create-room-modal')">&times;</button>
-            <h3 style="margin-bottom:20px;">创建新房间</h3>
-            <input type="text" id="new-room-code" placeholder="输入房间代码">
-            <input type="text" id="new-room-name" placeholder="显示名称">
-            <button onclick="createRoom()">确认创建</button>
-        </div>
-    </div>
-
-    <div id="settings-modal" class="modal" onclick="toggleSettings(event)">
+    <!-- 综合设置弹窗 -->
+    <div id="settings-modal" onclick="toggleSettings(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
-            <button class="close-x" onclick="hideModal('settings-modal')">&times;</button>
-            <h3 style="margin-bottom:20px;">个性化设置</h3>
-            <input type="text" id="custom-room-name" placeholder="修改当前房间名称">
-            <button onclick="updateRoomName()">保存更改</button>
+            <button class="close-settings" onclick="toggleSettings()">&times;</button>
+            <h3 style="margin-bottom:20px; text-align:center;">个性化设置</h3>
+            
+            <div class="setting-item">
+                <label>修改当前房间名称</label>
+                <input type="text" id="custom-room-name" placeholder="输入新名字...">
+                <button style="padding:8px; font-size:14px;" onclick="updateRoomName()">确认更改</button>
+            </div>
+
+            <div class="setting-item">
+                <label>选择气泡颜色 (仅影响聊天内容)</label>
+                <input type="color" id="color-selector" value="#0084ff">
+            </div>
+
+            <div class="setting-item">
+                <label>更换背景图片 (输入URL地址)</label>
+                <input type="text" id="bg-url-input" placeholder="https://example.com/image.jpg">
+            </div>
+
+            <button onclick="saveSettings()" style="margin-top:20px;">保存并应用</button>
         </div>
     </div>
 </div>
@@ -176,160 +199,282 @@
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
-    let supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let supabaseClient;
+    try {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) { console.error("Supabase 初始化失败:", e); }
 
-    let currentUser = null;
-    let currentRoomId = null;
+    let currentRoomCode = "";
+    let mySender = "用户_" + Math.floor(Math.random() * 1000);
+    let replyData = null;
     let roomSubscription = null;
 
-    async function handleAuth() {
-        const usernameInput = document.getElementById('reg-username').value.trim();
-        if (!usernameInput) return alert("请输入用户名");
-        try {
-            const { data, error } = await supabaseClient.from('profiles').upsert({ 
-                username: usernameInput,
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'username' }).select();
-            if (error) throw error;
-            currentUser = { id: data[0].id, username: data[0].username };
-            localStorage.setItem('chat_user', JSON.stringify(currentUser));
-            document.getElementById('login-area').style.display = 'none';
-            document.getElementById('main-app').style.display = 'flex';
-            loadRooms();
-        } catch (err) {
-            if(err.message.includes("unique constraint")) alert("该用户名已被占用，请换一个名字。");
-            else alert("操作失败，请检查数据库权限或网络连接。");
+    async function joinRoom() {
+        const nameInput = document.getElementById('username').value.trim();
+        currentRoomCode = document.getElementById('room-input').value.trim();
+        
+        if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
+            return alert("房间代码格式不正确，请只使用字母、数字或符号。");
         }
-    }
 
-    window.onload = () => {
-        const savedUser = localStorage.getItem('chat_user');
-        if (savedUser) {
-            currentUser = JSON.parse(savedUser);
-            document.getElementById('login-area').style.display = 'none';
-            document.getElementById('main-app').style.display = 'flex';
-            loadRooms();
-        }
-    };
+        if (!nameInput || !currentRoomCode) return alert("请输入名字和房间代码");
 
-    async function loadRooms() {
-        const { data: rooms } = await supabaseClient.from('rooms').select('*');
-        const list = document.getElementById('contact-list');
-        list.innerHTML = "";
-        if (rooms && rooms.length > 0) {
-            rooms.forEach(room => {
-                const div = document.createElement('div');
-                div.className = 'contact-item';
-                div.onclick = () => enterRoom(room.id, room.room_code, room.room_name);
-                div.innerHTML = `<div class="avatar"></div><div class="contact-info"><span class="name">${room.room_name}</span><span class="last-msg">点击进入对话...</span></div>`;
-                list.appendChild(div);
-            });
-        } else {
-            list.innerHTML = "<p style='padding:20px; color:#999;'>暂无房间，点击右上角+号创建</p>";
-        }
-    }
+        document.getElementById('login-area').style.display = 'none';
+        document.getElementById('chat-container').style.display = 'flex';
+        document.getElementById('room-title').innerText = currentRoomCode; 
+        
+        setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
-    async function createRoom() {
-        const code = document.getElementById('new-room-code').value.trim();
-        const name = document.getElementById('new-room-name').value.trim();
-        if (!code || !name) return alert("请填写完整信息");
-        const { error } = await supabaseClient.from('rooms').insert([{ room_code: code, room_name: name }]);
-        if (error) return alert("创建失败：" + error.message);
-        hideModal('create-room-modal');
-        loadRooms();
-    }
-
-    async function enterRoom(id, code, name) {
-        currentRoomId = id;
-        document.getElementById('room-title').innerText = name; // 设置当前房间名
-        switchView('chat');
+        await ensureRoomExists();
         loadHistory();
         initRealtime();
     }
 
+    async function ensureRoomExists() {
+        const { data: room, error } = await supabaseClient
+            .from('rooms')
+            .select('*')
+            .eq('room_code', currentRoomCode)
+            .single();
+
+        if (error || !room) {
+            const { error: insertError } = await supabaseClient
+                .from('rooms')
+                .insert([{ room_code: currentRoomCode, room_name: currentRoomCode }]);
+            if (insertError) console.error("创建房间失败:", insertError);
+        } else {
+            document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
+            document.documentElement.style.setProperty('--chat-bg', `url('${room.bg_url || ""}')`);
+        }
+    }
+
     async function loadHistory() {
-        const chatBox = document.getElementById('chat-box');
-        chatBox.innerHTML = "";
-        const { data } = await supabaseClient.from('messages')
-            .select(`content, created_at, profiles ( username )`)
-            .eq('room_id', currentRoomId)
+        const { data, error } = await supabaseClient
+            .from('messages')
+            .select('*')
+            .eq('room_code', currentRoomCode)
             .order('created_at', { ascending: true });
-        if (data) data.forEach(msg => {
-            const senderName = msg.profiles ? msg.profiles.username : "未知用户";
-            appendMessageToUI(senderName, msg.content);
-        });
+
+        if (!error && data) {
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML = ""; 
+            data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false));
+        }
     }
 
     function initRealtime() {
         if (roomSubscription) roomSubscription.unsubscribe();
-        roomSubscription = supabaseClient.channel(`room_${currentRoomId}`)
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, 
-            (payload) => {
-                appendMessageToUI("系统", payload.new.content); 
+
+        roomSubscription = supabaseClient.channel(`room_${currentRoomCode}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `room_code=eq.${currentRoomCode}`
+            }, (payload) => {
+                appendMessageToUI(payload.new.sender, payload.new.content, true);
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'rooms',
+                filter: `room_code=eq.${currentRoomCode}`
+            }, (payload) => {
+                const room = payload.new;
+                document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
+                document.documentElement.style.setProperty('--chat-bg', `url('${room.bg_url || ""}')`);
             })
             .subscribe();
     }
 
     async function sendMessage() {
-        const input = document.getElementById('message-input');
-        const content = input.value.trim();
+        const inputEl = document.getElementById('message-input');
+        let content = inputEl.value.trim();
         if (!content) return;
-        await supabaseClient.from('messages').insert([{ room_id: currentRoomId, sender_id: currentUser.id, content: content }]);
-        input.value = "";
-    }
 
-    function appendMessageToUI(sender, content) {
-        const chatBox = document.getElementById('chat-box');
-        const isMe = sender === currentUser.username;
-        const wrapper = document.createElement('div');
-        wrapper.className = `msg-wrapper ${isMe ? 'right' : 'left'}`;
-        wrapper.innerHTML = `<div class="msg-content">${!isMe ? `<span class="sender-name">${sender}</span>` : ''}<div style="white-space: pre-wrap;">${content}</div><span class="msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>`;
-        chatBox.appendChild(wrapper);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function switchView(view) {
-        const contactView = document.getElementById('view-contacts');
-        const chatView = document.getElementById('view-chat');
-        const addBtn = document.getElementById('add-room-btn');
-        const backBtn = document.getElementById('back-btn');
-
-        if (view === 'contacts') {
-            contactView.classList.remove('hidden');
-            chatView.classList.add('hidden');
-            addBtn.style.display = 'block'; 
-            backBtn.style.display = 'none';
-            document.getElementById('room-title').innerText = "消息"; // 回到列表，标题重置为“消息”
-        } else {
-            contactView.classList.add('hidden');
-            chatView.classList.remove('hidden');
-            addBtn.style.display = 'none'; 
-            backBtn.style.display = 'block';
+        let finalContent = content;
+        if (replyData) {
+            finalContent = `${content}\n\n[回复: ${replyData.content}]`;
         }
 
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        if (view === 'contacts') document.getElementById('nav-msg').classList.add('active');
+        const btn = document.getElementById('send-btn');
+        btn.innerText = "发送中...";
+        btn.disabled = true;
+
+        try {
+            const { error } = await supabaseClient
+                .from('messages')
+                .insert([{ 
+                    room_code: currentRoomCode, 
+                    content: finalContent, 
+                    sender: mySender,
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (error) {
+                console.error("发送失败:", error);
+                alert("消息发送失败，请检查网络或权限。");
+            } else {
+                inputEl.value = ""; 
+                cancelReply();
+            }
+        } catch (e) { console.error(e); }
+        finally {
+            btn.innerText = "发送";
+            btn.disabled = false;
+        }
     }
 
-    function goBack() { switchView('contacts'); }
-    function showCreateRoomModal() { document.getElementById('create-room-modal').style.display = 'flex'; }
-    function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+    function appendMessageToUI(sender, content, isNew) {
+        const chatBox = document.getElementById('chat-box');
+        const wrapper = document.createElement('div');
+        wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
+
+        const now = new Date();
+        const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+        let displayContent = content;
+        let replyTagHtml = "";
+
+        // 优化回复解析逻辑
+        if (content.includes("[回复:")) {
+            const parts = content.split("\n\n");
+            displayContent = parts[0] || content; 
+            const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
+            replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${rawReply}</div>`;
+        }
+
+        wrapper.innerHTML = `
+            <div class="msg-content">
+                ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
+                <div style="white-space: pre-wrap; word-break: break-word;">${displayContent}</div>
+                ${replyTagHtml}
+                <span class="msg-time">${timeStr}</span>
+            </div>
+        `;
+
+        chatBox.appendChild(wrapper);
+        // 确保滚动到最底部
+        setTimeout(() => {
+            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+        }, 50);
+    }
+
+    const chatBox = document.getElementById('chat-box');
+    let pressTimer;
+
+    function handleLongPress(element) {
+        const contentEl = element.querySelector('.msg-content');
+        if (!contentEl) return;
+        const content = contentEl.innerText;
+        replyData = { content };
+        const preview = document.getElementById('reply-preview');
+        preview.style.display = 'flex';
+        preview.innerHTML = `正在回复：${content} <span style="cursor:pointer; color:#07c475;" onclick="cancelReply()">✕</span>`;
+    }
+
+    function cancelReply() {
+        replyData = null;
+        document.getElementById('reply-preview').style.display = 'none';
+    }
+
+    chatBox.addEventListener('touchstart', (e) => {
+        const target = e.target.closest('.msg-wrapper');
+        if (target && !target.classList.contains('system-msg')) {
+            pressTimer = setTimeout(() => handleLongPress(target), 500);
+        }
+    }, {passive: true});
+
+    chatBox.addEventListener('touchend', () => clearTimeout(pressTimer));
+
+    chatBox.addEventListener('contextmenu', (e) => {
+        const target = e.target.closest('.msg-wrapper');
+        if (target && !target.classList.contains('system-msg')) {
+            e.preventDefault(); 
+            handleLongPress(target);
+        }
+    });
+
     function toggleSettings(e) {
-        if (e) return;
         const modal = document.getElementById('settings-modal');
+        if (e) return; 
         modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
     }
 
     async function updateRoomName() {
-        const newName = document.getElementById('custom-room-name').value;
-        if (!newName) return;
-        await supabaseClient.from('rooms').update({ room_name: newName }).eq('id', currentRoomId);
-        document.getElementById('room-title').innerText = newName;
-        hideModal('settings-modal');
+        const newName = document.getElementById('custom-room-name').value.trim();
+        if (!newName) return alert("请输入新名字");
+        
+        try {
+            const { error } = await supabaseClient
+                .from('rooms')
+                .update({ room_name: newName })
+                .eq('room_code', currentRoomCode);
+
+            if (error) throw error;
+            alert("名称已更新，所有人可见");
+        } catch (e) {
+            console.error(e);
+            alert("修改失败，请确保数据库权限已正确开启。");
+        }
+    }
+
+    function saveSettings() {
+        const color = document.getElementById('color-selector').value;
+        document.documentElement.style.setProperty('--bubble-color', color);
+        localStorage.setItem('chat_theme_color', color);
+
+        const bgUrl = document.getElementById('bg-url-input').value;
+        if (bgUrl) {
+            supabaseClient.from('rooms').update({ bg_url: bgUrl }).eq('room_code', currentRoomCode);
+            document.documentElement.style.setProperty('--chat-bg', `url('${bgUrl}')`);
+            localStorage.setItem('chat_bg_url', bgUrl);
+        } else {
+            document.documentElement.style.setProperty('--chat-bg', 'none');
+            localStorage.removeItem('chat_bg_url');
+        }
+
+        toggleSettings();
+    }
+
+    function leaveRoom() {
+        if(confirm("确定要退出当前房间吗？")) {
+            currentRoomCode = "";
+            document.getElementById('login-area').style.display = 'flex';
+            document.getElementById('chat-container').style.display = 'none';
+            location.reload(); 
+        }
+    }
+
+    window.onload = () => {
+        const savedColor = localStorage.getItem('chat_theme_color');
+        if (savedColor) {
+            document.documentElement.style.setProperty('--bubble-color', savedColor);
+            document.getElementById('color-selector').value = savedColor;
+        }
+
+        const savedBg = localStorage.getItem('chat_bg_url');
+        if (savedBg) {
+            document.documentElement.style.setProperty('--chat-bg', `url('${savedBg}')`);
+            document.getElementById('bg-url-input').value = savedBg;
+        }
+
+        const hasSeenUpdate = localStorage.getItem('has_seen_update');
+        if (!hasSeenUpdate) {
+            document.getElementById('update-modal').style.display = 'flex';
+        }
+    };
+
+    function closeUpdateModal() {
+        document.getElementById('update-modal').style.display = 'none';
+        localStorage.setItem('has_seen_update', 'true');
     }
 
     document.getElementById('message-input').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
     });
 </script>
 </body>
