@@ -3,88 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>极简微信聊天室</title>
+    <title>微信极简版</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --primary-color: #07c475; /* 微信绿 */
+            --primary-color: #07c475;
             --bg-gray: #f5f5f5;
             --msg-self: #95ec69;
             --msg-other: #ffffff;
-            --text-main: #000000;
             --nav-bg: #f7f7f7;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: var(--bg-gray); 
-            height: 100vh; width: 100vw;
-            display: flex; flex-direction: column; overflow: hidden;
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-gray); height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* --- 通用弹窗样式 (带❌) --- */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: none; align-items: center; justify-content: center; z-index: 5000; backdrop-filter: blur(2px);
+        }
+        .modal-content {
+            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; position: relative;
+        }
+        .close-x {
+            position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; border: none; background: none;
         }
 
-        /* --- 更新公告弹窗 --- */
-        #update-modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-            display: none; align-items: center; justify-content: center; z-index: 5000;
-            backdrop-filter: blur(4px);
-        }
-        .update-modal-content {
-            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; text-align: center;
-        }
-
-        /* --- 登录区域 --- */
-        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-        .login-box { width: 100%; max-width: 400px; padding: 40px; border: 1px solid #eee; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-        .login-box h2 { margin-bottom: 30px; text-align: center; color: #333; }
+        /* --- 登录界面 --- */
+        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 3000; }
+        .login-box { width: 100%; max-width: 400px; padding: 40px; border: 1px solid #eee; border-radius: 24px; }
         input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; }
         button { width: 100%; padding: 14px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; }
 
-        /* --- 主应用容器 --- */
+        /* --- 主应用布局 --- */
         #main-app { display: none; flex-direction: column; height: 100vh; width: 100%; max-width: 600px; margin: 0 auto; background: white; position: relative; }
 
-        /* --- 顶部导航栏 --- */
-        #top-nav { 
-            height: 55px; background: #f7f7f7; border-bottom: 1px solid #ddd;
-            display: flex; align-items: center; padding: 0 15px; justify-content: space-between;
-        }
+        /* --- 顶部导航 --- */
+        #top-nav { height: 55px; background: #f7f7f7; border-bottom: 1px solid #ddd; display: flex; align-items: center; padding: 0 15px; justify-content: space-between; }
         #room-title { font-weight: bold; font-size: 18px; color: #333; }
 
-        /* --- 视图切换逻辑 --- */
+        /* --- 视图切换 --- */
         .view-container { flex: 1; overflow-y: auto; position: relative; background: white; }
         .hidden { display: none !important; }
 
-        /* --- 联系人列表 (仿微信) --- */
+        /* --- 联系人/消息列表 --- */
         #contact-list { padding: 10px; }
-        .contact-item { 
-            display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer;
-        }
+        .contact-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
         .avatar { width: 48px; height: 48px; background: #ddd; border-radius: 50%; margin-right: 12px; }
         .contact-info .name { font-weight: bold; display: block; font-size: 16px; }
         .contact-info .last-msg { font-size: 13px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 200px; }
 
-        /* --- 聊天窗口优化 --- */
-        #chat-box { 
-            flex: 1; padding: 15px; display: flex; flex-direction: column; gap: 15px; 
-            background-color: #f3f3f3; 
-            background-image: url('https://user-images.githubusercontent.com/15075759/28449166-86d8e9a0-733c-4b1f-bb0e-4303309931cf.png');
-            background-size: cover; background-attachment: fixed;
-        }
-
-        /* 消息气泡 */
+        /* --- 聊天窗口 --- */
+        #chat-box { flex: 1; padding: 15px; display: flex; flex-direction: column; gap: 15px; background-color: #f3f3f3; background-image: url('https://user-images.githubusercontent.com/15075759/28449166-86d8e9a0-733c-4b1f-bb0e-4303309931cf.png'); background-size: cover; }
         .msg-wrapper { max-width: 85%; position: relative; animation: msgIn 0.2s ease-out; }
         @keyframes msgIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
         .left { align-self: flex-start; }
         .right { align-self: flex-end; text-align: right; }
-
-        .msg-content { 
-            padding: 10px 14px; border-radius: 8px; font-size: 15px; line-height: 1.5; 
-            word-break: break-word; position: relative;
-        }
+        .msg-content { padding: 10px 14px; border-radius: 8px; font-size: 15px; line-height: 1.5; word-break: break-word; }
         .left .msg-content { background: var(--msg-other); color: #000; border-radius: 8px 8px 8px 2px; }
         .right .msg-content { background: var(--msg-self); color: #000; border-radius: 8px 8px 2px 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-
         .sender-name { font-size: 12px; margin-bottom: 4px; display: block; color: #666; }
         .msg-time { font-size: 10px; color: #999; margin-top: 4px; display: block; }
 
@@ -94,71 +71,47 @@
         #message-input { flex: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 20px; outline: none; font-size: 16px; }
         #send-btn { width: auto; padding: 8px 20px; background: var(--primary-color); color: white; border: none; border-radius: 20px; font-weight: bold; }
 
-        /* --- 底部导航栏 (微信风格) --- */
-        #bottom-nav { 
-            height: 60px; background: #f7f7f7; border-top: 1px solid #ddd;
-            display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom);
-        }
+        /* --- 底部导航栏 --- */
+        #bottom-nav { height: 60px; background: #f7f7f7; border-top: 1px solid #ddd; display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); }
         .nav-item { text-align: center; font-size: 12px; color: #555; cursor: pointer; }
         .nav-item.active { color: var(--primary-color); }
 
-        /* 回复预览 */
-        #reply-preview {
-            background: rgba(0,0,0,0.05); padding: 8px; border-radius: 8px; margin-bottom: 10px; font-size: 13px; display: none;
-        }
-
-        /* 设置弹窗 */
-        #settings-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 3000; }
-        .modal-content { background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; position: relative; }
+        /* --- 其他 UI --- */
+        #add-room-btn { font-size: 24px; cursor: pointer; }
     </style>
 </head>
-<body id="app-body">
-
-<!-- 更新公告 -->
-<div id="update-modal" onclick="closeUpdateModal()">
-    <div class="update-modal-content">
-        <h2>✨ 版本更新</h2>
-        <p style="margin: 20px 0;">已优化微信风格导航、联系人列表及历史消息加载逻辑。</p>
-        <button onclick="closeUpdateModal()">我知道了</button>
-    </div>
-</div>
+<body>
 
 <!-- 登录界面 -->
 <div id="login-area">
     <div class="login-box">
-        <h2>进入聊天室</h2>
-        <input type="text" id="username" placeholder="输入你的名字">
-        <input type="text" id="room-input" placeholder="输入房间代码 (如: A101)">
-        <button onclick="joinRoom()">开始聊天</button>
+        <h2>欢迎进入</h2>
+        <input type="text" id="reg-username" placeholder="输入用户名注册/登录">
+        <button onclick="handleAuth()">开始使用</button>
     </div>
 </div>
 
-<!-- 主应用界面 -->
+<!-- 主应用 -->
 <div id="main-app">
     <div id="top-nav">
         <span id="back-btn" style="cursor:pointer; font-size: 20px;" onclick="goBack()">←</span>
-        <span id="room-title">正在加载...</span>
-        <span style="font-size: 20px;" onclick="toggleSettings()">⚙️</span>
+        <span id="room-title">消息</span>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span id="add-room-btn" onclick="showCreateRoomModal()">➕</span>
+            <span style="font-size: 20px;" onclick="toggleSettings()">⚙️</span>
+        </div>
     </div>
 
-    <!-- 联系人列表视图 -->
+    <!-- 消息列表视图 -->
     <div id="view-contacts" class="view-container">
         <div id="contact-list">
-            <!-- 这里动态加载房间/用户 -->
-            <div class="contact-item" onclick="enterRoom('公共聊天室')">
-                <div class="avatar"></div>
-                <div class="contact-info">
-                    <span class="name">公共聊天室</span>
-                    <span class="last-msg">点击进入对话...</span>
-                </div>
-            </div>
+            <!-- 这里动态加载房间 -->
         </div>
     </div>
 
     <!-- 聊天窗口视图 -->
     <div id="view-chat" class="view-container hidden">
         <div id="chat-box"></div>
-        <div id="reply-preview"></div>
         <div id="input-area">
             <div class="input-wrapper">
                 <input type="text" id="message-input" placeholder="输入消息...">
@@ -167,7 +120,7 @@
         </div>
     </div>
 
-    <!-- 底部导航栏 -->
+    <!-- 底部导航 -->
     <div id="bottom-nav">
         <div class="nav-item active" onclick="switchView('contacts')">💬<br>消息</div>
         <div class="nav-item" onclick="alert('通讯录功能开发中')">👥<br>通讯录</div>
@@ -175,183 +128,193 @@
     </div>
 </div>
 
+<!-- 创建房间弹窗 -->
+<div id="create-room-modal" class="modal">
+    <div class="modal-content">
+        <button class="close-x" onclick="hideModal('create-room-modal')">❌</button>
+        <h3>创建新房间</h3>
+        <input type="text" id="new-room-code" placeholder="输入房间代码 (如: A101)">
+        <input type="text" id="new-room-name" placeholder="显示名称">
+        <button onclick="createRoom()">确认创建</button>
+    </div>
+</div>
+
 <!-- 设置弹窗 -->
-<div id="settings-modal" onclick="toggleSettings(event)">
+<div id="settings-modal" class="modal" onclick="toggleSettings(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
+        <button class="close-x" onclick="hideModal('settings-modal')">❌</button>
         <h3>个性化设置</h3>
-        <input type="text" id="custom-room-name" placeholder="修改房间名称">
+        <input type="text" id="custom-room-name" placeholder="修改当前房间名称">
         <button onclick="updateRoomName()">保存更改</button>
     </div>
 </div>
 
 <script>
+    // 配置你的 Supabase 信息
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
     let supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let currentRoomCode = "";
-    let mySender = "用户_" + Math.floor(Math.random() * 1000);
+    let currentUser = null;
+    let currentRoomId = null;
     let roomSubscription = null;
 
-    // --- 核心逻辑 ---
+    // --- 认证逻辑 (简便注册) ---
+    async function handleAuth() {
+        const username = document.getElementById('reg-username').value.trim();
+        if (!username) return alert("请输入用户名");
 
-    async function joinRoom() {
-        const nameInput = document.getElementById('username').value.trim();
-        currentRoomCode = document.getElementById('room-input').value.trim();
-        
-        if (!nameInput || !currentRoomCode) return alert("请输入名字和房间代码");
+        // 这里使用 Supabase 的匿名登录或简单的用户模拟（为了演示，我们直接创建 profile）
+        // 实际生产中建议使用 supabase.auth.signUp()
+        const { data: { user }, error } = await supabase.auth.signInWithPassword({
+            email: `${username}@example.com`, // 模拟邮箱
+            password: 'password123'
+        }).catch(e => {
+            // 如果登录失败，尝试注册（简化逻辑）
+            return supabase.auth.signUp({
+                email: `${username}@example.com`,
+                password: 'password123',
+                options: { data: { username: username } }
+            });
+        });
 
+        if (error) {
+            // 如果是新用户，手动插入 profile
+            const { error: profileError } = await supabase.from('profiles').upsert({ 
+                id: user.id, 
+                username: username 
+            });
+            if (profileError) return alert("注册失败：" + profileError.message);
+        }
+
+        currentUser = user;
         document.getElementById('login-area').style.display = 'none';
         document.getElementById('main-app').style.display = 'flex';
-        
-        await ensureRoomExists();
-        loadHistory(); // 优先完成：加载历史消息
+        loadRooms();
+    }
+
+    // --- 房间逻辑 ---
+    async function loadRooms() {
+        const { data: rooms } = await supabaseClient.from('rooms').select('*');
+        const list = document.getElementById('contact-list');
+        list.innerHTML = "";
+        if (rooms && rooms.length > 0) {
+            rooms.forEach(room => {
+                const div = document.createElement('div');
+                div.className = 'contact-item';
+                div.onclick = () => enterRoom(room.id, room.room_code, room.room_name);
+                div.innerHTML = `
+                    <div class="avatar"></div>
+                    <div class="contact-info">
+                        <span class="name">${room.room_name}</span>
+                        <span class="last-msg">点击进入对话...</span>
+                    </div>`;
+                list.appendChild(div);
+            });
+        } else {
+            list.innerHTML = "<p style='padding:20px; color:#999;'>暂无房间，点击右上角+号创建</p>";
+        }
+    }
+
+    async function createRoom() {
+        const code = document.getElementById('new-room-code').value.trim();
+        const name = document.getElementById('new-room-name').value.trim();
+        if (!code || !name) return alert("请填写完整信息");
+
+        const { data, error } = await supabaseClient.from('rooms').insert([{ 
+            room_code: code, 
+            room_name: name 
+        }]).select().single();
+
+        if (error) return alert("创建失败：" + error.message);
+        hideModal('create-room-modal');
+        loadRooms();
+    }
+
+    async function enterRoom(id, code, name) {
+        currentRoomId = id;
+        document.getElementById('room-title').innerText = name;
+        switchView('chat');
+        loadHistory();
         initRealtime();
     }
 
-    async function ensureRoomExists() {
-        const { data: room } = await supabaseClient
-            .from('rooms')
-            .select('*')
-            .eq('room_code', currentRoomCode)
-            .single();
-
-        if (!room) {
-            await supabaseClient.from('rooms').insert([{ 
-                room_code: currentRoomCode, 
-                room_name: currentRoomCode || "新房间" 
-            }]);
-        } else {
-            document.getElementById('room-title').innerText = room.room_name;
-        }
-    }
-
-    // 优先完成：历史消息加载优化
+    // --- 消息逻辑 ---
     async function loadHistory() {
         const chatBox = document.getElementById('chat-box');
-        chatBox.innerHTML = ""; // 清空当前内容
-        
-        const { data, error } = await supabaseClient
-            .from('messages')
-            .select('*')
-            .eq('room_code', currentRoomCode)
-            .order('created_at', { ascending: true });
-
-        if (!error && data) {
-            data.forEach(msg => appendMessageToUI(msg.sender, msg.content));
-        }
+        chatBox.innerHTML = "";
+        const { data } = await supabaseClient.from('messages').select('*').eq('room_id', currentRoomId).order('created_at', { ascending: true });
+        if (data) data.forEach(msg => appendMessageToUI(msg.sender_name, msg.content));
     }
 
     function initRealtime() {
         if (roomSubscription) roomSubscription.unsubscribe();
-
-        roomSubscription = supabaseClient.channel(`room_${currentRoomCode}`)
-            .on('postgres_changes', {
-                event: 'INSERT',
-                schema: 'public',
-                table: 'messages',
-                filter: `room_code=eq.${currentRoomCode}`
-            }, (payload) => {
-                appendMessageToUI(payload.new.sender, payload.new.content);
-            })
+        roomSubscription = supabaseClient.channel(`room_${currentRoomId}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, 
+            (payload) => appendMessageToUI(payload.new.sender_name, payload.new.content))
             .subscribe();
     }
 
     async function sendMessage() {
-        const inputEl = document.getElementById('message-input');
-        let content = inputEl.value.trim();
+        const input = document.getElementById('message-input');
+        const content = input.value.trim();
         if (!content) return;
 
-        try {
-            await supabaseClient.from('messages').insert([{ 
-                room_code: currentRoomCode, 
-                content: content, 
-                sender: mySender,
-                created_at: new Date().toISOString()
-            }]);
-            inputEl.value = ""; 
-        } catch (e) { console.error(e); }
+        await supabaseClient.from('messages').insert([{ 
+            room_id: currentRoomId, 
+            sender_id: currentUser.id, 
+            content: content 
+        }]);
+        input.value = "";
     }
 
     function appendMessageToUI(sender, content) {
         const chatBox = document.getElementById('chat-box');
+        const isMe = sender === currentUser.username;
         const wrapper = document.createElement('div');
-        wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
-
-        const now = new Date();
-        const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-
+        wrapper.className = `msg-wrapper ${isMe ? 'right' : 'left'}`;
         wrapper.innerHTML = `
             <div class="msg-content">
-                ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
-                <div style="white-space: pre-wrap;">${content}</div>
-                <span class="msg-time">${timeStr}</span>
-            </div>
-        `;
-
+                ${!isMe ? `<span class="sender-name">${sender}</span>` : ''}
+                <div>${content}</div>
+                <span class="msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+            </div>`;
         chatBox.appendChild(wrapper);
-        chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+        chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // --- 导航与视图切换 ---
+    // --- UI 辅助 ---
     function switchView(view) {
         const contactView = document.getElementById('view-contacts');
         const chatView = document.getElementById('view-chat');
-        const navItems = document.querySelectorAll('.nav-item');
-
         if (view === 'contacts') {
             contactView.classList.remove('hidden');
             chatView.classList.add('hidden');
-            navItems[0].classList.add('active');
         } else {
             contactView.classList.add('hidden');
             chatView.classList.remove('hidden');
-            navItems[1].classList.add('active'); // 模拟切换到聊天页
         }
     }
 
-    function enterRoom(name) {
-        // 这里简单演示：点击联系人直接进入当前房间逻辑
-        document.getElementById('room-title').innerText = name;
-        switchView('chat');
-        loadHistory();
-    }
-
-    function goBack() {
-        if (currentRoomCode) {
-            switchView('contacts');
-        } else {
-            location.reload();
-        }
-    }
-
-    // --- 其他功能 ---
+    function goBack() { switchView('contacts'); }
+    function showCreateRoomModal() { document.getElementById('create-room-modal').style.display = 'flex'; }
+    function hideModal(id) { document.getElementById(id).style.display = 'none'; }
     function toggleSettings(e) {
+        if (e) return;
         const modal = document.getElementById('settings-modal');
-        if (e) return; 
         modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
     }
 
     async function updateRoomName() {
-        const newName = document.getElementById('custom-room-name').value.trim();
+        const newName = document.getElementById('custom-room-name').value;
         if (!newName) return;
-        await supabaseClient.from('rooms').update({ room_name: newName }).eq('room_code', currentRoomCode);
+        await supabaseClient.from('rooms').update({ room_name: newName }).eq('id', currentRoomId);
         document.getElementById('room-title').innerText = newName;
-        toggleSettings();
+        hideModal('settings-modal');
     }
 
-    function closeUpdateModal() {
-        document.getElementById('update-modal').style.display = 'none';
-        localStorage.setItem('has_seen_update', 'true');
-    }
-
-    window.onload = () => {
-        if (!localStorage.getItem('has_seen_update')) {
-            document.getElementById('update-modal').style.display = 'flex';
-        }
-    };
-
+    // 监听回车发送
     document.getElementById('message-input').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
     });
