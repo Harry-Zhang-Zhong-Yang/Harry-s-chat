@@ -95,13 +95,13 @@
 
         /* 输入区域 - 修改对齐逻辑 */
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
-        .input-wrapper { position: relative; display: flex; align-items: center; gap: 8px; width: 100%; }
+        .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
         #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
         #add-btn { 
             width: 45px; height: 45px; border-radius: 50%; background: #eee; 
             display: flex; align-items: center; justify-content: center; 
             font-size: 24px; cursor: pointer; transition: all 0.2s; border: none;
-            flex-shrink: 0; z-index: 5;
+            flex-shrink: 0;
         }
         #add-btn:active { transform: scale(0.9); background: #ddd; }
 
@@ -133,9 +133,9 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 支持手机端图片发送（自动压缩画质）<br>
             • UI对齐优化：加号按钮与输入框完美水平排列<br>
-            • 修复了设置弹窗叉号位置重叠问题
+            • 修复了设置弹窗叉号位置重叠问题<br>
+            • 进入房间直接显示最新消息，上滑加载历史
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -245,7 +245,7 @@
         }
 
         // 版本校验逻辑
-        const APP_VERSION = "1.0.7"; 
+        const APP_VERSION = "1.0.8"; 
         const lastVersion = localStorage.getItem('app_version');
         if (lastVersion !== APP_VERSION) {
             document.getElementById('update-modal').style.display = 'flex';
@@ -396,6 +396,12 @@
             finalContent = `${content}\n\n[回复: ${replyData.content}]`;
         }
 
+        // 核心修复：禁止嵌套回复逻辑
+        if (finalContent.includes("[回复:") && content.includes("[回复:")) {
+             alert("系统提示：暂不支持重复嵌套回复。");
+             return;
+        }
+
         let messageToSave = finalContent;
         if (pendingImage) {
             messageToSave = `[IMAGE_DATA:${pendingImage}]\n${finalContent}`;
@@ -439,7 +445,7 @@
         let displayContent = content;
         let replyTagHtml = "";
 
-        // 核心修复：图片乱码处理与回复限制逻辑
+        // 图片乱码处理与回复限制逻辑
         if (content.includes("[IMAGE_DATA:")) {
             const parts = content.split("\n");
             const imgPart = parts[0].replace("[IMAGE_DATA:", "").replace("]", "");
