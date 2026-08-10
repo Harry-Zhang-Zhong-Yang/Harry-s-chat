@@ -28,19 +28,8 @@
         input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; }
         button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; }
 
-        /* --- 主应用容器 (电脑端优化) --- */
-        #main-app { 
-            display: none; 
-            flex-direction: column; 
-            height: 100vh; 
-            width: 100%; 
-            max-width: 900px; /* 限制电脑端最大宽度 */
-            margin: 0 auto; 
-            background: white; 
-            position: relative; 
-            border-left: 1px solid #eee; 
-            border-right: 1px solid #eee; 
-        }
+        /* --- 主应用容器 --- */
+        #main-app { display: none; flex-direction: column; height: 100vh; width: 100%; max-width: 900px; margin: 0 auto; background: white; position: relative; border-left: 1px solid #eee; border-right: 1px solid #eee; }
 
         /* --- 顶部导航栏 --- */
         #top-nav { height: 60px; background: #f9f9f9; border-bottom: 1px solid #eee; display: flex; align-items: center; padding: 0 15px; }
@@ -48,14 +37,8 @@
         #room-title { font-weight: bold; font-size: 18px; color: #333; flex: 1; text-align: center; }
         #nav-right-icons { display: flex; align-items: center; gap: 15px; }
 
-        /* --- 视图容器 (核心修复：flex: 1 确保占据上方空间) --- */
-        .view-container { 
-            flex: 1; /* 这行保证了聊天内容区域会撑开，把输入框挤到最下面 */
-            overflow-y: auto; 
-            position: relative; 
-            background: white; 
-            padding: 20px;
-        }
+        /* --- 内容区域 (消息列表) --- */
+        .content-area { flex: 1; overflow-y: auto; background: white; padding: 20px; position: relative; }
         .hidden { display: none !important; }
 
         /* --- 联系人列表样式 --- */
@@ -66,13 +49,7 @@
         .contact-info .last-msg { color: #999; font-size: 13px; }
 
         /* --- 聊天界面样式 --- */
-        #chat-box { 
-            display: flex; 
-            flex-direction: column; 
-            gap: 15px; 
-            background-color: #ffffff; 
-            padding: 10px; /* 稍微减小内边距让内容更充实 */
-        }
+        #chat-box { display: flex; flex-direction: column; gap: 15px; }
         .msg-wrapper { max-width: 80%; position: relative; animation: msgIn 0.2s ease-out; }
         @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .left { align-self: flex-start; }
@@ -83,30 +60,29 @@
         .sender-name { font-size: 12px; margin-bottom: 4px; display: block; color: #666; }
         .msg-time { font-size: 10px; color: #999; margin-top: 4px; display: block; }
 
-        /* --- 输入区域 (固定在底部) --- */
+        /* --- 输入区域 (独立容器，固定在底部) --- */
         #input-area { padding: 15px; background: white; border-top: 1px solid #eee; }
         .input-wrapper { 
             display: flex; 
             align-items: center; 
             gap: 8px; 
             height: 46px; 
-            background: white;
         }
         #message-input { 
             flex: 1; 
             padding: 0 20px; 
             border: 1px solid #ddd; 
-            border-radius: 23px; /* 圆角胶囊 */
+            border-radius: 23px; 
             outline: none; 
             font-size: 16px;
         }
         #send-btn { 
             flex: 0 0 auto; 
-            width: 85px;    /* 固定宽度 */
+            width: 85px;    
             background: var(--btn-color); 
             color: white; 
             border: none; 
-            border-radius: 23px; /* 圆角胶囊 */
+            border-radius: 23px; 
             font-weight: bold; 
             height: 40px; 
             display: flex; 
@@ -150,20 +126,21 @@
         </div>
     </div>
 
-    <!-- 联系人列表视图 -->
-    <div id="view-contacts" class="view-container">
+    <!-- 内容区域：这里包含消息列表或联系人列表 -->
+    <div id="view-contacts" class="content-area">
         <div id="contact-list"></div>
     </div>
 
-    <!-- 聊天窗口视图 -->
-    <div id="view-chat" class="view-container hidden">
+    <!-- 聊天窗口视图 (独立于输入框) -->
+    <div id="view-chat" class="content-area hidden">
         <div id="chat-box"></div>
-        <!-- 输入区域在最底部，且独立于消息列表容器外（或作为其兄弟节点） -->
-        <div id="input-area">
-            <div class="input-wrapper">
-                <input type="text" id="message-input" placeholder="输入消息...">
-                <button id="send-btn" onclick="sendMessage()">发送</button>
-            </div>
+    </div>
+
+    <!-- 输入区域：固定在底部，不随内容滚动 -->
+    <div id="input-area">
+        <div class="input-wrapper">
+            <input type="text" id="message-input" placeholder="输入消息...">
+            <button id="send-btn" onclick="sendMessage()">发送</button>
         </div>
     </div>
 
@@ -174,7 +151,7 @@
         <div class="nav-item" id="nav-me" onclick="alert('我的设置')">👤<br>我</div>
     </div>
 
-    <!-- 创建房间弹窗 -->
+    <!-- 弹窗 -->
     <div id="create-room-modal" class="modal">
         <div class="modal-content">
             <button class="close-x" onclick="hideModal('create-room-modal')">&times;</button>
@@ -185,7 +162,6 @@
         </div>
     </div>
 
-    <!-- 设置弹窗 -->
     <div id="settings-modal" class="modal" onclick="toggleSettings(event)">
         <div class="modal-content" onclick="event.stopPropagation()">
             <button class="close-x" onclick="hideModal('settings-modal')">&times;</button>
@@ -209,23 +185,18 @@
     async function handleAuth() {
         const usernameInput = document.getElementById('reg-username').value.trim();
         if (!usernameInput) return alert("请输入用户名");
-
         try {
             const { data, error } = await supabaseClient.from('profiles').upsert({ 
                 username: usernameInput,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'username' }).select();
-
             if (error) throw error;
-
             currentUser = { id: data[0].id, username: data[0].username };
             localStorage.setItem('chat_user', JSON.stringify(currentUser));
-
             document.getElementById('login-area').style.display = 'none';
             document.getElementById('main-app').style.display = 'flex';
             loadRooms();
         } catch (err) {
-            console.error("认证失败:", err);
             if(err.message.includes("unique constraint")) alert("该用户名已被占用，请换一个名字。");
             else alert("操作失败，请检查数据库权限或网络连接。");
         }
@@ -250,12 +221,7 @@
                 const div = document.createElement('div');
                 div.className = 'contact-item';
                 div.onclick = () => enterRoom(room.id, room.room_code, room.room_name);
-                div.innerHTML = `
-                    <div class="avatar"></div>
-                    <div class="contact-info">
-                        <span class="name">${room.room_name}</span>
-                        <span class="last-msg">点击进入对话...</span>
-                    </div>`;
+                div.innerHTML = `<div class="avatar"></div><div class="contact-info"><span class="name">${room.room_name}</span><span class="last-msg">点击进入对话...</span></div>`;
                 list.appendChild(div);
             });
         } else {
@@ -267,12 +233,7 @@
         const code = document.getElementById('new-room-code').value.trim();
         const name = document.getElementById('new-room-name').value.trim();
         if (!code || !name) return alert("请填写完整信息");
-
-        const { error } = await supabaseClient.from('rooms').insert([{ 
-            room_code: code, 
-            room_name: name 
-        }]);
-
+        const { error } = await supabaseClient.from('rooms').insert([{ room_code: code, room_name: name }]);
         if (error) return alert("创建失败：" + error.message);
         hideModal('create-room-modal');
         loadRooms();
@@ -280,7 +241,7 @@
 
     async function enterRoom(id, code, name) {
         currentRoomId = id;
-        document.getElementById('room-title').innerText = name;
+        document.getElementById('room-title').innerText = name; // 设置当前房间名
         switchView('chat');
         loadHistory();
         initRealtime();
@@ -289,16 +250,10 @@
     async function loadHistory() {
         const chatBox = document.getElementById('chat-box');
         chatBox.innerHTML = "";
-        
         const { data } = await supabaseClient.from('messages')
-            .select(`
-                content, 
-                created_at,
-                profiles ( username )
-            `)
+            .select(`content, created_at, profiles ( username )`)
             .eq('room_id', currentRoomId)
             .order('created_at', { ascending: true });
-
         if (data) data.forEach(msg => {
             const senderName = msg.profiles ? msg.profiles.username : "未知用户";
             appendMessageToUI(senderName, msg.content);
@@ -310,8 +265,7 @@
         roomSubscription = supabaseClient.channel(`room_${currentRoomId}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, 
             (payload) => {
-                const msg = payload.new;
-                appendMessageToUI("系统", msg.content); 
+                appendMessageToUI("系统", payload.new.content); 
             })
             .subscribe();
     }
@@ -320,12 +274,7 @@
         const input = document.getElementById('message-input');
         const content = input.value.trim();
         if (!content) return;
-
-        await supabaseClient.from('messages').insert([{ 
-            room_id: currentRoomId, 
-            sender_id: currentUser.id, 
-            content: content 
-        }]);
+        await supabaseClient.from('messages').insert([{ room_id: currentRoomId, sender_id: currentUser.id, content: content }]);
         input.value = "";
     }
 
@@ -334,12 +283,7 @@
         const isMe = sender === currentUser.username;
         const wrapper = document.createElement('div');
         wrapper.className = `msg-wrapper ${isMe ? 'right' : 'left'}`;
-        wrapper.innerHTML = `
-            <div class="msg-content">
-                ${!isMe ? `<span class="sender-name">${sender}</span>` : ''}
-                <div style="white-space: pre-wrap;">${content}</div>
-                <span class="msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
-            </div>`;
+        wrapper.innerHTML = `<div class="msg-content">${!isMe ? `<span class="sender-name">${sender}</span>` : ''}<div style="white-space: pre-wrap;">${content}</div><span class="msg-time">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span></div>`;
         chatBox.appendChild(wrapper);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -354,12 +298,13 @@
             contactView.classList.remove('hidden');
             chatView.classList.add('hidden');
             addBtn.style.display = 'block'; 
-            backBtn.style.display = 'none'; // 列表页隐藏箭头
+            backBtn.style.display = 'none';
+            document.getElementById('room-title').innerText = "消息"; // 回到列表，标题重置为“消息”
         } else {
             contactView.classList.add('hidden');
             chatView.classList.remove('hidden');
             addBtn.style.display = 'none'; 
-            backBtn.style.display = 'block'; // 进入房间显示箭头
+            backBtn.style.display = 'block';
         }
 
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
