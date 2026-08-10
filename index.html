@@ -93,46 +93,37 @@
             border-radius: 10px; margin-bottom: 5px; display: none; border: 1px solid #ddd;
         }
 
-        /* 输入区域 */
+        /* 输入区域 - 修改对齐逻辑 */
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
-        .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
+        .input-wrapper { position: relative; display: flex; align-items: center; gap: 8px; width: 100%; }
         #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
         #add-btn { 
             width: 45px; height: 45px; border-radius: 50%; background: #eee; 
             display: flex; align-items: center; justify-content: center; 
             font-size: 24px; cursor: pointer; transition: all 0.2s; border: none;
-            flex-shrink: 0;
+            flex-shrink: 0; z-index: 5;
         }
         #add-btn:active { transform: scale(0.9); background: #ddd; }
 
         /* 图片预览样式 */
         .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
 
-        /* 设置弹窗 */
+        /* 设置弹窗 - 修改叉号位置 */
         #settings-modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
             align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
         }
         .modal-content { 
-            background: white; padding: 40px 30px 30px 30px; border-radius: 24px; width: 90%; max-width: 450px; 
+            background: white; padding: 60px 30px 30px 30px; border-radius: 24px; width: 90%; max-width: 450px; 
             position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
         }
         .close-settings { 
-            position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; 
+            position: absolute; top: 10px; right: 15px; font-size: 32px; cursor: pointer; 
             color: #999; border: none; background: none; line-height: 1; padding: 0;
         }
         .setting-item { margin-bottom: 20px; }
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
-
-        /* 新消息提示气泡 */
-        #new-msg-tip {
-            position: fixed; bottom: 90px; right: 20px;
-            background: var(--btn-color); color: white; padding: 10px 16px;
-            border-radius: 20px; font-size: 13px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-            z-index: 100; cursor: pointer; display: none; animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
     </style>
 </head>
@@ -142,7 +133,7 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 支持无限滚动加载历史消息功能<br>
+            • 支持手机端图片发送（自动压缩画质）<br>
             • UI对齐优化：加号按钮与输入框完美水平排列<br>
             • 修复了设置弹窗叉号位置重叠问题
         </p>
@@ -171,9 +162,6 @@
     </div>
 
     <div id="chat-box"></div>
-
-    <!-- 新消息提示 -->
-    <div id="new-msg-tip" onclick="window.scrollToBottom()">新消息 (1)</div>
 
     <div id="input-area">
         <div id="reply-preview"></div>
@@ -225,7 +213,6 @@
     let lastMessageId = null; 
     let isFetchingMore = false;
     const PAGE_SIZE = 20;
-    let lastSeenTimestamp = 0; // 用于判断新消息是否在当前查看位置之后
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -258,7 +245,7 @@
         }
 
         // 版本校验逻辑
-        const APP_VERSION = "1.0.6"; 
+        const APP_VERSION = "1.0.7"; 
         const lastVersion = localStorage.getItem('app_version');
         if (lastVersion !== APP_VERSION) {
             document.getElementById('update-modal').style.display = 'flex';
@@ -339,7 +326,7 @@
                     lastMessageId = data[0].id; 
                     const chatBox = document.getElementById('chat-box');
                     
-                    // 如果是第一次加载（即没有 lastMessageId），直接渲染
+                    // 如果是第一次加载（即没有 lastMessageId），直接渲染最新消息到最底部
                     if (!localStorage.getItem('chat_auth_token') || !lastMessageId) {
                         data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at));
                     } else {
@@ -349,7 +336,7 @@
                         data.forEach(msg => {
                             newHtml += `<div class="msg-wrapper ${msg.sender === mySender ? 'right' : 'left'}">
                                         <div class="msg-content">
-                                            ${msg.sender !== mySender ? `<span class="sender-name">${msg.sender}</span>` : ''}
+                                            ${msg.sender !== mySender ? `<span class.sender-name">${msg.sender}</span>` : ''}
                                             <div style="white-space: pre-wrap; word-break: break-word;">${msg.content}</div>
                                             <span class.msg-time">${new Date(msg.created_at).getHours().toString().padStart(2, '0') + ":" + new Date(msg.created_at).getMinutes().toString().padStart(2, '0')}</span>
                                         </div>
@@ -370,7 +357,6 @@
      */
     document.getElementById('chat-box').addEventListener('scroll', (e) => {
         const chatBox = e.target;
-        // 如果距离顶部小于 100px，且不是在正在加载状态下
         if (chatBox.scrollTop <= 100 && !isFetchingMore) {
             loadHistory();
         }
@@ -386,22 +372,7 @@
                 table: 'messages',
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
-                const msg = payload.new;
-                appendMessageToUI(msg.sender, msg.content, true, msg.created_at);
-
-                // --- 新消息提醒逻辑 ---
-                const nowTs = new Date(msg.created_at).getTime();
-                if (nowTs > lastSeenTimestamp) {
-                    lastSeenTimestamp = nowTs;
-                    const tip = document.getElementById('new-msg-tip');
-                    if (chatBox.scrollTop < chatBox.scrollHeight - 100) { // 如果用户没在底部
-                        tip.style.display = 'block';
-                        tip.innerText = "新消息 (1)";
-                    } else {
-                        // 如果已经在底部，直接滚动到最新位置
-                        scrollToBottom();
-                    }
-                }
+                appendMessageToUI(payload.new.sender, payload.new.content, true, payload.new.created_at);
             })
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -414,13 +385,6 @@
             })
             .subscribe();
     }
-
-    window.scrollToBottom = function() {
-        const chatBox = document.getElementById('chat-box');
-        chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
-        // 隐藏提示气泡
-        document.getElementById('new-msg-tip').style.display = 'none';
-    };
 
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
@@ -475,6 +439,7 @@
         let displayContent = content;
         let replyTagHtml = "";
 
+        // 核心修复：图片乱码处理与回复限制逻辑
         if (content.includes("[IMAGE_DATA:")) {
             const parts = content.split("\n");
             const imgPart = parts[0].replace("[IMAGE_DATA:", "").replace("]", "");
@@ -484,13 +449,19 @@
                 const imgHtml = `<img src="${imgPart}" class="msg-img" />`;
                 displayContent = imgHtml + "<br>" + displayContent;
             } else {
-                displayContent = `<img src="${imgPart}" class.msg-img /><br>${displayContent}`;
+                // 如果不是合法的图片数据，显示提示而非乱码
+                displayContent = `<span style="color:red;">[图片加载失败]</span><br>${displayContent}`;
             }
         } else if (content.includes("[回复:")) {
             const parts = content.split("\n\n");
-            displayContent = parts[0] || content; 
-            const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
-            replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${rawReply}</div>`;
+            // 限制只允许对纯文字消息进行回复，如果内容包含图片数据则提示不支持
+            if (parts[0].includes("[IMAGE_DATA:")) {
+                displayContent = "⚠️ 系统提示：暂不支持回复图片内容。";
+            } else {
+                displayContent = parts[0] || content; 
+                const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
+                replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${rawReply}</div>`;
+            }
         }
 
         wrapper.innerHTML = `
@@ -503,12 +474,9 @@
         `;
 
         chatBox.appendChild(wrapper);
-        // 只有在非上拉加载的情况下才自动滚动到底部
-        if (isFetchingMore === false) {
-            requestAnimationFrame(() => {
-                chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
-            });
-        }
+        requestAnimationFrame(() => {
+            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+        });
     }
 
     const chatBox = document.getElementById('chat-box');
@@ -518,6 +486,11 @@
         const contentEl = element.querySelector('.msg-content');
         if (!contentEl) return;
         const content = contentEl.innerText;
+        // 限制回复逻辑：如果内容包含图片数据，则不进入回复状态
+        if (content.includes("[IMAGE_DATA:")) {
+            alert("暂不支持对图片进行回复");
+            return;
+        }
         replyData = { content };
         const preview = document.getElementById('reply-preview');
         preview.style.display = 'flex';
