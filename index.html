@@ -43,6 +43,10 @@
         button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: opacity 0.2s; }
         button:active { opacity: 0.8; }
 
+        /* 免登录勾选框样式 */
+        .remember-me { display: flex; align-items: center; gap: 8px; margin-top: -5px; margin-bottom: 15px; font-size: 14px; color: #666; cursor: pointer; }
+        .remember-me input { width: auto; margin: 0; }
+
         /* --- 聊天主容器 --- */
         #chat-container { 
             display: flex; flex-direction: column; max-width: 900px; margin: 0 auto; 
@@ -62,7 +66,7 @@
         #chat-box { 
             flex: 1; overflow-y: auto; padding: 20px; display: flex; 
             flex-direction: column; gap: 12px; 
-            background-color: #f8f9fa; /* 固定浅灰色背景 */
+            background-color: #f8f9fa; 
             scroll-behavior: smooth;
         }
 
@@ -93,7 +97,7 @@
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
         #message-input { width: 100%; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
         #send-btn { background: var(--btn-color); color: white; padding: 8px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin-left: 10px; height: 45px; }
-        #send-btn:disabled { background: #ccc; }
+        #send-btn:disabled { background: #ccc; cursor: not-allowed; }
 
         /* 设置弹窗 */
         #settings-modal {
@@ -116,7 +120,7 @@
 </head>
 <body id="app-body">
 
-<div id="update-modal" onclick="closeUpdateModal()">
+<div id="update-modal" onclick="window.closeUpdateModal()">
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
@@ -124,7 +128,7 @@
             • 移除了背景图片功能以提升加载速度<br>
             • 修复了无痕模式下的用户名显示问题
         </p>
-        <button onclick="closeUpdateModal()">我知道了</button>
+        <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
 </div>
 
@@ -133,18 +137,19 @@
         <h2>进入聊天室</h2>
         <input type="text" id="username" placeholder="输入你的名字" autocomplete="off">
         <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off">
-        <div style="font-size: 13px; color: #888; margin-top: -5px; margin-bottom: 10px;">
-            <input type="checkbox" id="auto-login-check" style="width: auto; margin-right: 5px;"> 10天内免登录（自动进入上次房间）
+        <div class="remember-me">
+            <input type="checkbox" id="auto-login-check">
+            <label for="auto-login-check">10天内免登录（自动进入上次房间）</label>
         </div>
-        <button onclick="joinRoom()">开始聊天</button>
+        <button onclick="window.joinRoom()">开始聊天</button>
     </div>
 </div>
 
 <div id="chat-container" style="display:none;">
     <div id="nav-bar">
-        <span id="back-btn" onclick="leaveRoom()">←</span>
+        <span id="back-btn" onclick="window.leaveRoom()">←</span>
         <span id="room-title">正在加载...</span>
-        <span id="settings-btn" style="cursor:pointer; font-size:20px;" onclick="toggleSettings()">⚙️</span>
+        <span id="settings-btn" style="cursor:pointer; font-size:20px;" onclick="window.toggleSettings()">⚙️</span>
     </div>
 
     <div id="chat-box"></div>
@@ -153,19 +158,19 @@
         <div id="reply-preview"></div>
         <div style="display: flex; align-items: center;">
             <input type="text" id="message-input" placeholder="输入消息并按回车..." autocomplete="off">
-            <button id="send-btn" onclick="sendMessage()">发送</button>
+            <button id="send-btn" onclick="window.sendMessage()">发送</button>
         </div>
 
         <!-- 设置弹窗 -->
-        <div id="settings-modal" onclick="toggleSettings(event)">
+        <div id="settings-modal" onclick="window.toggleSettings(event)">
             <div class="modal-content" onclick="event.stopPropagation()">
-                <button class="close-settings" onclick="toggleSettings()">&times;</button>
+                <button class="close-settings" onclick="window.toggleSettings()">&times;</button>
                 <h3 style="margin-bottom:20px; text-align:center;">个性化设置</h3>
                 
                 <div class="setting-item">
                     <label>修改当前房间名称</label>
                     <input type="text" id="custom-room-name" placeholder="输入新名字...">
-                    <button style="padding:8px; font-size:14px;" onclick="updateRoomName()">确认更改</button>
+                    <button style="padding:8px; font-size:14px;" onclick="window.updateRoomName()">确认更改</button>
                 </div>
 
                 <div class="setting-item">
@@ -173,13 +178,14 @@
                     <input type="color" id="color-selector" value="#0084ff">
                 </div>
 
-                <button onclick="saveSettings()" style="margin-top:20px;">保存并应用</button>
+                <button onclick="window.saveSettings()" style="margin-top:20px;">保存并应用</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
+    // 配置信息
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -188,17 +194,21 @@
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (e) { console.error("Supabase 初始化失败:", e); }
 
+    // 全局变量
     let currentRoomCode = "";
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
 
+    /**
+     * 初始化页面逻辑
+     */
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
         const savedRoom = localStorage.getItem('chat_last_room');
         const expiry = localStorage.getItem('chat_auth_expiry');
 
-        // 自动登录逻辑：只有当所有数据都存在且未过期时才进入
+        // 自动登录逻辑：检查 Token 是否存在且未过期
         if (savedToken && savedRoom && expiry) {
             const now = new Date().getTime();
             if (now < parseInt(expiry)) {
@@ -214,27 +224,30 @@
                 loadHistory();
                 initRealtime();
             } else {
-                // 过期或数据异常，清除并重置
-                localStorage.removeItem('chat_auth_token');
-                localStorage.removeItem('chat_last_room');
-                localStorage.removeItem('chat_auth_expiry');
+                // 过期清除数据并刷新
+                localStorage.clear();
                 location.reload();
             }
         }
 
+        // 加载本地主题设置
         const savedColor = localStorage.getItem('chat_theme_color');
         if (savedColor) {
             document.documentElement.style.setProperty('--bubble-color', savedColor);
             document.getElementById('color-selector').value = savedColor;
         }
 
+        // 更新公告逻辑
         const hasSeenUpdate = localStorage.getItem('has_seen_update');
         if (!hasSeenUpdate) {
             document.getElementById('update-modal').style.display = 'flex';
         }
     };
 
-    async function joinRoom() {
+    /**
+     * 加入房间函数
+     */
+    window.joinRoom = async function() {
         const nameInput = document.getElementById('username').value.trim();
         currentRoomCode = document.getElementById('room-input').value.trim();
         const isAutoLogin = document.getElementById('auto-login-check').checked;
@@ -245,7 +258,7 @@
 
         if (!nameInput || !currentRoomCode) return alert("请输入名字和房间代码");
 
-        // 如果勾选了免登录，则存入本地
+        // 如果勾选了免登录，则存入本地持久化数据
         if (isAutoLogin) {
             const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000); // 10天后过期
             localStorage.setItem('chat_auth_token', nameInput);
@@ -262,8 +275,11 @@
         await ensureRoomExists();
         loadHistory();
         initRealtime();
-    }
+    };
 
+    /**
+     * 确保房间存在于数据库中
+     */
     async function ensureRoomExists() {
         const { data: room, error } = await supabaseClient
             .from('rooms')
@@ -280,6 +296,9 @@
         }
     }
 
+    /**
+     * 加载历史消息
+     */
     async function loadHistory() {
         const { data, error } = await supabaseClient
             .from('messages')
@@ -294,6 +313,9 @@
         }
     }
 
+    /**
+     * 初始化实时订阅
+     */
     function initRealtime() {
         if (roomSubscription) roomSubscription.unsubscribe();
 
@@ -318,6 +340,191 @@
             .subscribe();
     }
 
-    async function sendMessage() {
+    /**
+     * 发送消息函数
+     */
+    window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
-        let content = input
+        let content = inputEl.value.trim();
+        if (!content) return;
+
+        // 防止发送空内容或仅有空格的内容
+        let finalContent = content;
+        if (replyData) {
+            finalContent = `${content}\n\n[回复: ${replyData.content}]`;
+        }
+
+        const btn = document.getElementById('send-btn');
+        btn.innerText = "发送中...";
+        btn.disabled = true; // 防止重复点击导致的并发请求
+
+        try {
+            const { error } = await supabaseClient
+                .from('messages')
+                .insert([{ 
+                    room_code: currentRoomCode, 
+                    content: finalContent, 
+                    sender: mySender,
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (error) {
+                console.error("发送失败:", error);
+                alert("消息发送失败，请检查网络或权限。");
+            } else {
+                inputEl.value = ""; 
+                cancelReply();
+            }
+        } catch (e) { console.error(e); }
+        finally {
+            btn.innerText = "发送";
+            btn.disabled = false;
+        }
+    };
+
+    /**
+     * 将消息渲染到 UI
+     */
+    function appendMessageToUI(sender, content, isNew) {
+        const chatBox = document.getElementById('chat-box');
+        const wrapper = document.createElement('div');
+        wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
+
+        const now = new Date();
+        const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+        let displayContent = content;
+        let replyTagHtml = "";
+
+        // 解析回复标签逻辑
+        if (content.includes("[回复:")) {
+            const parts = content.split("\n\n");
+            displayContent = parts[0] || content; 
+            const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
+            replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${rawReply}</div>`;
+        }
+
+        wrapper.innerHTML = `
+            <div class="msg-content">
+                ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
+                <div style="white-space: pre-wrap; word-break: break-word;">${displayContent}</div>
+                ${replyTagHtml}
+                <span class.msg-time">${timeStr}</span>
+            </div>
+        `;
+
+        chatBox.appendChild(wrapper);
+        
+        // 优化滚动逻辑：确保新消息始终在底部且平滑
+        requestAnimationFrame(() => {
+            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+        });
+    }
+
+    /**
+     * 长按回复功能
+     */
+    const chatBox = document.getElementById('chat-box');
+    let pressTimer;
+
+    function handleLongPress(element) {
+        const contentEl = element.querySelector('.msg-content');
+        if (!contentEl) return;
+        const content = contentEl.innerText;
+        replyData = { content };
+        const preview = document.getElementById('reply-preview');
+        preview.style.display = 'flex';
+        preview.innerHTML = `正在回复：${content} <span style="cursor:pointer; color:#07c475;" onclick="window.cancelReply()">✕</span>`;
+    }
+
+    window.cancelReply = function() {
+        replyData = null;
+        document.getElementById('reply-preview').style.display = 'none';
+    };
+
+    // 触摸与右键事件监听
+    chatBox.addEventListener('touchstart', (e) => {
+        const target = e.target.closest('.msg-wrapper');
+        if (target && !target.classList.contains('system-msg')) {
+            pressTimer = setTimeout(() => handleLongPress(target), 500);
+        }
+    }, {passive: true});
+
+    chatBox.addEventListener('touchend', () => clearTimeout(pressTimer));
+
+    chatBox.addEventListener('contextmenu', (e) => {
+        const target = e.target.closest('.msg-wrapper');
+        if (target && !target.classList.contains('system-msg')) {
+            e.preventDefault(); 
+            handleLongPress(target);
+        }
+    });
+
+    /**
+     * 设置相关功能
+     */
+    window.toggleSettings = function(e) {
+        const modal = document.getElementById('settings-modal');
+        if (e) return; 
+        modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+    };
+
+    window.updateRoomName = async function() {
+        const newName = document.getElementById('custom-room-name').value.trim();
+        if (!newName) return alert("请输入新名字");
+        
+        try {
+            const { error } = await supabaseClient
+                .from('rooms')
+                .update({ room_name: newName })
+                .eq('room_code', currentRoomCode);
+
+            if (error) throw error;
+            alert("名称已更新，所有人可见");
+        } catch (e) {
+            console.error(e);
+            alert("修改失败，请确保数据库权限已正确开启。");
+        }
+    };
+
+    window.saveSettings = function() {
+        const color = document.getElementById('color-selector').value;
+        document.documentElement.style.setProperty('--bubble-color', color);
+        localStorage.setItem('chat_theme_color', color);
+
+        // 背景功能已按要求删除，此处不再处理 bgUrl
+        window.toggleSettings();
+    };
+
+    /**
+     * 退出房间逻辑：彻底清除自动登录数据
+     */
+    window.leaveRoom = function() {
+        if(confirm("确定要退出当前房间吗？（这将清除您的免登录状态）")) {
+            // 清除所有相关的本地存储数据，确保下次进入必须重新登录或手动勾选
+            localStorage.removeItem('chat_auth_token');
+            localStorage.removeItem('chat_last_room');
+            localStorage.removeItem('chat_auth_expiry');
+            
+            currentRoomCode = "";
+            document.getElementById('login-area').style.display = 'flex';
+            document.getElementById('chat-container').style.display = 'none';
+            location.reload(); 
+        }
+    };
+
+    window.closeUpdateModal = function() {
+        document.getElementById('update-modal').style.display = 'none';
+        localStorage.setItem('has_seen_update', 'true');
+    };
+
+    // 回车键发送监听
+    document.getElementById('message-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            window.sendMessage();
+        }
+    });
+</script>
+</body>
+</html>
