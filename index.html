@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial.0, maximum-scale=1.0, user-scalable=no">
     <title>极简高级聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -93,30 +93,28 @@
             border-radius: 10px; margin-bottom: 5px; display: none; border: 1px solid #ddd;
         }
 
-        /* 输入区域 */
+        /* 输入区域 - 修改对齐逻辑 */
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
         .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
         #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
-        
-        /* 加号圆圈按钮 */
         #add-btn { 
             width: 45px; height: 45px; border-radius: 50%; background: #eee; 
             display: flex; align-items: center; justify-content: center; 
             font-size: 24px; cursor: pointer; transition: all 0.2s; border: none;
-            flex-shrink: 0; /* 防止被压缩 */
+            flex-shrink: 0;
         }
         #add-btn:active { transform: scale(0.9); background: #ddd; }
 
         /* 图片预览样式 */
         .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
 
-        /* 设置弹窗 */
+        /* 设置弹窗 - 修改叉号位置 */
         #settings-modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
             align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
         }
         .modal-content { 
-            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; 
+            background: white; padding: 40px 30px 30px 30px; border-radius: 24px; width: 90%; max-width: 450px; 
             position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
         }
         .close-settings { 
@@ -131,20 +129,18 @@
 </head>
 <body id="app-body">
 
-<!-- 更新公告 -->
 <div id="update-modal" onclick="window.closeUpdateModal()">
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 支持手机端图片发送（自动压缩画质）<br>
-            • UI重构：加号按钮与输入框完美对齐<br>
-            • 修复了时间戳显示问题，现在消息显示真实发送时刻
+            • 支持无限滚动加载历史消息功能<br>
+            • UI对齐优化：加号按钮与输入框完美水平排列<br>
+            • 修复了设置弹窗叉号位置重叠问题
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
 </div>
 
-<!-- 登录区域 -->
 <div id="login-area">
     <div class="login-box">
         <h2>进入聊天室</h2>
@@ -158,7 +154,6 @@
     </div>
 </div>
 
-<!-- 聊天主容器 -->
 <div id="chat-container" style="display:none;">
     <div id="nav-bar">
         <span id="back-btn" onclick="window.leaveRoom()">←</span>
@@ -200,9 +195,6 @@
 </div>
 
 <script>
-    // 版本控制：每次更新代码时，手动修改此数字即可触发公告
-    const APP_VERSION = "1.0.3"; 
-    
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -216,6 +208,11 @@
     let replyData = null;
     let roomSubscription = null;
     let pendingImage = null;
+
+    // --- 无限滚动加载相关变量 ---
+    let lastMessageId = null; // 用于分页标记
+    let isFetchingMore = false;
+    const PAGE_SIZE = 20;
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -231,8 +228,9 @@
                 document.getElementById('chat-container').style.display = 'flex';
                 document.getElementById('room-title').innerText = currentRoomCode;
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
+
                 ensureRoomExists();
-                loadHistory();
+                loadHistory(); // 初始加载最新消息
                 initRealtime();
             } else {
                 localStorage.clear();
@@ -246,7 +244,8 @@
             document.getElementById('color-selector').value = savedColor;
         }
 
-        // 强制公告逻辑：如果版本号不匹配，显示弹窗
+        // 版本校验逻辑
+        const APP_VERSION = "1.0.4"; // 修改此数字可强制弹出公告
         const lastVersion = localStorage.getItem('app_version');
         if (lastVersion !== APP_VERSION) {
             document.getElementById('update-modal').style.display = 'flex';
@@ -280,7 +279,7 @@
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
         await ensureRoomExists();
-        loadHistory();
+        loadHistory(); // 加载第一页（最新消息）
         initRealtime();
     };
 
@@ -300,19 +299,57 @@
         }
     }
 
+    /**
+     * 加载历史消息（支持分页）
+     */
     async function loadHistory() {
-        const { data, error } = await supabaseClient
-            .from('messages')
-            .select('*')
-            .eq('room_code', currentRoomCode)
-            .order('created_at', { ascending: true });
+        if (isFetchingMore) return;
+        isFetchingMore = true;
 
-        if (!error && data) {
-            const chatBox = document.getElementById('chat-box');
-            chatBox.innerHTML = ""; 
-            data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at));
+        try {
+            let query = supabaseClient
+                .from('messages')
+                .select('*')
+                .eq('room_code', currentRoomCode)
+                .order('created_at', { ascending: false }); // 先按时间倒序排，方便拿最新的
+
+            if (lastMessageId) {
+                // 如果已经加载过一部分，就找比最后一条消息更早的
+                query = query.lt('id', lastMessageId);
+            }
+
+            const { data, error } = await query.limit(PAGE_SIZE);
+
+            if (!error && data) {
+                // 因为是倒序查出来的，需要反转数组变回正序显示
+                data.reverse();
+                
+                if (data.length > 0) {
+                    lastMessageId = data[0].id; // 更新最后一条消息ID作为分页标记
+                    const chatBox = document.getElementById('chat-box');
+                    // 将新加载的消息插入到最前面（因为是历史消息）
+                    data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at));
+                } else {
+                    // 如果没数据了，说明到底了
+                    console.log("已到达最早消息");
+                }
+            }
+        } catch (e) { console.error(e); }
+        finally {
+            isFetchingMore = false;
         }
     }
+
+    /**
+     * 监听滚动事件：上滑到顶部时触发加载更多
+     */
+    document.getElementById('chat-box').addEventListener('scroll', (e) => {
+        const chatBox = e.target;
+        // 如果距离顶部小于 100px，且不是在正在加载状态下
+        if (chatBox.scrollTop <= 100 && !isFetchingMore) {
+            loadHistory();
+        }
+    });
 
     function initRealtime() {
         if (roomSubscription) roomSubscription.unsubscribe();
@@ -337,48 +374,6 @@
             })
             .subscribe();
     }
-
-    window.triggerImageUpload = function() {
-        document.getElementById('file-input').click();
-    };
-
-    window.handleImageSelect = function(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        if (file.size > 15 * 1024 * 1024) { // 限制15MB
-            alert("图片太大啦！请选择小于15MB的图片。");
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.src = e.target.result;
-            img.onload = function() {
-                // 自动压缩逻辑：确保图片宽度不超过800px，并降低质量到0.7
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                if (width > 800) {
-                    const ratio = 800 / width;
-                    width *= ratio;
-                    height *= ratio;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                pendingImage = canvas.toDataURL('image/jpeg', 0.7);
-                // 选择完图片后直接发送消息
-                window.sendMessage();
-            };
-        };
-        reader.readAsDataURL(file);
-    };
 
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
