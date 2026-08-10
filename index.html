@@ -95,9 +95,13 @@
 
         /* 输入区域 */
         #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
-        #message-input { width: 100%; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
-        #send-btn { background: var(--btn-color); color: white; padding: 8px 20px; border-radius: 20px; border: none; font-weight: bold; cursor: pointer; margin-left: 10px; height: 45px; }
+        .input-wrapper { display: flex; align-items: center; gap: 8px; }
+        #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
+        #send-btn { background: var(--btn-color); color: white; padding: 8px 20px; border: none; border-radius: 20px; font-weight: bold; cursor: pointer; height: 45px; min-width: 60px; }
         #send-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        /* 图片预览样式 */
+        .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
 
         /* 设置弹窗 */
         #settings-modal {
@@ -124,9 +128,9 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 时间戳修复：现在消息会显示真实的发送时间，而非进入房间时的当前时间<br>
-            • 免登录默认开启：初始界面勾选框已设为默认选中状态<br>
-            • 身份持久化优化：确保用户在不同操作间保持一致的用户名
+            • 支持手机端发送图片功能<br>
+            • 时间戳修复：现在消息会显示真实的发送时间<br>
+            • 优化了用户身份持久化逻辑
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -138,7 +142,6 @@
         <input type="text" id="username" placeholder="输入你的名字" autocomplete="off">
         <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off">
         <div class="remember-me">
-            <!-- 默认勾选状态 -->
             <input type="checkbox" id="auto-login-check" checked>
             <label for="auto-login-check">10天内免登录（自动进入上次房间）</label>
         </div>
@@ -157,10 +160,15 @@
 
     <div id="input-area">
         <div id="reply-preview"></div>
-        <div style="display: flex; align-items: center;">
+        <div class="input-wrapper">
+            <!-- 图片发送按钮 -->
+            <button id="img-btn" style="background:none; color:#666; padding:0; font-size:24px;" onclick="window.triggerImageUpload()">📷</button>
             <input type="text" id="message-input" placeholder="输入消息并按回车..." autocomplete="off">
             <button id="send-btn" onclick="window.sendMessage()">发送</button>
         </div>
+
+        <!-- 隐藏的文件选择器 -->
+        <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="window.handleImageSelect(event)">
 
         <!-- 设置弹窗 -->
         <div id="settings-modal" onclick="window.toggleSettings(event)">
@@ -198,16 +206,13 @@
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
+    let pendingImage = null; // 用于暂存选中的图片
 
-    /**
-     * 初始化页面逻辑
-     */
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
         const savedRoom = localStorage.getItem('chat_last_room');
         const expiry = localStorage.getItem('chat_auth_expiry');
 
-        // 自动登录逻辑：检查 Token 是否存在且未过期
         if (savedToken && savedRoom && expiry) {
             const now = new Date().getTime();
             if (now < parseInt(expiry)) {
@@ -223,7 +228,6 @@
                 loadHistory();
                 initRealtime();
             } else {
-                // 过期清除数据并刷新
                 localStorage.clear();
                 location.reload();
             }
@@ -241,9 +245,6 @@
         }
     };
 
-    /**
-     * 加入房间函数
-     */
     window.joinRoom = async function() {
         const nameInput = document.getElementById('username').value.trim();
         currentRoomCode = document.getElementById('room-input').value.trim();
@@ -255,12 +256,12 @@
 
         if (!nameInput || !currentRoomCode) return alert("请输入名字和房间代码");
 
-        // 核心改进：只要输入了名字就持久化到本地（无论是否勾选免登录）
+        // 核心：只要输入了名字就持久化到本地
         localStorage.setItem('chat_auth_token', nameInput);
         mySender = nameInput; 
 
         if (isAutoLogin) {
-            const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000); // 10天后过期
+            const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000); 
             localStorage.setItem('chat_last_room', currentRoomCode);
             localStorage.setItem('chat_auth_expiry', expiryTime.toString());
         }
@@ -330,14 +331,46 @@
             .subscribe();
     }
 
+    /**
+     * 图片处理逻辑
+     */
+    window.triggerImageUpload = function() {
+        document.getElementById('file-input').click();
+    };
+
+    window.handleImageSelect = function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // 检查文件大小 (限制在5MB以内，防止Base64过大导致数据库报错)
+        if (file.size > 5 * 1024 * 1024) {
+            alert("图片太大啦！请选择小于5MB的图片。");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            pendingImage = e.target.result; // 这里是 Base64 字符串
+            // 在输入框里显示一个提示，或者直接准备发送
+            document.getElementById('message-input').placeholder = "图片已选择，点击发送即可";
+        };
+        reader.readAsDataURL(file);
+    };
+
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
         let content = inputEl.value.trim();
-        if (!content) return;
+        if (!content && !pendingImage) return;
 
         let finalContent = content;
         if (replyData) {
             finalContent = `${content}\n\n[回复: ${replyData.content}]`;
+        }
+
+        // 如果有图片，把图片内容拼接到消息最前面（或者根据你的需求放在后面）
+        let messageToSave = finalContent;
+        if (pendingImage) {
+            messageToSave = `[IMAGE_DATA:${pendingImage}]\n${finalContent}`;
         }
 
         const btn = document.getElementById('send-btn');
@@ -349,7 +382,7 @@
                 .from('messages')
                 .insert([{ 
                     room_code: currentRoomCode, 
-                    content: finalContent, 
+                    content: messageToSave, 
                     sender: mySender,
                     created_at: new Date().toISOString()
                 }]);
@@ -359,6 +392,7 @@
                 alert("消息发送失败，请检查网络或权限。");
             } else {
                 inputEl.value = ""; 
+                pendingImage = null; // 清空图片状态
                 cancelReply();
             }
         } catch (e) { console.error(e); }
@@ -368,19 +402,11 @@
         }
     };
 
-    /**
-     * 将消息渲染到 UI
-     * @param {string} sender 发送者名字
-     * @param {string} content 消息内容
-     * @param {boolean} isNew 是否是新消息（用于滚动）
-     * @param {string} timestamp_str 数据库返回的原始时间戳字符串
-     */
     function appendMessageToUI(sender, content, isNew, timestamp_str) {
         const chatBox = document.getElementById('chat-box');
         const wrapper = document.createElement('div');
         wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
 
-        // 修复时间戳逻辑：优先使用数据库传来的时间，如果没有则用当前时间
         let timeStr = "00:00";
         if (timestamp_str) {
             const date = new Date(timestamp_str);
@@ -393,7 +419,21 @@
         let displayContent = content;
         let replyTagHtml = "";
 
-        if (content.includes("[回复:")) {
+        // 处理图片显示逻辑
+        if (content.includes("[IMAGE_DATA:")) {
+            const parts = content.split("\n");
+            const imgPart = parts[0].replace("[IMAGE_DATA:", "").replace("]", "");
+            displayContent = parts.slice(1).join("\n") || ""; // 提取图片后的文字内容
+            
+            // 如果是Base64格式，直接渲染成img标签
+            if (imgPart.startsWith("data:image")) {
+                const imgHtml = `<img src="${imgPart}" class="msg-img" />`;
+                displayContent = imgHtml + "<br>" + displayContent;
+            } else {
+                // 如果是普通链接，直接显示
+                displayContent = `<img src="${imgPart}" class="msg-img" /><br>${displayContent}`;
+            }
+        } else if (content.includes("[回复:")) {
             const parts = content.split("\n\n");
             displayContent = parts[0] || content; 
             const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
