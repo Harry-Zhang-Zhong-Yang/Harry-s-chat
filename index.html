@@ -161,12 +161,12 @@
     let currentRoomId = null;
     let roomSubscription = null;
 
-    // --- 核心逻辑：持久化登录 ---
-    async function handleAuth() {
+        async function handleAuth() {
         const usernameInput = document.getElementById('reg-username').value.trim();
         if (!usernameInput) return alert("请输入用户名");
 
         try {
+            // 使用 upsert 插入或更新用户
             const { data, error } = await supabaseClient.from('profiles').upsert({ 
                 username: usernameInput,
                 updated_at: new Date().toISOString()
@@ -174,20 +174,27 @@
 
             if (error) throw error;
 
-            currentUser = { id: data[0].id, username: data[0].username };
-            
-            // 将用户信息存入本地缓存，实现下次打开自动登录
+            // 获取数据，如果没拿到 data[0]，则用当前输入的值兜底（防止报错）
+            const userData = data && data.length > 0 ? data[0] : { id: crypto.randomUUID(), username: usernameInput };
+
+            currentUser = { 
+                id: userData.id, 
+                username: userData.username 
+            };
+
+            // 持久化登录
             localStorage.setItem('chat_user', JSON.stringify(currentUser));
 
             document.getElementById('login-area').style.display = 'none';
             document.getElementById('main-app').style.display = 'flex';
             loadRooms();
         } catch (err) {
-            console.error("认证失败:", err);
+            console.error("认证失败详情:", err);
             if(err.message.includes("unique constraint")) alert("该用户名已被占用，请换一个名字。");
             else alert("操作失败，请检查数据库权限或网络连接。");
         }
     }
+
 
     // 页面加载时自动读取缓存登录状态
     window.onload = () => {
