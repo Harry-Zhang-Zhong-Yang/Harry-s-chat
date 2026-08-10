@@ -125,6 +125,15 @@
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
 
+        /* 新消息提示气泡 */
+        #new-msg-tip {
+            position: fixed; bottom: 90px; right: 20px;
+            background: var(--btn-color); color: white; padding: 10px 16px;
+            border-radius: 20px; font-size: 13px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 100; cursor: pointer; display: none; animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
     </style>
 </head>
 <body id="app-body">
@@ -133,7 +142,7 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 支持手机端图片发送（自动压缩画质）<br>
+            • 支持无限滚动加载历史消息功能<br>
             • UI对齐优化：加号按钮与输入框完美水平排列<br>
             • 修复了设置弹窗叉号位置重叠问题
         </p>
@@ -162,6 +171,9 @@
     </div>
 
     <div id="chat-box"></div>
+
+    <!-- 新消息提示 -->
+    <div id="new-msg-tip" onclick="window.scrollToBottom()">新消息 (1)</div>
 
     <div id="input-area">
         <div id="reply-preview"></div>
@@ -213,10 +225,8 @@
     let lastMessageId = null; 
     let isFetchingMore = false;
     const PAGE_SIZE = 20;
+    let lastSeenTimestamp = 0; // 用于判断新消息是否在当前查看位置之后
 
-    /**
-     * 初始化页面逻辑
-     */
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
         const savedRoom = localStorage.getItem('chat_last_room');
@@ -247,8 +257,8 @@
             document.getElementById('color-selector').value = savedColor;
         }
 
-        // 版本校验逻辑：修改 APP_VERSION 即可触发公告
-        const APP_VERSION = "1.0.5"; 
+        // 版本校验逻辑
+        const APP_VERSION = "1.0.6"; 
         const lastVersion = localStorage.getItem('app_version');
         if (lastVersion !== APP_VERSION) {
             document.getElementById('update-modal').style.display = 'flex';
@@ -256,9 +266,6 @@
         }
     };
 
-    /**
-     * 加入房间函数
-     */
     window.joinRoom = async function() {
         const nameInput = document.getElementById('username').value.trim();
         currentRoomCode = document.getElementById('room-input').value.trim();
@@ -320,18 +327,16 @@
                 .order('created_at', { ascending: false }); // 始终按时间倒序排，方便拿最新的
 
             if (lastMessageId) {
-                // 如果已经加载过一部分，就找比最后一条消息ID更小的（即更早的）
                 query = query.lt('id', lastMessageId);
             }
 
             const { data, error } = await query.limit(PAGE_SIZE);
 
             if (!error && data) {
-                // 核心修复：反转数组，确保消息按时间正序排列（旧的在上面）
-                data.reverse();
+                data.reverse(); // 反转数组，确保消息按时间正序排列（旧的在上面）
                 
                 if (data.length > 0) {
-                    lastMessageId = data[0].id; // 更新最后一条消息ID作为分页标记
+                    lastMessageId = data[0].id; 
                     const chatBox = document.getElementById('chat-box');
                     
                     // 如果是第一次加载（即没有 lastMessageId），直接渲染
@@ -381,7 +386,22 @@
                 table: 'messages',
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
-                appendMessageToUI(payload.new.sender, payload.new.content, true, payload.new.created_at);
+                const msg = payload.new;
+                appendMessageToUI(msg.sender, msg.content, true, msg.created_at);
+
+                // --- 新消息提醒逻辑 ---
+                const nowTs = new Date(msg.created_at).getTime();
+                if (nowTs > lastSeenTimestamp) {
+                    lastSeenTimestamp = nowTs;
+                    const tip = document.getElementById('new-msg-tip');
+                    if (chatBox.scrollTop < chatBox.scrollHeight - 100) { // 如果用户没在底部
+                        tip.style.display = 'block';
+                        tip.innerText = "新消息 (1)";
+                    } else {
+                        // 如果已经在底部，直接滚动到最新位置
+                        scrollToBottom();
+                    }
+                }
             })
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -394,6 +414,13 @@
             })
             .subscribe();
     }
+
+    window.scrollToBottom = function() {
+        const chatBox = document.getElementById('chat-box');
+        chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+        // 隐藏提示气泡
+        document.getElementById('new-msg-tip').style.display = 'none';
+    };
 
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
@@ -457,7 +484,7 @@
                 const imgHtml = `<img src="${imgPart}" class="msg-img" />`;
                 displayContent = imgHtml + "<br>" + displayContent;
             } else {
-                displayContent = `<img src="${imgPart}" class="msg-img" /><br>${displayContent}`;
+                displayContent = `<img src="${imgPart}" class.msg-img /><br>${displayContent}`;
             }
         } else if (content.includes("[回复:")) {
             const parts = content.split("\n\n");
@@ -468,7 +495,7 @@
 
         wrapper.innerHTML = `
             <div class="msg-content">
-                ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
+                ${sender !== mySender ? `<span class.sender-name">${sender}</span>` : ''}
                 <div style="white-space: pre-wrap; word-break: break-word;">${displayContent}</div>
                 ${replyTagHtml}
                 <span class.msg-time">${timeStr}</span>
@@ -476,9 +503,12 @@
         `;
 
         chatBox.appendChild(wrapper);
-        requestAnimationFrame(() => {
-            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
-        });
+        // 只有在非上拉加载的情况下才自动滚动到底部
+        if (isFetchingMore === false) {
+            requestAnimationFrame(() => {
+                chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+            });
+        }
     }
 
     const chatBox = document.getElementById('chat-box');
