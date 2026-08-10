@@ -3,86 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>微信极简版</title>
+    <title>极简高级聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --primary-color: #07c475;
-            --bg-gray: #f5f5f5;
-            --msg-self: #95ec69;
-            --msg-other: #ffffff;
-            --nav-bg: #f7f7f7;
+            --btn-color: #0084ff; 
+            --bubble-color: #0084ff; 
+            --bg-color: #f0f2f5; 
+            --msg-others: #ffffff;
+            --text-main: #333333;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-gray); height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; }
-
-        /* --- 通用弹窗样式 (带❌) --- */
-        .modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-            display: none; align-items: center; justify-content: center; z-index: 5000; backdrop-filter: blur(2px);
-        }
-        .modal-content {
-            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; position: relative;
-        }
-        .close-x {
-            position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #999; border: none; background: none;
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: var(--bg-color); 
+            height: 100vh; width: 100vw;
+            display: flex; flex-direction: column; overflow: hidden;
         }
 
-        /* --- 登录界面 --- */
-        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 3000; }
-        .login-box { width: 100%; max-width: 400px; padding: 40px; border: 1px solid #eee; border-radius: 24px; }
+        /* --- 登录区域 --- */
+        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+        .login-box { width: 100%; max-width: 400px; padding: 40px; border: 1px solid #eee; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .login-box h2 { margin-bottom: 30px; text-align: center; color: #333; }
         input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; }
-        button { width: 100%; padding: 14px; background: var(--primary-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; }
+        button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; }
 
-        /* --- 主应用布局 --- */
-        #main-app { display: none; flex-direction: column; height: 100vh; width: 100%; max-width: 600px; margin: 0 auto; background: white; position: relative; }
+        /* --- 主应用容器 --- */
+        #main-app { display: none; flex-direction: column; height: 100vh; width: 100vw; background: white; position: relative; }
 
-        /* --- 顶部导航 --- */
-        #top-nav { height: 55px; background: #f7f7f7; border-bottom: 1px solid #ddd; display: flex; align-items: center; padding: 0 15px; justify-content: space-between; }
-        #room-title { font-weight: bold; font-size: 18px; color: #333; }
+        /* --- 通用导航栏 --- */
+        #top-nav { 
+            height: 60px; background: #f9f9f9; border-bottom: 1px solid #eee; 
+            display: flex; align-items: center; padding: 0 15px; justify-content: space-between; z-index: 100;
+        }
+        #room-title { font-weight: bold; font-size: 18px; color: #333; flex: 1; text-align: center; }
 
-        /* --- 视图切换 --- */
-        .view-container { flex: 1; overflow-y: auto; position: relative; background: white; }
+        /* --- 视图容器 --- */
+        .view-container { flex: 1; overflow-y: auto; position: relative; }
         .hidden { display: none !important; }
 
-        /* --- 联系人/消息列表 --- */
-        #contact-list { padding: 10px; }
-        .contact-item { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
-        .avatar { width: 48px; height: 48px; background: #ddd; border-radius: 50%; margin-right: 12px; }
-        .contact-info .name { font-weight: bold; display: block; font-size: 16px; }
-        .contact-info .last-msg { font-size: 13px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 200px; }
+        /* --- 联系人列表样式 --- */
+        .contact-item { 
+            display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f0f0f0; cursor: pointer;
+        }
+        .avatar { width: 48px; height: 48px; background: #ddd; border-radius: 50%; margin-right: 15px; }
+        .contact-info .name { display: block; font-weight: bold; font-size: 16px; }
+        .contact-info .last-msg { color: #999; font-size: 13px; }
 
-        /* --- 聊天窗口 --- */
-        #chat-box { flex: 1; padding: 15px; display: flex; flex-direction: column; gap: 15px; background-color: #f3f3f3; background-image: url('https://user-images.githubusercontent.com/15075759/28449166-86d8e9a0-733c-4b1f-bb0e-4303309931cf.png'); background-size: cover; }
-        .msg-wrapper { max-width: 85%; position: relative; animation: msgIn 0.2s ease-out; }
-        @keyframes msgIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        /* --- 聊天界面样式 --- */
+        #chat-box { flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 12px; background-color: #f5f5f5; overflow-y: auto; }
+        .msg-wrapper { max-width: 80%; position: relative; animation: msgIn 0.3s ease-out; }
+        @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .left { align-self: flex-start; }
         .right { align-self: flex-end; text-align: right; }
-        .msg-content { padding: 10px 14px; border-radius: 8px; font-size: 15px; line-height: 1.5; word-break: break-word; }
-        .left .msg-content { background: var(--msg-other); color: #000; border-radius: 8px 8px 8px 2px; }
-        .right .msg-content { background: var(--msg-self); color: #000; border-radius: 8px 8px 2px 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
-        .sender-name { font-size: 12px; margin-bottom: 4px; display: block; color: #666; }
-        .msg-time { font-size: 10px; color: #999; margin-top: 4px; display: block; }
+        .msg-content { padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.5; position: relative; }
+        .left .msg-content { background: white; color: #333; border: 1px solid #e0e0e0; border-bottom-left-radius: 4px; }
+        .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; }
+        .sender-name { font-size: 12px; margin-bottom: 4px; display: block; opacity: 0.8; }
+        .msg-time { font-size: 10px; margin-top: 6px; display: block; opacity: 0.5; }
 
         /* --- 输入区域 --- */
-        #input-area { padding: 10px; background: white; border-top: 1px solid #ddd; }
+        #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
         .input-wrapper { display: flex; align-items: center; gap: 10px; }
-        #message-input { flex: 1; padding: 10px 15px; border: 1px solid #ddd; border-radius: 20px; outline: none; font-size: 16px; }
-        #send-btn { width: auto; padding: 8px 20px; background: var(--primary-color); color: white; border: none; border-radius: 20px; font-weight: bold; }
+        #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; }
+        #send-btn { background: var(--btn-color); color: white; padding: 10px 20px; border-radius: 20px; border: none; font-weight: bold; height: 45px; }
 
         /* --- 底部导航栏 --- */
-        #bottom-nav { height: 60px; background: #f7f7f7; border-top: 1px solid #ddd; display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); }
-        .nav-item { text-align: center; font-size: 12px; color: #555; cursor: pointer; }
-        .nav-item.active { color: var(--primary-color); }
+        #bottom-nav { 
+            height: 65px; background: white; border-top: 1px solid #eee; 
+            display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom);
+        }
+        .nav-item { text-align: center; font-size: 12px; color: #999; cursor: pointer; }
+        .nav-item.active { color: var(--btn-color); }
 
-        /* --- 其他 UI --- */
-        #add-room-btn { font-size: 24px; cursor: pointer; }
+        /* --- 弹窗样式优化 --- */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
+            align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
+        }
+        .modal-content { 
+            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; 
+            position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        /* 绝对定位到右上角 */
+        .close-x { 
+            position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; 
+            color: #999; border: none; background: none; line-height: 1; padding: 0;
+        }
     </style>
 </head>
-<body>
+<body id="app-body">
 
-<!-- 登录界面 -->
 <div id="login-area">
     <div class="login-box">
         <h2>欢迎进入</h2>
@@ -91,22 +103,21 @@
     </div>
 </div>
 
-<!-- 主应用 -->
 <div id="main-app">
+    <!-- 顶部导航 -->
     <div id="top-nav">
-        <span id="back-btn" style="cursor:pointer; font-size: 20px;" onclick="goBack()">←</span>
+        <span id="back-btn" style="cursor:pointer; font-size: 24px;" onclick="goBack()">←</span>
         <span id="room-title">消息</span>
-        <div style="display: flex; align-items: center; gap: 15px;">
-            <span id="add-room-btn" onclick="showCreateRoomModal()">➕</span>
-            <span style="font-size: 20px;" onclick="toggleSettings()">⚙️</span>
+        <div id="nav-right-icons" style="display: flex; align-items: center; gap: 15px;">
+            <!-- 创建按钮：仅在联系人列表显示 -->
+            <span id="add-room-btn" style="font-size: 24px; cursor:pointer;" onclick="showCreateRoomModal()">➕</span>
+            <span style="font-size: 20px; cursor:pointer;" onclick="toggleSettings()">⚙️</span>
         </div>
     </div>
 
-    <!-- 消息列表视图 -->
+    <!-- 联系人列表视图 -->
     <div id="view-contacts" class="view-container">
-        <div id="contact-list">
-            <!-- 这里动态加载房间 -->
-        </div>
+        <div id="contact-list"></div>
     </div>
 
     <!-- 聊天窗口视图 -->
@@ -122,34 +133,34 @@
 
     <!-- 底部导航 -->
     <div id="bottom-nav">
-        <div class="nav-item active" onclick="switchView('contacts')">💬<br>消息</div>
-        <div class="nav-item" onclick="alert('通讯录功能开发中')">👥<br>通讯录</div>
-        <div class="nav-item" onclick="alert('我的设置')">👤<br>我</div>
+        <div class="nav-item active" id="nav-msg" onclick="switchView('contacts')">💬<br>消息</div>
+        <div class="nav-item" id="nav-list" onclick="alert('通讯录功能开发中')">👥<br>通讯录</div>
+        <div class="nav-item" id="nav-me" onclick="alert('我的设置')">👤<br>我</div>
+    </div>
+
+    <!-- 创建房间弹窗 -->
+    <div id="create-room-modal" class="modal">
+        <div class="modal-content">
+            <button class="close-x" onclick="hideModal('create-room-modal')">&times;</button>
+            <h3 style="margin-bottom:20px;">创建新房间</h3>
+            <input type="text" id="new-room-code" placeholder="输入房间代码">
+            <input type="text" id="new-room-name" placeholder="显示名称">
+            <button onclick="createRoom()">确认创建</button>
+        </div>
+    </div>
+
+    <!-- 设置弹窗 -->
+    <div id="settings-modal" class="modal" onclick="toggleSettings(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="close-x" onclick="hideModal('settings-modal')">&times;</button>
+            <h3 style="margin-bottom:20px;">个性化设置</h3>
+            <input type="text" id="custom-room-name" placeholder="修改当前房间名称">
+            <button onclick="updateRoomName()">保存更改</button>
+        </div>
     </div>
 </div>
 
-<!-- 创建房间弹窗 -->
-<div id="create-room-modal" class="modal">
-    <div class="modal-content">
-        <button class="close-x" onclick="hideModal('create-room-modal')">❌</button>
-        <h3>创建新房间</h3>
-        <input type="text" id="new-room-code" placeholder="输入房间代码 (如: A101)">
-        <input type="text" id="new-room-name" placeholder="显示名称">
-        <button onclick="createRoom()">确认创建</button>
-    </div>
-</div>
-
-<!-- 设置弹窗 -->
-<div id="settings-modal" class="modal" onclick="toggleSettings(event)">
-    <div class="modal-content" onclick="event.stopPropagation()">
-        <button class="close-x" onclick="hideModal('settings-modal')">❌</button>
-        <h3>个性化设置</h3>
-        <input type="text" id="custom-room-name" placeholder="修改当前房间名称">
-        <button onclick="updateRoomName()">保存更改</button>
-    </div>
-</div>
 <script>
-    // 配置你的 Supabase 信息
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -159,13 +170,12 @@
     let currentRoomId = null;
     let roomSubscription = null;
 
-    // --- 核心认证逻辑：简便注册/登录 ---
-        async function handleAuth() {
+    // --- 认证逻辑 ---
+    async function handleAuth() {
         const usernameInput = document.getElementById('reg-username').value.trim();
         if (!usernameInput) return alert("请输入用户名");
 
         try {
-            // 这里的 upsert 会让数据库自动生成 id
             const { data, error } = await supabaseClient.from('profiles').upsert({ 
                 username: usernameInput,
                 updated_at: new Date().toISOString()
@@ -173,38 +183,22 @@
 
             if (error) throw error;
 
-            // 获取数据库生成的 id 和 username
-            currentUser = { 
-                id: data[0].id, 
-                username: data[0].username 
-            };
-
-            console.log("登录成功:", currentUser);
+            currentUser = { id: data[0].id, username: data[0].username };
             document.getElementById('login-area').style.display = 'none';
             document.getElementById('main-app').style.display = 'flex';
             loadRooms();
         } catch (err) {
-            console.error("认证失败详情:", err);
-            if(err.message.includes("unique constraint")) {
-                alert("该用户名已被占用，请换一个名字。");
-            } else {
-                alert("操作失败，请检查数据库权限或网络连接。");
-            }
+            console.error("认证失败:", err);
+            if(err.message.includes("unique constraint")) alert("该用户名已被占用，请换一个名字。");
+            else alert("操作失败，请检查数据库权限或网络连接。");
         }
     }
 
-
     // --- 房间逻辑 ---
     async function loadRooms() {
-        const { data: rooms, error } = await supabaseClient.from('rooms').select('*');
-        if (error) {
-            console.error("加载房间失败:", error);
-            return;
-        }
-
+        const { data: rooms } = await supabaseClient.from('rooms').select('*');
         const list = document.getElementById('contact-list');
         list.innerHTML = "";
-        
         if (rooms && rooms.length > 0) {
             rooms.forEach(room => {
                 const div = document.createElement('div');
@@ -250,7 +244,6 @@
     async function loadHistory() {
         const chatBox = document.getElementById('chat-box');
         chatBox.innerHTML = "";
-        
         const { data } = await supabaseClient.from('messages').select('*').eq('room_id', currentRoomId).order('created_at', { ascending: true });
         if (data) data.forEach(msg => appendMessageToUI(msg.sender_name, msg.content));
     }
@@ -291,17 +284,27 @@
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    // --- UI 辅助 ---
+    // --- UI 辅助逻辑 (核心修复点) ---
     function switchView(view) {
         const contactView = document.getElementById('view-contacts');
         const chatView = document.getElementById('view-chat');
+        const addBtn = document.getElementById('add-room-btn');
+
         if (view === 'contacts') {
             contactView.classList.remove('hidden');
             chatView.classList.add('hidden');
+            // 在联系人列表显示“创建房间”按钮
+            addBtn.style.display = 'block'; 
         } else {
             contactView.classList.add('hidden');
             chatView.classList.remove('hidden');
+            // 在聊天界面隐藏“创建房间”按钮，只保留设置图标
+            addBtn.style.display = 'none'; 
         }
+
+        // 更新底部导航高亮
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        if (view === 'contacts') document.getElementById('nav-msg').classList.add('active');
     }
 
     function goBack() { switchView('contacts'); }
@@ -326,7 +329,5 @@
         if (e.key === 'Enter') sendMessage();
     });
 </script>
-
-
 </body>
 </html>
