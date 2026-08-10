@@ -160,13 +160,12 @@
     let roomSubscription = null;
 
     // --- 核心认证逻辑：简便注册/登录 ---
-    async function handleAuth() {
+        async function handleAuth() {
         const usernameInput = document.getElementById('reg-username').value.trim();
         if (!usernameInput) return alert("请输入用户名");
 
         try {
-            // 1. 先尝试在 profiles 表中插入或更新用户
-            // 我们使用 upsert，如果用户名已存在则更新，不存在则创建
+            // 这里的 upsert 会让数据库自动生成 id
             const { data, error } = await supabaseClient.from('profiles').upsert({ 
                 username: usernameInput,
                 updated_at: new Date().toISOString()
@@ -174,9 +173,7 @@
 
             if (error) throw error;
 
-            // 2. 获取当前用户数据（这里我们模拟一个 session，因为是简便注册）
-            // 在实际复杂的系统中这里会用 auth.getUser()
-            // 为了让你的代码能跑通且不报错，我们直接构造 currentUser 对象
+            // 获取数据库生成的 id 和 username
             currentUser = { 
                 id: data[0].id, 
                 username: data[0].username 
@@ -185,14 +182,17 @@
             console.log("登录成功:", currentUser);
             document.getElementById('login-area').style.display = 'none';
             document.getElementById('main-app').style.display = 'flex';
-            
-            // 初始化加载
             loadRooms();
         } catch (err) {
-            console.error("认证失败:", err);
-            alert("操作失败，请检查数据库权限或用户名是否可用。");
+            console.error("认证失败详情:", err);
+            if(err.message.includes("unique constraint")) {
+                alert("该用户名已被占用，请换一个名字。");
+            } else {
+                alert("操作失败，请检查数据库权限或网络连接。");
+            }
         }
     }
+
 
     // --- 房间逻辑 ---
     async function loadRooms() {
