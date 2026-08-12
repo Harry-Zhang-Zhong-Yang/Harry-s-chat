@@ -139,9 +139,10 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 支持微信式点击录音发送功能<br>
-            • 新增智能菜单：支持回复与语音转文字<br>
-            • UI重构：麦克风与加号按钮完美对齐
+            • 首屏优化：进入房间直接展示最新消息<br>
+            • UI精简：移除冗余回复按钮，保留转文字功能<br>
+            • 交互升级：手机长按回复改为两秒判定<br>
+            • 时间增强：非当天消息自动显示日期
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -179,7 +180,6 @@
             <button id="add-btn" class="action-btn" onclick="window.triggerImageUpload()">+</button>
         </div>
 
-        <!-- 隐藏的文件选择器 -->
         <input type="file" id="file-input" accept="image/*,audio/*" style="display:none;" onchange="window.handleFileSelect(event)">
 
         <!-- 设置弹窗 -->
@@ -203,7 +203,7 @@
 </div>
 
 <script>
-    const APP_VERSION = "1.0.8"; 
+    const APP_VERSION = "1.0.9"; 
     
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
@@ -217,7 +217,7 @@
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
-    let pendingMedia = null; // 用于暂存上传好的图片或语音
+    let pendingMedia = null; 
 
     // --- 语音录制相关变量 ---
     let mediaRecorder;
@@ -317,6 +317,9 @@
             const chatBox = document.getElementById('chat-box');
             chatBox.innerHTML = ""; 
             data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
+            
+            // --- 优化：进入房间直接展示最新的消息 ---
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
     }
 
@@ -344,7 +347,6 @@
             .subscribe();
     }
 
-    // --- 附件上传逻辑（优化：仅负责上传，不直接发送） ---
     window.triggerImageUpload = function() {
         document.getElementById('file-input').click();
     };
@@ -379,15 +381,13 @@
                 type: fileExt.toLowerCase().includes('mp3') || fileExt.toLowerCase().includes('wav') ? 'audio' : 'image'
             };
 
-            // 上传成功后，提示用户点击发送或自动触发（此处建议手动确认，但为了流畅度可保留自动触发）
-            window.sendMessage(); 
+            window.sendMessage();
         } catch (e) {
             console.error(e);
             alert("上传失败，请检查网络或权限。");
         }
     };
 
-    // --- 语音录制核心逻辑（优化：流管理与状态控制） ---
     async function startRecording() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -448,22 +448,20 @@
         }
     }
 
-    // 录音按钮交互优化（防止多次触发）
     const micBtn = document.getElementById('mic-btn');
+    // 兼容手机端点击/长按逻辑
     micBtn.addEventListener('mousedown', (e) => { e.preventDefault(); startRecording(); });
-    micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+    micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); }, {passive: false});
 
     window.addEventListener('mouseup', () => stopRecording());
     window.addEventListener('touchend', () => stopRecording());
 
-    // --- 发送消息逻辑（核心优化：统一入口） ---
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
         let content = inputEl.value.trim();
         
         if (!content && !pendingMedia) return;
 
-        // 如果有回复内容，拼接在消息后面
         let finalContent = content;
         if (replyData) {
             finalContent = `${content}\n\n[回复: ${replyData.content}]`;
@@ -487,7 +485,7 @@
             } else {
                 inputEl.value = ""; 
                 pendingMedia = null;
-                cancelReply(); // 发送成功后清除回复状态
+                cancelReply();
             }
         } catch (e) { console.error(e); }
     };
@@ -497,10 +495,20 @@
         const wrapper = document.createElement('div');
         wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
 
+        // --- 优化：智能时间戳逻辑 ---
         let timeStr = "00:00";
         if (timestamp_str) {
             const date = new Date(timestamp_str);
-            timeStr = date.getHours().toString().padStart(2, '0') + ":" + date.getMinutes().toString().padStart(2, '0');
+            const now = new Date();
+            const isToday = date.toDateString() === now.toDateString();
+
+            if (!isToday) {
+                // 非当天显示 MM-DD HH:mm
+                timeStr = `${date.getMonth() + 1}-${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            } else {
+                // 当天仅显示 HH:mm
+                timeStr = date.getHours().toString().padStart(2, '0') + ":" + date.getMinutes().toString().padStart(2, '0');
+            }
         } else {
             const now = new Date();
             timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
@@ -509,7 +517,6 @@
         let displayContent = content;
         let replyTagHtml = "";
 
-        // 解析回复内容
         if (content.includes("[回复:")) {
             const parts = content.split("\n\n");
             displayContent = parts[0] || content; 
@@ -539,7 +546,7 @@
             </div>
         `;
 
-        // --- 动态菜单逻辑（优化：统一生成） ---
+        // --- 动态菜单逻辑（仅保留转文字） ---
         const menuContainer = document.createElement('div');
         menuContainer.style.cssText = "display:flex; gap:8px; margin-bottom:5px; justify-content:flex-end;";
         
@@ -577,15 +584,6 @@
                     transcriptDiv.innerText = "无法启动语音识别。";
                 }
             }});
-        } else if (!replyData && sender !== mySender) {
-            options.push({ label: '回复', action: () => {
-                const contentEl = wrapper.querySelector('.msg-content');
-                if(contentEl) {
-                    replyData = { content: contentEl.innerText };
-                    document.getElementById('reply-preview').style.display = 'flex';
-                    document.getElementById('reply-preview').innerHTML = `正在回复：${replyData.content} <span style="cursor:pointer; color:#07c475;" onclick="window.cancelReply()">✕</span>`;
-                }
-            }});
         }
 
         options.forEach(opt => {
@@ -599,7 +597,6 @@
         wrapper.prepend(menuContainer);
         chatBox.appendChild(wrapper);
         
-        // 平滑滚动到底部
         requestAnimationFrame(() => {
             chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
         });
@@ -615,7 +612,7 @@
         replyData = { content };
         const preview = document.getElementById('reply-preview');
         preview.style.display = 'flex';
-        preview.innerHTML = `正在回复：${content} <span style="cursor:pointer; color:#07c475;" onclick="window.cancelReply()">✕</span>`;
+        preview.innerHTML = `正在回复：${replyData.content} <span style="cursor:pointer; color:#07c475;" onclick="window.cancelReply()">✕</span>`;
     }
 
     window.cancelReply = function() {
@@ -623,16 +620,18 @@
         document.getElementById('reply-preview').style.display = 'none';
     };
 
-    // 触摸长按逻辑优化
+    // --- 交互优化：手机长按回复改为两秒 (2000ms) ---
     chatBox.addEventListener('touchstart', (e) => {
         const target = e.target.closest('.msg-wrapper');
         if (target && !target.classList.contains('system-msg')) {
-            pressTimer = setTimeout(() => handleLongPress(target), 500);
+            // 只有在非按钮区域长按才触发回复，防止干扰转文字按钮
+            pressTimer = setTimeout(() => handleLongPress(target), 2000);
         }
     }, {passive: true});
 
     chatBox.addEventListener('touchend', () => clearTimeout(pressTimer));
 
+    // 电脑端右键长按回复
     chatBox.addEventListener('contextmenu', (e) => {
         const target = e.target.closest('.msg-wrapper');
         if (target && !target.classList.contains('system-msg')) {
