@@ -103,7 +103,7 @@
             width: 45px; height: 45px; border-radius: 50%; background: #eee; 
             display: flex; align-items: center; justify-content: center; 
             font-size: 24px; cursor: pointer; transition: all 0.2s; border: none;
-            flex-shrink: 0; /* 防止被压缩 */
+            flex-shrink: 0;
         }
         #add-btn:active { transform: scale(0.9); background: #ddd; }
 
@@ -136,7 +136,7 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 支持手机端图片发送（自动压缩画质）<br>
+            • 支持手机端图片和语音发送（自动上传至云端）<br>
             • UI重构：加号按钮与输入框完美对齐<br>
             • 修复了时间戳显示问题，现在消息显示真实发送时刻
         </p>
@@ -172,12 +172,11 @@
         <div id="reply-preview"></div>
         <div class="input-wrapper">
             <input type="text" id="message-input" placeholder="输入消息并按回车..." autocomplete="off">
-            <!-- 加号圆圈按钮 -->
             <button id="add-btn" onclick="window.triggerImageUpload()">+</button>
         </div>
 
         <!-- 隐藏的文件选择器 -->
-        <input type="file" id="file-input" accept="image/*" style="display:none;" onchange="window.handleImageSelect(event)">
+        <input type="file" id="file-input" accept="image/*,audio/*" style="display:none;" onchange="window.handleFileSelect(event)">
 
         <!-- 设置弹窗 -->
         <div id="settings-modal" onclick="window.toggleSettings(event)">
@@ -200,8 +199,7 @@
 </div>
 
 <script>
-    // 版本控制：每次更新代码时，手动修改此数字即可触发公告
-    const APP_VERSION = "1.0.3"; 
+    const APP_VERSION = "1.0.4"; 
     
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
@@ -215,7 +213,7 @@
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
-    let pendingImage = null;
+    let pendingMedia = null; // 这里存储上传后的 URL 和类型
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -246,7 +244,6 @@
             document.getElementById('color-selector').value = savedColor;
         }
 
-        // 强制公告逻辑：如果版本号不匹配，显示弹窗
         const lastVersion = localStorage.getItem('app_version');
         if (lastVersion !== APP_VERSION) {
             document.getElementById('update-modal').style.display = 'flex';
@@ -310,7 +307,7 @@
         if (!error && data) {
             const chatBox = document.getElementById('chat-box');
             chatBox.innerHTML = ""; 
-            data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at));
+            data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
         }
     }
 
@@ -324,7 +321,7 @@
                 table: 'messages',
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
-                appendMessageToUI(payload.new.sender, payload.new.content, true, payload.new.created_at);
+                appendMessageToUI(payload.new.sender, payload.new.content, true, payload.new.created_at, payload.new.media_url, payload.new.media_type);
             })
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -338,61 +335,58 @@
             .subscribe();
     }
 
+    // --- 核心修改：文件上传逻辑 ---
     window.triggerImageUpload = function() {
         document.getElementById('file-input').click();
     };
 
-    window.handleImageSelect = function(event) {
+    window.handleFileSelect = async function(event) {
         const file = event.target.files[0];
         if (!file) return;
 
-        if (file.size > 15 * 1024 * 1024) { // 限制15MB
-            alert("图片太大啦！请选择小于15MB的图片。");
-            return;
+        if (file.size > 15 * 1024 * 1024) {
+            return alert("文件太大啦！请选择小于15MB的文件。");
         }
 
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.src = e.target.result;
-            img.onload = function() {
-                // 自动压缩逻辑：确保图片宽度不超过800px，并降低质量到0.7
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
+        try {
+            // 生成唯一文件名，防止重名冲突
+            const fileExt = file.name.split('.').pop();
+            const fileName = `media_${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
+            const filePath = `chat_media/${fileName}`;
 
-                if (width > 800) {
-                    const ratio = 800 / width;
-                    width *= ratio;
-                    height *= ratio;
-                }
+            // 上传到 Supabase Storage
+            const { data, error } = await supabase.storage
+                .from('chat_media')
+                .upload(filePath, file);
 
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
+            if (error) throw error;
 
-                pendingImage = canvas.toDataURL('image/jpeg', 0.7);
-                // 选择完图片后直接发送消息
-                window.sendMessage();
+            // 获取公开 URL
+            const { data: publicData } = supabase.storage
+                .from('chat_media')
+                .getPublicUrl(filePath);
+
+            pendingMedia = {
+                url: publicData.publicUrl,
+                type: fileExt.toLowerCase().includes('mp3') || fileExt.toLowerCase().includes('wav') ? 'audio' : 'image'
             };
-        };
-        reader.readAsDataURL(file);
+
+            // 上传成功后自动发送消息（如果输入框为空，则只发媒体）
+            window.sendMessage();
+        } catch (e) {
+            console.error(e);
+            alert("上传失败，请检查网络或权限。");
+        }
     };
 
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
         let content = inputEl.value.trim();
-        if (!content && !pendingImage) return;
+        if (!content && !pendingMedia) return;
 
         let finalContent = content;
         if (replyData) {
             finalContent = `${content}\n\n[回复: ${replyData.content}]`;
-        }
-
-        let messageToSave = finalContent;
-        if (pendingImage) {
-            messageToSave = `[IMAGE_DATA:${pendingImage}]\n${finalContent}`;
         }
 
         try {
@@ -400,23 +394,25 @@
                 .from('messages')
                 .insert([{ 
                     room_code: currentRoomCode, 
-                    content: messageToSave, 
+                    content: finalContent, 
                     sender: mySender,
+                    media_url: pendingMedia ? pendingMedia.url : null,
+                    media_type: pendingMedia ? pendingMedia.type : null,
                     created_at: new Date().toISOString()
                 }]);
 
             if (error) {
                 console.error("发送失败:", error);
-                alert("消息发送失败，请检查网络或权限。");
+                alert("消息发送失败。");
             } else {
                 inputEl.value = ""; 
-                pendingImage = null;
+                pendingMedia = null;
                 cancelReply();
             }
         } catch (e) { console.error(e); }
     };
 
-    function appendMessageToUI(sender, content, isNew, timestamp_str) {
+    function appendMessageToUI(sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null) {
         const chatBox = document.getElementById('chat-box');
         const wrapper = document.createElement('div');
         wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
@@ -433,30 +429,30 @@
         let displayContent = content;
         let replyTagHtml = "";
 
-        if (content.includes("[IMAGE_DATA:")) {
-            const parts = content.split("\n");
-            const imgPart = parts[0].replace("[IMAGE_DATA:", "").replace("]", "");
-            displayContent = parts.slice(1).join("\n") || ""; 
-            
-            if (imgPart.startsWith("data:image")) {
-                const imgHtml = `<img src="${imgPart}" class="msg-img" />`;
-                displayContent = imgHtml + "<br>" + displayContent;
-            } else {
-                displayContent = `<img src="${imgPart}" class="msg-img" /><br>${displayContent}`;
-            }
-        } else if (content.includes("[回复:")) {
+        // 处理回复标签逻辑
+        if (content.includes("[回复:")) {
             const parts = content.split("\n\n");
             displayContent = parts[0] || content; 
             const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
             replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${rawReply}</div>`;
         }
 
+        // 处理媒体显示逻辑
+        let mediaHtml = "";
+        if (mediaUrl) {
+            if (mediaType === 'image') {
+                mediaHtml = `<img src="${mediaUrl}" class="msg-img" />`;
+            } else if (mediaType === 'audio') {
+                mediaHtml = `<audio controls src="${mediaUrl}" style="width:100%; margin-top:5px;"></audio>`;
+            }
+        }
+
         wrapper.innerHTML = `
             <div class="msg-content">
                 ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
-                <div style="white-space: pre-wrap; word-break: break-word;">${displayContent}</div>
+                <div style="white-space: pre-wrap; word-break: break-word;">${mediaHtml}${displayContent}</div>
                 ${replyTagHtml}
-                <span class.msg-time">${timeStr}</span>
+                <span class="msg-time">${timeStr}</span>
             </div>
         `;
 
@@ -466,6 +462,7 @@
         });
     }
 
+    // --- 其他 UI 逻辑保持不变 ---
     const chatBox = document.getElementById('chat-box');
     let pressTimer;
 
