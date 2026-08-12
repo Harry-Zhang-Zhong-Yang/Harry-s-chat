@@ -199,21 +199,23 @@
 </div>
 
 <script>
-    const APP_VERSION = "1.0.4"; 
-    
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
     let supabaseClient;
     try {
+        // 初始化客户端
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    } catch (e) { console.error("Supabase 初始化失败:", e); }
+        console.log("Supabase 连接成功！");
+    } catch (e) { 
+        console.error("Supabase 初始化失败:", e); 
+    }
 
     let currentRoomCode = "";
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
-    let pendingMedia = null; // 这里存储上传后的 URL 和类型
+    let pendingMedia = null; 
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -349,20 +351,20 @@
         }
 
         try {
-            // 生成唯一文件名，防止重名冲突
             const fileExt = file.name.split('.').pop();
             const fileName = `media_${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
             const filePath = `chat_media/${fileName}`;
 
-            // 上传到 Supabase Storage
-            const { data, error } = await supabase.storage
+            // 【修正点】：这里必须用 supabaseClient 而不是 supabase
+            const { data, error } = await supabaseClient
+                .storage
                 .from('chat_media')
                 .upload(filePath, file);
 
             if (error) throw error;
 
-            // 获取公开 URL
-            const { data: publicData } = supabase.storage
+            const { data: publicData } = await supabaseClient
+                .storage
                 .from('chat_media')
                 .getPublicUrl(filePath);
 
@@ -371,7 +373,6 @@
                 type: fileExt.toLowerCase().includes('mp3') || fileExt.toLowerCase().includes('wav') ? 'audio' : 'image'
             };
 
-            // 上传成功后自动发送消息（如果输入框为空，则只发媒体）
             window.sendMessage();
         } catch (e) {
             console.error(e);
@@ -390,6 +391,7 @@
         }
 
         try {
+            // 【修正点】：这里也必须用 supabaseClient 而不是 supabase
             const { error } = await supabaseClient
                 .from('messages')
                 .insert([{ 
