@@ -98,14 +98,25 @@
         .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
         #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
         
-        /* 加号圆圈按钮 */
-        #add-btn { 
+        /* 功能按钮样式 */
+        .action-btn { 
             width: 45px; height: 45px; border-radius: 50%; background: #eee; 
             display: flex; align-items: center; justify-content: center; 
             font-size: 24px; cursor: pointer; transition: all 0.2s; border: none;
             flex-shrink: 0;
         }
-        #add-btn:active { transform: scale(0.9); background: #ddd; }
+        .action-btn:active { transform: scale(0.9); background: #ddd; }
+
+        /* 录音状态样式 */
+        #mic-btn.recording {
+            background: #ff4d4f !important;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(255, 77, 79, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 77, 79, 0); }
+        }
 
         /* 图片预览样式 */
         .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
@@ -136,8 +147,8 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 支持手机端图片和语音发送（自动上传至云端）<br>
-            • UI重构：加号按钮与输入框完美对齐<br>
+            • 支持微信式长按录音发送功能<br>
+            • UI重构：麦克风与加号按钮完美对齐<br>
             • 修复了时间戳显示问题，现在消息显示真实发送时刻
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
@@ -171,8 +182,13 @@
     <div id="input-area">
         <div id="reply-preview"></div>
         <div class="input-wrapper">
+            <!-- 语音按钮 -->
+            <button id="mic-btn" class="action-btn" title="长按录音" onclick="window.handleMicClick(event)">🎤</button>
+            
             <input type="text" id="message-input" placeholder="输入消息并按回车..." autocomplete="off">
-            <button id="add-btn" onclick="window.triggerImageUpload()">+</button>
+            
+            <!-- 附件按钮 -->
+            <button id="add-btn" class="action-btn" onclick="window.triggerImageUpload()">+</button>
         </div>
 
         <!-- 隐藏的文件选择器 -->
@@ -199,7 +215,7 @@
 </div>
 
 <script>
-    const APP_VERSION = "1.0.4"; 
+    const APP_VERSION = "1.0.5"; 
     
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
@@ -207,16 +223,18 @@
     let supabaseClient;
     try {
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        console.log("Supabase 连接成功！");
-    } catch (e) { 
-        console.error("Supabase 初始化失败:", e); 
-    }
+    } catch (e) { console.error("Supabase 初始化失败:", e); }
 
     let currentRoomCode = "";
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
-    let pendingMedia = null; 
+    let pendingMedia = null; // {url: string, type: 'image'|'audio'}
+
+    // --- 语音录制相关变量 ---
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -338,7 +356,7 @@
             .subscribe();
     }
 
-    // --- 核心修改：文件上传逻辑 ---
+    // --- 附件上传逻辑 ---
     window.triggerImageUpload = function() {
         document.getElementById('file-input').click();
     };
@@ -356,7 +374,6 @@
             const fileName = `media_${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
             const filePath = `chat_media/${fileName}`;
 
-            // 【修正点】：这里必须用 supabaseClient 而不是 supabase
             const { data, error } = await supabaseClient
                 .storage
                 .from('chat_media')
@@ -381,6 +398,91 @@
         }
     };
 
+    // --- 语音录制核心逻辑 ---
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); // 兼容性较好的格式
+                const fileExt = "webm"; // 如果是移动端，可能需要更复杂的处理，但目前足够用
+                const fileName = `voice_${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
+                const filePath = `chat_media/${fileName}`;
+
+                try {
+                    const { data, error } = await supabaseClient
+                        .storage
+                        .from('chat_media')
+                        .upload(filePath, audioBlob);
+
+                    if (error) throw error;
+
+                    const { data: publicData } = await supabaseClient
+                        .storage
+                        .from('chat_media')
+                        .getPublicUrl(filePath);
+
+                    pendingMedia = {
+                        url: publicData.publicUrl,
+                        type: 'audio'
+                    };
+
+                    window.sendMessage();
+                } catch (e) {
+                    console.error("语音上传失败:", e);
+                    alert("语音发送失败。");
+                } finally {
+                    stream.getTracks().forEach(track => track.stop());
+                }
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            document.getElementById('mic-btn').classList.add('recording');
+        } catch (e) {
+            console.error("无法获取麦克风权限:", e);
+            alert("请允许浏览器访问您的麦克风。");
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+            isRecording = false;
+            document.getElementById('mic-btn').classList.remove('recording');
+        }
+    }
+
+    window.handleMicClick = function(e) {
+        e.preventDefault();
+        if (!isRecording) {
+            startRecording();
+        } else {
+            stopRecording();
+        }
+    };
+
+    // 处理长按逻辑 (移动端和桌面端通用)
+    const micBtn = document.getElementById('mic-btn');
+    
+    // 鼠标/触摸开始
+    micBtn.addEventListener('mousedown', () => startRecording());
+    micBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault(); // 防止默认行为
+        startRecording();
+    });
+
+    // 鼠标/触摸结束
+    window.addEventListener('mouseup', () => stopRecording());
+    window.addEventListener('touchend', () => stopRecording());
+
+    // --- 发送消息逻辑 ---
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
         let content = inputEl.value.trim();
@@ -392,7 +494,6 @@
         }
 
         try {
-            // 【修正点】：这里也必须用 supabaseClient 而不是 supabase
             const { error } = await supabaseClient
                 .from('messages')
                 .insert([{ 
@@ -432,7 +533,6 @@
         let displayContent = content;
         let replyTagHtml = "";
 
-        // 处理回复标签逻辑
         if (content.includes("[回复:")) {
             const parts = content.split("\n\n");
             displayContent = parts[0] || content; 
@@ -440,7 +540,6 @@
             replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${rawReply}</div>`;
         }
 
-        // 处理媒体显示逻辑
         let mediaHtml = "";
         if (mediaUrl) {
             if (mediaType === 'image') {
@@ -455,7 +554,7 @@
                 ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
                 <div style="white-space: pre-wrap; word-break: break-word;">${mediaHtml}${displayContent}</div>
                 ${replyTagHtml}
-                <span class="msg-time">${timeStr}</span>
+                <span class.msg-time">${timeStr}</span>
             </div>
         `;
 
@@ -465,7 +564,6 @@
         });
     }
 
-    // --- 其他 UI 逻辑保持不变 ---
     const chatBox = document.getElementById('chat-box');
     let pressTimer;
 
