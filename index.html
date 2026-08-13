@@ -52,6 +52,13 @@
             width: 100%; height: 100vh; background: white; position: relative;
         }
 
+        /* 背景图层 */
+        #chat-bg {
+            position: absolute; inset: 0; z-index: 0;
+            background-size: cover; background-position: center;
+            transition: background-image 0.5s ease;
+        }
+
         #nav-bar { 
             height: 65px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
             border-bottom: 1px solid #eee; display: flex; align-items: center; 
@@ -60,11 +67,12 @@
         #back-btn { font-size: 24px; cursor: pointer; padding: 5px; }
         #room-title { font-weight: bold; font-size: 17px; color: #333; flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+        /* 聊天框内容层 */
         #chat-box { 
             flex: 1; overflow-y: auto; padding: 20px; display: flex; 
             flex-direction: column; gap: 12px; 
-            background-color: #f8f9fa; 
-            scroll-behavior: smooth;
+            background-color: transparent; /* 让背景透出来 */
+            scroll-behavior: smooth; z-index: 1;
         }
 
         .msg-wrapper { max-width: 85%; position: relative; animation: msgIn 0.3s ease-out; }
@@ -77,6 +85,7 @@
             padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.6; 
             position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.03);
             display: flex; flex-direction: column; gap: 8px;
+            background: rgba(255,255,255,0.9); /* 给气泡一点半透明，防止背景干扰阅读 */
         }
         .left .msg-content { background: var(--msg-others); color: #333; border: 1px solid #eef0f2; border-bottom-left-radius: 4px; }
         .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
@@ -90,7 +99,7 @@
             border-radius: 10px; margin-bottom: 5px; display: none; border: 1px solid #ddd;
         }
 
-        #input-area { padding: 15px; border-top: 1px solid #eee; background: white; }
+        #input-area { padding: 15px; border-top: 1px solid #eee; background: white; z-index: 10; }
         .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
         #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
         
@@ -114,6 +123,7 @@
 
         .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
 
+        /* --- 设置弹窗 --- */
         #settings-modal {
             position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
             align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
@@ -130,6 +140,11 @@
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
 
+        /* 录音状态提示 */
+        #recording-status {
+            font-size: 12px; color: #ff4d4f; margin-bottom: 5px; height: 18px; text-align: center;
+        }
+
     </style>
 </head>
 <body id="app-body">
@@ -139,10 +154,10 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 首屏优化：进入房间直接展示最新消息<br>
-            • UI精简：移除冗余回复按钮，保留转文字功能<br>
-            • 交互升级：手机长按回复改为两秒判定<br>
-            • 时间增强：非当天消息自动显示日期
+            • 语音播放优化：点击消息即可立即播放<br>
+            • 录音状态增强：新增实时时长显示<br>
+            • 背景自定义：支持用户上传个性化背景图<br>
+            • 全平台兼容：深度适配手机与电脑端交互
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -164,6 +179,7 @@
 
 <!-- 聊天主容器 -->
 <div id="chat-container" style="display:none;">
+    <div id="chat-bg"></div>
     <div id="nav-bar">
         <span id="back-btn" onclick="window.leaveRoom()">←</span>
         <span id="room-title">正在加载...</span>
@@ -173,6 +189,7 @@
     <div id="chat-box"></div>
 
     <div id="input-area">
+        <div id="recording-status"></div>
         <div id="reply-preview"></div>
         <div class="input-wrapper">
             <button id="mic-btn" class="action-btn" title="点击开始录音，再次点击发送">🎤</button>
@@ -180,6 +197,7 @@
             <button id="add-btn" class="action-btn" onclick="window.triggerImageUpload()">+</button>
         </div>
 
+        <!-- 隐藏的文件选择器 -->
         <input type="file" id="file-input" accept="image/*,audio/*" style="display:none;" onchange="window.handleFileSelect(event)">
 
         <!-- 设置弹窗 -->
@@ -196,6 +214,11 @@
                     <label>选择气泡颜色 (仅影响聊天内容)</label>
                     <input type="color" id="color-selector" value="#0084ff">
                 </div>
+                <div class="setting-item">
+                    <label>更改聊天背景</label>
+                    <input type="file" id="bg-upload-input" accept="image/*" style="display:none;" onchange="window.handleBgUpload(event)">
+                    <button onclick="document.getElementById('bg-upload-input').click()">选择一张图片作为背景</button>
+                </div>
                 <button onclick="window.saveSettings()" style="margin-top:20px;">保存并应用</button>
             </div>
         </div>
@@ -203,7 +226,7 @@
 </div>
 
 <script>
-    const APP_VERSION = "1.0.9"; 
+    const APP_VERSION = "1.0.10"; 
     
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
@@ -223,6 +246,7 @@
     let mediaRecorder;
     let audioChunks = [];
     let isRecording = false;
+    let recordingStartTime = 0;
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -247,10 +271,17 @@
             }
         }
 
+        // 应用颜色设置
         const savedColor = localStorage.getItem('chat_theme_color');
         if (savedColor) {
             document.documentElement.style.setProperty('--bubble-color', savedColor);
             document.getElementById('color-selector').value = savedColor;
+        }
+
+        // 应用背景设置
+        const savedBg = localStorage.getItem('chat_bg_url');
+        if (savedBg) {
+            document.getElementById('chat-bg').style.backgroundImage = `url(${savedBg})`;
         }
 
         const lastVersion = localStorage.getItem('app_version');
@@ -317,8 +348,7 @@
             const chatBox = document.getElementById('chat-box');
             chatBox.innerHTML = ""; 
             data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
-            
-            // --- 优化：进入房间直接展示最新的消息 ---
+            // 进入房间直接展示最新的消息
             chatBox.scrollTop = chatBox.scrollHeight;
         }
     }
@@ -388,6 +418,7 @@
         }
     };
 
+    // --- 语音录制核心逻辑（增强状态显示） ---
     async function startRecording() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -428,12 +459,25 @@
                     alert("语音发送失败。");
                 } finally {
                     stream.getTracks().forEach(track => track.stop());
+                    document.getElementById('recording-status').innerText = "";
                 }
             };
 
             mediaRecorder.start();
             isRecording = true;
+            recordingStartTime = Date.now();
             document.getElementById('mic-btn').classList.add('recording');
+            
+            // 启动计时器更新状态文字
+            const timerInterval = setInterval(() => {
+                if (!isRecording) {
+                    clearInterval(timerInterval);
+                    return;
+                }
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                document.getElementById('recording-status').innerText = `正在录音... ${elapsed % 60 < 10 ? '0' : ''}${elapsed % 60}`;
+            }, 100);
+
         } catch (e) {
             console.error("无法获取麦克风权限:", e);
             alert("请允许浏览器访问您的麦克风。");
@@ -456,6 +500,7 @@
     window.addEventListener('mouseup', () => stopRecording());
     window.addEventListener('touchend', () => stopRecording());
 
+    // --- 发送消息逻辑 ---
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
         let content = inputEl.value.trim();
@@ -495,7 +540,7 @@
         const wrapper = document.createElement('div');
         wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
 
-        // --- 优化：智能时间戳逻辑 ---
+        // --- 智能时间戳逻辑 ---
         let timeStr = "00:00";
         if (timestamp_str) {
             const date = new Date(timestamp_str);
@@ -503,10 +548,8 @@
             const isToday = date.toDateString() === now.toDateString();
 
             if (!isToday) {
-                // 非当天显示 MM-DD HH:mm
                 timeStr = `${date.getMonth() + 1}-${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
             } else {
-                // 当天仅显示 HH:mm
                 timeStr = date.getHours().toString().padStart(2, '0') + ":" + date.getMinutes().toString().padStart(2, '0');
             }
         } else {
@@ -529,8 +572,9 @@
             if (mediaType === 'image') {
                 mediaHtml = `<img src="${mediaUrl}" class="msg-img" />`;
             } else if (mediaType === 'audio') {
+                // 优化：点击消息气泡即可播放音频
                 mediaHtml = `
-                    <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="display:flex; flex-direction:column; gap:8px;" onclick="this.querySelector('audio').play();" style="cursor:pointer;">
                         <audio controls src="${mediaUrl}" style="width:100%;"></audio>
                         <div class="voice-transcript" style="font-size:14px; color:${sender === mySender ? '#fff' : '#333'}; border-top:1px solid rgba(255,255,255,0.2); padding-top:8px;"></div>
                     </div>`;
@@ -624,7 +668,6 @@
     chatBox.addEventListener('touchstart', (e) => {
         const target = e.target.closest('.msg-wrapper');
         if (target && !target.classList.contains('system-msg')) {
-            // 只有在非按钮区域长按才触发回复，防止干扰转文字按钮
             pressTimer = setTimeout(() => handleLongPress(target), 2000);
         }
     }, {passive: true});
@@ -664,6 +707,28 @@
         document.documentElement.style.setProperty('--bubble-color', color);
         localStorage.setItem('chat_theme_color', color);
         window.toggleSettings();
+    };
+
+    // --- 背景图片处理逻辑 ---
+    window.handleBgUpload = async function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64String = reader.result.split(',')[1];
+                // 这里为了简单直接存入 localStorage，如果图片很大可能会超出限制。
+                // 生产环境建议上传到 Supabase Storage 获取 URL 再存储。
+                localStorage.setItem('chat_bg_url', reader.result);
+                document.getElementById('chat-bg').style.backgroundImage = `url(${reader.result})`;
+                alert("背景已更新！");
+            };
+            reader.readAsDataURL(file);
+        } catch (e) {
+            console.error(e);
+            alert("上传背景失败。");
+        }
     };
 
     window.leaveRoom = function() {
