@@ -210,7 +210,7 @@
 </div>
 
 <script>
-    const APP_VERSION = "1.0.13"; 
+    const APP_VERSION = "1.0.14"; 
     
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
@@ -226,8 +226,8 @@
     let roomSubscription = null;
     let pendingMedia = null; 
 
-    // --- 分页加载相关变量 ---
-    let lastMessageId = null; // 用于记录最后一条消息的ID，实现分页
+    // 分页加载相关变量
+    let lastMessageId = null;
     let isLoadingMore = false;
     const PAGE_SIZE = 30;
 
@@ -246,7 +246,7 @@
                 document.getElementById('room-title').innerText = currentRoomCode;
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 ensureRoomExists();
-                loadHistory(); // 这里会加载最近30条
+                loadHistory(true); // 初始化加载最近30条
                 initRealtime();
             } else {
                 localStorage.clear();
@@ -298,7 +298,7 @@
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
         await ensureRoomExists();
-        loadHistory(); // 初始化加载最近30条
+        loadHistory(true); // 初始化加载最近30条
         initRealtime();
     };
 
@@ -347,26 +347,22 @@
                 // 因为是倒序排列，我们需要反转数组顺序来正确显示在UI上
                 data.reverse();
 
+                const chatBoxEl = document.getElementById('chat-box');
                 if (isInitial) {
-                    const chatBox = document.getElementById('chat-box');
-                    chatBox.innerHTML = ""; 
+                    chatBoxEl.innerHTML = ""; 
                     data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
-                    // 直接定位到最底部
-                    chatBox.scrollTop = chatBox.scrollHeight;
+                    // 直接定位到最底部，不带动画
+                    chatBoxEl.scrollTop = chatBoxEl.scrollHeight;
                 } else {
                     // 插入历史消息到顶部（在当前第一条之前）
-                    const chatBox = document.getElementById('chat-box');
-                    data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
-                    // 这里的appendMessageToUI会把新消息加到最后，所以我们需要手动处理插入位置或简单地让它在上方显示
-                    // 为了逻辑简单且不卡顿，我们直接把加载出来的历史消息插到 chatBox 的最前面
-                    const firstMsg = chatBox.firstElementChild;
+                    const firstMsg = chatBoxEl.firstElementChild;
                     if (firstMsg) {
                         data.forEach(msg => {
                             const wrapper = document.createElement('div');
                             wrapper.className = `msg-wrapper ${msg.sender === mySender ? 'right' : 'left'}`;
-                            // 这里复用UI逻辑（简化版）
+                            // 简化版UI插入，确保不重复渲染复杂的DOM结构
                             wrapper.innerHTML = `<div class="msg-content">${msg.content}</div>`; 
-                            chatBox.insertBefore(wrapper, firstMsg);
+                            chatBoxEl.insertBefore(wrapper, firstMsg);
                         });
                     }
                 }
@@ -382,9 +378,9 @@
     }
 
     // --- 监听滚动以触发加载更多 ---
-    const chatBox = document.getElementById('chat-box');
-    chatBox.addEventListener('scroll', () => {
-        if (chatBox.scrollTop <= 50) { // 如果距离顶部小于50px
+    const chatBoxEl = document.getElementById('chat-box');
+    chatBoxEl.addEventListener('scroll', () => {
+        if (chatBoxEl.scrollTop <= 50) { // 如果距离顶部小于50px
             if (!isLoadingMore && lastMessageId) {
                 loadHistory(false); // 加载历史记录
             }
@@ -492,7 +488,7 @@
     };
 
     function appendMessageToUI(sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null) {
-        const chatBox = document.getElementById('chat-box');
+        const chatBoxEl = document.getElementById('chat-box');
         const wrapper = document.createElement('div');
         wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
 
@@ -592,13 +588,12 @@
         });
 
         wrapper.prepend(menuContainer);
-        chatBox.appendChild(wrapper);
+        chatBoxEl.appendChild(wrapper);
         
         // 实时消息直接跳到底部，不带动画
-        chatBox.scrollTop = chatBox.scrollHeight;
+        chatBoxEl.scrollTop = chatBoxEl.scrollHeight;
     }
 
-    const chatBox = document.getElementById('chat-box');
     let pressTimer;
 
     function handleLongPress(element) {
@@ -616,16 +611,17 @@
         document.getElementById('reply-preview').style.display = 'none';
     };
 
-    chatBox.addEventListener('touchstart', (e) => {
+    const chatBoxEl = document.getElementById('chat-box');
+    chatBoxEl.addEventListener('touchstart', (e) => {
         const target = e.target.closest('.msg-wrapper');
         if (target && !target.classList.contains('system-msg')) {
             pressTimer = setTimeout(() => handleLongPress(target), 2000);
         }
     }, {passive: true});
 
-    chatBox.addEventListener('touchend', () => clearTimeout(pressTimer));
+    chatBoxEl.addEventListener('touchend', () => clearTimeout(pressTimer));
 
-    chatBox.addEventListener('contextmenu', (e) => {
+    chatBoxEl.addEventListener('contextmenu', (e) => {
         const target = e.target.closest('.msg-wrapper');
         if (target && !target.classList.contains('system-msg')) {
             e.preventDefault(); 
