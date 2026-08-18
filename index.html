@@ -131,6 +131,7 @@
         .setting-item { margin-bottom: 20px; }
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+
     </style>
 </head>
 <body id="app-body">
@@ -317,15 +318,14 @@
             .from('messages')
             .select('*')
             .eq('room_code', currentRoomCode)
-            .order('created_at', { ascending: true })
-            .limit(30);  // Limit the history to latest 30 messages
+            .order('created_at', { ascending: true });
 
         if (!error && data) {
             const chatBox = document.getElementById('chat-box');
             chatBox.innerHTML = ""; 
             data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
             
-            // Scroll to the latest message immediately
+            // 修改点：直接强制定位到最底部，完全不使用任何动画效果
             chatBox.scrollTop = chatBox.scrollHeight;
         }
     }
@@ -483,9 +483,57 @@
             </div>
         `;
 
+        const menuContainer = document.createElement('div');
+        menuContainer.style.cssText = "display:flex; gap:8px; margin-bottom:5px; justify-content:flex-end;";
+        
+        let options = [];
+        if (replyData) {
+            options.push({ label: '取消', action: () => cancelReply() });
+        }
+
+        if (mediaType === 'audio') {
+            options.push({ label: '转文字', action: async () => {
+                const transcriptDiv = wrapper.querySelector('.voice-transcript');
+                if (!transcriptDiv) return;
+                
+                transcriptDiv.innerText = "正在识别...";
+                try {
+                    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                    recognition.lang = 'zh-CN';
+                    recognition.start();
+
+                    recognition.onresult = (event) => {
+                        const result = event.results[0][0].transcript;
+                        transcriptDiv.innerText = result;
+                    };
+
+                    recognition.onerror = () => {
+                        transcriptDiv.innerText = "识别失败，请重新点击。";
+                    };
+
+                    recognition.onend = () => {
+                        if (transcriptDiv.innerText === "正在识别...") transcriptDiv.innerText = "未检测到语音内容。";
+                    };
+                } catch (e) {
+                    console.error(e);
+                    alert("浏览器不支持语音识别或权限被拒绝。");
+                    transcriptDiv.innerText = "无法启动语音识别。";
+                }
+            }});
+        }
+
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.innerText = opt.label;
+            btn.style.cssText = "padding:4px 8px; font-size:12px; margin:0; background:#eee; color:#333; border:none; border-radius:6px;";
+            btn.onclick = (e) => { e.stopPropagation(); opt.action(); };
+            menuContainer.appendChild(btn);
+        });
+
+        wrapper.prepend(menuContainer);
         chatBox.appendChild(wrapper);
         
-        // Scroll to the latest message immediately
+        // 修改点：彻底移除 requestAnimationFrame 和 smooth 动画，直接强制定位到最底部
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
