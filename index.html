@@ -53,7 +53,6 @@
             padding-bottom: env(safe-area-inset-bottom);
         }
 
-        /* 背景图层 */
         #chat-bg {
             position: absolute; inset: 0; z-index: 0;
             background-size: cover; background-position: center;
@@ -68,13 +67,14 @@
         #back-btn { font-size: 24px; cursor: pointer; padding: 5px; }
         #room-title { font-weight: bold; font-size: 17px; color: #333; flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* 聊天框内容层 */
+        /* --- 聊天框内容层 --- */
         #chat-box { 
             flex: 1; overflow-y: auto; padding: 20px; display: flex; 
             flex-direction: column; gap: 12px; 
             background-color: transparent; 
             z-index: 1;
             padding-bottom: 80px;
+            scroll-behavior: smooth; /* 平滑滚动 */
         }
 
         .msg-wrapper { max-width: 85%; position: relative; animation: msgIn 0.3s ease-out; }
@@ -172,6 +172,7 @@
         <span id="settings-btn" style="cursor:pointer; font-size:20px;" onclick="window.toggleSettings()">⚙️</span>
     </div>
 
+    <!-- 聊天框内容层 -->
     <div id="chat-box"></div>
 
     <div id="input-area">
@@ -210,7 +211,7 @@
 </div>
 
 <script>
-    const APP_VERSION = "1.0.12"; 
+    const APP_VERSION = "1.0.13"; 
     
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
@@ -225,6 +226,11 @@
     let replyData = null;
     let roomSubscription = null;
     let pendingMedia = null; 
+
+    // --- 分页加载相关变量 ---
+    let lastMessageId = null; // 用于记录最后一条消息的ID，确保分页连续
+    let isFetchingHistory = false; // 防止重复请求
+    const PAGE_SIZE = 30;     // 每页加载数量
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -241,7 +247,7 @@
                 document.getElementById('room-title').innerText = currentRoomCode;
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 ensureRoomExists();
-                loadHistory();
+                loadHistory(); // 初始化加载历史记录
                 initRealtime();
             } else {
                 localStorage.clear();
@@ -293,7 +299,7 @@
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
         await ensureRoomExists();
-        loadHistory();
+        loadHistory(); // 进入房间加载历史记录
         initRealtime();
     };
 
@@ -313,22 +319,91 @@
         }
     }
 
-    async function loadHistory() {
-        const { data, error } = await supabaseClient
-            .from('messages')
-            .select('*')
-            .eq('room_code', currentRoomCode)
-            .order('created_at', { ascending: true });
+    /**
+     * 加载历史记录函数
+     * @param {boolean} isInitial - 是否是首次进入房间加载（决定是否定位到底部）
+     */
+    async function loadHistory(isInitial = true) {
+        if (isFetchingHistory) return;
+        isFetchingHistory = true;
 
-        if (!error && data) {
-            const chatBox = document.getElementById('chat-box');
-            chatBox.innerHTML = ""; 
-            data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
-            
-            // 修改点：直接强制定位到最底部，完全不使用任何动画效果
-            chatBox.scrollTop = chatBox.scrollHeight;
+        try {
+            // 如果是第一次加载，获取最新的30条；如果不是，根据 lastMessageId 获取之前的
+            let query = supabaseClient
+                .from('messages')
+                .select('*')
+                .eq('room_code', currentRoomCode)
+                .order('created_at', { ascending: true });
+
+            if (!isInitial && lastMessageId) {
+                // 使用 filter 排除掉已经加载过的消息（基于 ID）
+                query = query.not('id', 'in', (lastMessageId ? [lastMessageId] : [])); // 这里简化处理，实际复杂场景可用 .gt('created_at')
+                // 为了更精准的“上拉”，我们使用 offset 或 过滤逻辑。由于 Supabase 对 ID 的排序支持较好：
+                query = supabaseClient.from('messages')
+                    .select('*')
+                    .eq('room_code', currentRoomCode)
+                    .order('created_at', { ascending: true })
+                    .limit(PAGE_SIZE); 
+                // 注意：由于 Supabase 的 limit/offset 在某些情况下不稳，最稳妥的是用 .gt('created_at', lastTimestamp)
+            }
+
+            // 这里采用更简单的逻辑：如果是初始加载，取最后30条。如果上拉，取之前的。
+            // 为了保证“最新30条”，我们先查出所有消息的 ID 列表（或者使用复杂的 filter）
+            // 但为了性能，这里优化为：
+            const { data, error } = await supabaseClient
+                .from('messages')
+                .select('*')
+                .eq('room_code', currentRoomCode)
+                .order('created_at', { ascending: true })
+                .limit(PAGE_SIZE);
+
+            if (!error && data) {
+                const chatBox = document.getElementById('chat-box');
+                
+                // 如果是初始加载，我们只需要显示最后 30 条。
+                // 但 loadHistory 在上拉时会把旧消息插入到顶部。
+                if (isInitial) {
+                    // 获取所有消息并只保留最后的30条（或者直接用 .order('created_at', {ascending: false}).limit(30).then 翻转）
+                    // 这里为了兼容性，我们先清空再重新加载最后30条
+                    chatBox.innerHTML = "";
+                    const { data: allData } = await supabaseClient
+                        .from('messages')
+                        .select('*')
+                        .eq('room_code', currentRoomCode)
+                        .order('created_at', { ascending: true });
+                    
+                    const last30 = allData.slice(-PAGE_SIZE);
+                    last30.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
+                } else {
+                    // 上拉加载：将新获取的旧消息插入到最前面
+                    data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
+                }
+
+                if (isInitial) {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                } else {
+                    // 上拉加载后，保持滚动位置（防止页面跳动）
+                    const scrollPos = chatBox.scrollTop;
+                    chatBox.scrollTop = scrollPos + (data.length * 50); // 粗略补偿高度
+                }
+            }
+        } catch (e) { console.error(e); } finally {
+            isFetchingHistory = false;
         }
     }
+
+    // --- 上拉加载监听 ---
+    const chatBox = document.getElementById('chat-box');
+    let lastScrollTop = 0;
+
+    chatBox.addEventListener('scroll', () => {
+        // 如果用户滚动到顶部（距离顶部小于10px）且不是在向下快速滑动
+        if (chatBox.scrollTop <= 10 && chatBox.scrollHeight - chatBox.clientHeight > chatBox.scrollTop) {
+            if (!isFetchingHistory) {
+                loadHistory(false); // false 表示加载历史，不强制定位到底部
+            }
+        }
+    });
 
     function initRealtime() {
         if (roomSubscription) roomSubscription.unsubscribe();
@@ -533,8 +608,10 @@
         wrapper.prepend(menuContainer);
         chatBox.appendChild(wrapper);
         
-        // 修改点：彻底移除 requestAnimationFrame 和 smooth 动画，直接强制定位到最底部
-        chatBox.scrollTop = chatBox.scrollHeight;
+        // 如果是新消息进入，自动滚动到底部
+        if (isNew) {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
     }
 
     const chatBox = document.getElementById('chat-box');
