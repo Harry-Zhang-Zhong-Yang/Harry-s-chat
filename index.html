@@ -5,7 +5,678 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>极简高级聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style><!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>极简高级聊天室</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        :root {
+            --btn-color: #0084ff; 
+            --bubble-color: #0084ff; 
+            --bg-color: #f0f2f5; 
+            --msg-others: #ffffff;
+            --text-main: #333333;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: var(--bg-color); 
+            height: 100vh; width: 100vw;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* --- 更新公告弹窗 --- */
+        #update-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            display: none; align-items: center; justify-content: center; z-index: 5000;
+            backdrop-filter: blur(4px);
+        }
+        .update-modal-content {
+            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; text-align: center;
+            animation: modalIn 0.3s ease-out;
+        }
+        @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* --- 登录区域 --- */
+        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+        .login-box { width: 100%; max-width: 400px; padding: 40px; border: 1px solid #eee; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        .login-box h2 { margin-bottom: 30px; text-align: center; color: #333; }
+        input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; transition: all 0.2s; }
+        input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(0,132,255,0.1); }
+        button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: opacity 0.2s; }
+        button:active { opacity: 0.8; }
+
+        .remember-me { display: flex; align-items: center; gap: 8px; margin-top: -5px; margin-bottom: 15px; font-size: 14px; color: #666; cursor: pointer; }
+        .remember-me input { width: auto; margin: 0; }
+
+        /* --- 聊天主容器 --- */
+        #chat-container { 
+            display: flex; flex-direction: column; max-width: 900px; margin: 0 auto; 
+            width: 100%; height: 100vh; background: white; position: relative;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        #chat-bg {
+            position: absolute; inset: 0; z-index: 0;
+            background-size: cover; background-position: center;
+            transition: background-image 0.5s ease;
+        }
+
+        #nav-bar { 
+            height: 65px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
+            border-bottom: 1px solid #eee; display: flex; align-items: center; 
+            padding: 0 15px; justify-content: space-between; z-index: 10;
+        }
+        #back-btn { font-size: 24px; cursor: pointer; padding: 5px; }
+        #room-title { font-weight: bold; font-size: 17px; color: #333; flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* --- 聊天框内容层 --- */
+        #chat-box { 
+            flex: 1; overflow-y: auto; padding: 20px; display: flex; 
+            flex-direction: column; gap: 12px; 
+            background-color: transparent; 
+            z-index: 1;
+            padding-bottom: 80px;
+        }
+
+        .msg-wrapper { max-width: 85%; position: relative; animation: msgIn 0.3s ease-out; }
+        @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .left { align-self: flex-start; }
+        .right { align-self: flex-end; text-align: right; }
+
+        .msg-content { 
+            padding: 12px 16px; border-radius: 18px; font-size: 15px; line-height: 1.6; 
+            position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+            display: flex; flex-direction: column; gap: 8px;
+            background: rgba(255,255,255,0.9);
+        }
+        .left .msg-content { background: var(--msg-others); color: #333; border: 1px solid #eef0f2; border-bottom-left-radius: 4px; }
+        .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+        .sender-name { font-size: 12px; font-weight: bold; margin-bottom: 4px; display: block; opacity: 0.8; }
+        .msg-time { font-size: 10px; margin-top: 6px; display: block; opacity: 0.5; }
+
+        #reply-preview {
+            height: auto; min-height: 40px; display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 12px; font-size: 13px; color: #666; background: #eef0f2;
+            border-radius: 10px; margin-bottom: 5px; display: none; border: 1px solid #ddd;
+        }
+
+        #input-area { padding: 15px; border-top: 1px solid #eee; background: white; z-index: 10; }
+        .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
+        #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
+        
+        .action-btn { 
+            width: 45px; height: 45px; border-radius: 50%; background: #eee; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 24px; cursor: pointer; transition: all 0.2s; border: none;
+            flex-shrink: 0;
+        }
+        .action-btn:active { transform: scale(0.9); background: #ddd; }
+
+        .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
+
+        /* --- 设置弹窗 --- */
+        #settings-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
+            align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
+        }
+        .modal-content { 
+            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; 
+            position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .close-settings { 
+            position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; 
+            color: #999; border: none; background: none; line-height: 1; padding: 0;
+        }
+        .setting-item { margin-bottom: 20px; }
+        .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
+        .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+
+    </style>
+</head>
+<body id="app-body">
+
+<!-- 更新公告 -->
+<div id="update-modal" onclick="window.closeUpdateModal()">
+    <div class="update-modal-content">
+        <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
+        <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
+            • 加载优化：进入房间仅加载最新30条消息，极速秒开！<br>
+            • 修复Bug：彻底解决上拉历史时的无限循环问题。<br>
+            • 功能精简：移除语音录制功能，界面更清爽。
+        </p>
+        <button onclick="window.closeUpdateModal()">我知道了</button>
+    </div>
+</div>
+
+<!-- 登录区域 -->
+<div id="login-area">
+    <div class="login-box">
+        <h2>进入聊天室</h2>
+        <input type="text" id="username" placeholder="输入你的名字" autocomplete="off">
+        <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off">
+        <div class="remember-me">
+            <input type="checkbox" id="auto-login-check" checked>
+            <label for="auto-login-check">10天内免登录（自动进入上次房间）</label>
+        </div>
+        <button onclick="window.joinRoom()">开始聊天</button>
+    </div>
+</div>
+
+<!-- 聊天主容器 -->
+<div id="chat-container" style="display:none;">
+    <div id="chat-bg"></div>
+    <div id="nav-bar">
+        <span id="back-btn" onclick="window.leaveRoom()">←</span>
+        <span id="room-title">正在加载...</span>
+        <span id="settings-btn" style="cursor:pointer; font-size:20px;" onclick="window.toggleSettings()">⚙️</span>
+    </div>
+
+    <div id="chat-box"></div>
+
+    <div id="input-area">
+        <div id="reply-preview"></div>
+        <div class="input-wrapper">
+            <input type="text" id="message-input" placeholder="输入消息并按回车..." autocomplete="off">
+            <button id="add-btn" class="action-btn" onclick="window.triggerImageUpload()">+</button>
+        </div>
+
+        <!-- 隐藏的文件选择器 -->
+        <input type="file" id="file-input" accept="image/*,audio/*" style="display:none;" onchange="window.handleFileSelect(event)">
+
+        <!-- 设置弹窗 -->
+        <div id="settings-modal" onclick="window.toggleSettings(event)">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <button class="close-settings" onclick="window.toggleSettings()">&times;</button>
+                <h3 style="margin-bottom:20px; text-align:center;">个性化设置</h3>
+                <div class="setting-item">
+                    <label>修改当前房间名称</label>
+                    <input type="text" id="custom-room-name" placeholder="输入新名字...">
+                    <button style="padding:8px; font-size:14px;" onclick="window.updateRoomName()">确认更改</button>
+                </div>
+                <div class="setting-item">
+                    <label>选择气泡颜色 (仅影响聊天内容)</label>
+                    <input type="color" id="color-selector" value="#0084ff">
+                </div>
+                <div class="setting-item">
+                    <label>更改聊天背景</label>
+                    <input type="file" id="bg-upload-input" accept="image/*" style="display:none;" onchange="window.handleBgUpload(event)">
+                    <button onclick="document.getElementById('bg-upload-input').click()">选择一张图片作为背景</button>
+                </div>
+                <button onclick="window.saveSettings()" style="margin-top:20px;">保存并应用</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const APP_VERSION = "1.0.16"; 
+    const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
+    
+    let supabaseClient;
+    try {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) { console.error("Supabase 初始化失败:", e); }
+
+    let currentRoomCode = "";
+    let mySender = "用户_" + Math.floor(Math.random() * 1000);
+    let replyData = null;
+    let roomSubscription = null;
+    let pendingMedia = null; 
+
+    // 分页相关变量
+    let isFetchingHistory = false;
+    const PAGE_SIZE = 30;
+    let lastMessageTimestamp = null; // 用于记录上一次加载的最老消息的时间戳
+
+    window.onload = () => {
+        const savedToken = localStorage.getItem('chat_auth_token');
+        const savedRoom = localStorage.getItem('chat_last_room');
+        const expiry = localStorage.getItem('chat_auth_expiry');
+
+        if (savedToken && savedRoom && expiry) {
+            const now = new Date().getTime();
+            if (now < parseInt(expiry)) {
+                currentRoomCode = savedRoom;
+                mySender = savedToken; 
+                document.getElementById('login-area').style.display = 'none';
+                document.getElementById('chat-container').style.display = 'flex';
+                document.getElementById('room-title').innerText = currentRoomCode;
+                setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
+                ensureRoomExists();
+                loadHistory(true); // 初始化加载（仅30条）
+                initRealtime();
+            } else {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        const savedColor = localStorage.getItem('chat_theme_color');
+        if (savedColor) {
+            document.documentElement.style.setProperty('--bubble-color', savedColor);
+            document.getElementById('color-selector').value = savedColor;
+        }
+
+        const savedBg = localStorage.getItem('chat_bg_url');
+        if (savedBg) {
+            document.getElementById('chat-bg').style.backgroundImage = `url(${savedBg})`;
+        }
+
+        const lastVersion = localStorage.getItem('app_version');
+        if (lastVersion !== APP_VERSION) {
+            document.getElementById('update-modal').style.display = 'flex';
+            localStorage.setItem('app_version', APP_VERSION);
+        }
+    };
+
+    window.joinRoom = async function() {
+        const nameInput = document.getElementById('username').value.trim();
+        currentRoomCode = document.getElementById('room-input').value.trim();
+        const isAutoLogin = document.getElementById('auto-login-check').checked;
+        
+        if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
+            return alert("房间代码格式不正确，请只使用字母、数字或符号。");
+        }
+
+        if (!nameInput || !currentRoomCode) return alert("请输入名字和房间代码");
+
+        localStorage.setItem('chat_auth_token', nameInput);
+        mySender = nameInput; 
+
+        if (isAutoLogin) {
+            const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000); 
+            localStorage.setItem('chat_last_room', currentRoomCode);
+            localStorage.setItem('chat_auth_expiry', expiryTime.toString());
+        }
+
+        document.getElementById('login-area').style.display = 'none';
+        document.getElementById('chat-container').style.display = 'flex';
+        document.getElementById('room-title').innerText = currentRoomCode; 
+        setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
+
+        await ensureRoomExists();
+        loadHistory(true); // 进入房间加载历史记录（仅30条）
+        initRealtime();
+    };
+
+    async function ensureRoomExists() {
+        const { data: room, error } = await supabaseClient
+            .from('rooms')
+            .select('*')
+            .eq('room_code', currentRoomCode)
+            .single();
+
+        if (error || !room) {
+            await supabaseClient
+                .from('rooms')
+                .insert([{ room_code: currentRoomCode, room_name: currentRoomCode }]);
+        } else {
+            document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
+        }
+    }
+
+    async function loadHistory(isInitial = true) {
+        if (isFetchingHistory) return;
+        isFetchingHistory = true;
+
+        try {
+            const chatBox = document.getElementById('chat-box');
+
+            if (isInitial) {
+                // 初始加载：只获取最新的30条消息，保证秒开
+                const { data: allData, error } = await supabaseClient
+                    .from('messages')
+                    .select('*')
+                    .eq('room_code', currentRoomCode)
+                    .order('created_at', { ascending: true })
+                    .limit(PAGE_SIZE);
+                
+                if (!error && allData) {
+                    const data = allData; 
+                    chatBox.innerHTML = ""; 
+                    data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
+                    // 设置时间戳，用于后续上拉请求更早的消息
+                    lastMessageTimestamp = data[0].created_at; 
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+            } else {
+                // 上拉加载：获取比当前最老消息更早的消息
+                if (!lastMessageTimestamp) return;
+
+                const { data: oldData, error } = await supabaseClient
+                    .from('messages')
+                    .select('*')
+                    .eq('room_code', currentRoomCode)
+                    .lt('created_at', lastMessageTimestamp) // 关键：只查比当前最老消息更早的
+                    .order('created_at', { ascending: true })
+                    .limit(PAGE_SIZE);
+
+                if (!error && oldData && oldData.length > 0) {
+                    oldData.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
+                    // 更新时间戳为这批里最老的
+                    lastMessageTimestamp = oldData[0].created_at;
+
+                    const scrollPos = chatBox.scrollTop;
+                    chatBox.scrollTop = scrollPos + (oldData.length * 60); 
+                } else {
+                    // 没有更多消息了，清除时间戳防止重复请求
+                    lastMessageTimestamp = null;
+                }
+            }
+        } catch (e) { console.error("LoadHistory Error:", e); } finally {
+            isFetchingHistory = false;
+        }
+    }
+
+    const chatBoxEl = document.getElementById('chat-box');
+    let pressTimer;
+
+    // 上拉监听逻辑优化：增加阈值判断防止频繁触发
+    chatBoxEl.addEventListener('scroll', () => {
+        if (chatBoxEl.scrollTop <= 10 && !isFetchingHistory) {
+            loadHistory(false);
+        }
+    });
+
+    function initRealtime() {
+        if (roomSubscription) roomSubscription.unsubscribe();
+
+        roomSubscription = supabaseClient.channel(`room_${currentRoomCode}`)
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'messages',
+                filter: `room_code=eq.${currentRoomCode}`
+            }, (payload) => {
+                appendMessageToUI(payload.new.sender, payload.new.content, true, payload.new.created_at, payload.new.media_url, payload.new.media_type);
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'rooms',
+                filter: `room_code=eq.${currentRoomCode}`
+            }, (payload) => {
+                const room = payload.new;
+                document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
+            })
+            .subscribe();
+    }
+
+    window.triggerImageUpload = function() {
+        document.getElementById('file-input').click();
+    };
+
+    window.handleFileSelect = async function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (file.size > 15 * 1024 * 1024) {
+            return alert("文件太大啦！请选择小于15MB的文件。");
+        }
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `media_${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
+            const filePath = `chat_media/${fileName}`;
+
+            const { data, error } = await supabaseClient
+                .storage
+                .from('chat_media')
+                .upload(filePath, file);
+
+            if (error) throw error;
+
+            const { data: publicData } = await supabaseClient
+                .storage
+                .from('chat_media')
+                .getPublicUrl(filePath);
+
+            pendingMedia = {
+                url: publicData.publicUrl,
+                type: fileExt.toLowerCase().includes('mp3') || fileExt.toLowerCase().includes('wav') ? 'audio' : 'image'
+            };
+
+            window.sendMessage();
+        } catch (e) { console.error(e); alert("上传失败，请检查网络或权限。"); }
+    };
+
+    window.sendMessage = async function() {
+        const inputEl = document.getElementById('message-input');
+        let content = inputEl.value.trim();
+        
+        if (!content && !pendingMedia) return;
+
+        let finalContent = content;
+        if (replyData) {
+            finalContent = `${content}\n\n[回复: ${replyData.content}]`;
+        }
+
+        try {
+            const { error } = await supabaseClient
+                .from('messages')
+                .insert([{ 
+                    room_code: currentRoomCode, 
+                    content: finalContent, 
+                    sender: mySender,
+                    media_url: pendingMedia ? pendingMedia.url : null,
+                    media_type: pendingMedia ? pendingMedia.type : null,
+                    created_at: new Date().toISOString()
+                }]);
+
+            if (error) {
+                console.error("发送失败:", error);
+                alert("消息发送失败。");
+            } else {
+                inputEl.value = ""; 
+                pendingMedia = null;
+                cancelReply();
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    function appendMessageToUI(sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null) {
+        const chatBox = document.getElementById('chat-box');
+        const wrapper = document.createElement('div');
+        wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
+
+        let timeStr = "00:00";
+        if (timestamp_str) {
+            const date = new Date(timestamp_str);
+            const now = new Date();
+            const isToday = date.toDateString() === now.toDateString();
+            if (!isToday) {
+                timeStr = `${date.getMonth() + 1}-${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+            } else {
+                timeStr = date.getHours().toString().padStart(2, '0') + ":" + date.getMinutes().toString().padStart(2, '0');
+            }
+        } else {
+            const now = new Date();
+            timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+        }
+
+        let displayContent = content;
+        let replyTagHtml = "";
+
+        if (content.includes("[回复:")) {
+            const parts = content.split("\n\n");
+            displayContent = parts[0] || content; 
+            const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
+            replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${rawReply}</div>`;
+        }
+
+        let mediaHtml = "";
+        if (mediaUrl) {
+            if (mediaType === 'image') {
+                mediaHtml = `<img src="${mediaUrl}" class="msg-img" />`;
+            } else if (mediaType === 'audio') {
+                mediaHtml = `
+                    <div style="display:flex; flex-direction:column; gap:8px;" onclick="this.querySelector('audio').play();" style="cursor:pointer;">
+                        <audio controls src="${mediaUrl}" style="width:100%;"></audio>
+                        <div class="voice-transcript" style="font-size:14px; color:${sender === mySender ? '#fff' : '#333'}; border-top:1px solid rgba(255,255,255,0.2); padding-top:8px;"></div>
+                    </div>`;
+            }
+        }
+
+        wrapper.innerHTML = `
+            <div class="msg-content">
+                ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
+                <div style="white-space: pre-wrap; word-break: break-word;">${mediaHtml}${displayContent}</div>
+                ${replyTagHtml}
+                <span class="msg-time">${timeStr}</span>
+            </div>
+        `;
+
+        const menuContainer = document.createElement('div');
+        menuContainer.style.cssText = "display:flex; gap:8px; margin-bottom:5px; justify-content:flex-end;";
+        
+        let options = [];
+        if (replyData) {
+            options.push({ label: '取消', action: () => cancelReply() });
+        }
+
+        if (mediaType === 'audio') {
+            options.push({ label: '转文字', action: async () => {
+                const transcriptDiv = wrapper.querySelector('.voice-transcript');
+                if (!transcriptDiv) return;
+                transcriptDiv.innerText = "正在识别...";
+                try {
+                    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+                    recognition.lang = 'zh-CN';
+                    recognition.start();
+                    recognition.onresult = (event) => {
+                        const result = event.results[0][0].transcript;
+                        transcriptDiv.innerText = result;
+                    };
+                    recognition.onerror = () => { transcriptDiv.innerText = "识别失败。"; };
+                    recognition.onend = () => { if (transcriptDiv.innerText === "正在识别...") transcriptDiv.innerText = "未检测到语音内容。"; };
+                } catch (e) { console.error(e); transcriptDiv.innerText = "无法启动语音识别。"; }
+            }});
+        }
+
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.innerText = opt.label;
+            btn.style.cssText = "padding:4px 8px; font-size:12px; margin:0; background:#eee; color:#333; border:none; border-radius:6px;";
+            btn.onclick = (e) => { e.stopPropagation(); opt.action(); };
+            menuContainer.appendChild(btn);
+        });
+
+        wrapper.prepend(menuContainer);
+        chatBox.appendChild(wrapper);
+        
+        if (isNew) {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    }
+
+    let pressTimer;
+
+    function handleLongPress(element) {
+        const contentEl = element.querySelector('.msg-content');
+        if (!contentEl) return;
+        const content = contentEl.innerText;
+        replyData = { content };
+        const preview = document.getElementById('reply-preview');
+        preview.style.display = 'flex';
+        preview.innerHTML = `正在回复：${replyData.content} <span style="cursor:pointer; color:#07c475;" onclick="window.cancelReply()">✕</span>`;
+    }
+
+    window.cancelReply = function() {
+        replyData = null;
+        document.getElementById('reply-preview').style.display = 'none';
+    };
+
+    chatBoxEl.addEventListener('touchstart', (e) => {
+        const target = e.target.closest('.msg-wrapper');
+        if (target && !target.classList.contains('system-msg')) {
+            pressTimer = setTimeout(() => handleLongPress(target), 2000);
+        }
+    }, {passive: true});
+
+    chatBoxEl.addEventListener('touchend', () => clearTimeout(pressTimer));
+
+    chatBoxEl.addEventListener('contextmenu', (e) => {
+        const target = e.target.closest('.msg-wrapper');
+        if (target && !target.classList.contains('system-msg')) {
+            e.preventDefault(); 
+            handleLongPress(target);
+        }
+    });
+
+    window.toggleSettings = function(e) {
+        const modal = document.getElementById('settings-modal');
+        if (e) return; 
+        modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+    };
+
+    window.updateRoomName = async function() {
+        const newName = document.getElementById('custom-room-name').value.trim();
+        if (!newName) return alert("请输入新名字");
+        try {
+            const { error } = await supabaseClient
+                .from('rooms')
+                .update({ room_name: newName })
+                .eq('room_code', currentRoomCode);
+            if (error) throw error;
+            alert("名称已更新，所有人可见");
+        } catch (e) { alert("修改失败。"); }
+    };
+
+    window.saveSettings = function() {
+        const color = document.getElementById('color-selector').value;
+        document.documentElement.style.setProperty('--bubble-color', color);
+        localStorage.setItem('chat_theme_color', color);
+        window.toggleSettings();
+    };
+
+    window.handleBgUpload = async function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        try {
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                localStorage.setItem('chat_bg_url', reader.result);
+                document.getElementById('chat-bg').style.backgroundImage = `url(${reader.result})`;
+                alert("背景已更新！");
+            };
+            reader.readAsDataURL(file);
+        } catch (e) { console.error(e); alert("上传背景失败。"); }
+    };
+
+    window.leaveRoom = function() {
+        if(confirm("确定要退出当前房间吗？（这将重置您的用户身份）")) {
+            localStorage.removeItem('chat_auth_token');
+            localStorage.removeItem('chat_last_room');
+            localStorage.removeItem('chat_auth_expiry');
+            currentRoomCode = "";
+            document.getElementById('login-area').style.display = 'flex';
+            document.getElementById('chat-container').style.display = 'none';
+            location.reload(); 
+        }
+    };
+
+    window.closeUpdateModal = function() {
+        document.getElementById('update-modal').style.display = 'none';
+    };
+
+    document.getElementById('message-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            window.sendMessage();
+        }
+    });
+</script>
+</body>
+</html>
+
         :root {
             --btn-color: #0084ff; 
             --bubble-color: #0084ff; 
