@@ -209,7 +209,7 @@
 </div>
 
 <script>
-    const APP_VERSION = "1.0.14"; 
+    const APP_VERSION = "1.0.15"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -224,9 +224,10 @@
     let roomSubscription = null;
     let pendingMedia = null; 
 
-    // 分页相关变量
+    // 分页核心变量
     let isFetchingHistory = false;
     const PAGE_SIZE = 30;
+    let lastTimestamp = null; // 用于记录上一次加载的最旧消息的时间戳，防止循环加载
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -316,7 +317,7 @@
     }
 
     /**
-     * 加载历史记录逻辑
+     * 加载历史记录逻辑 (修复循环加载Bug)
      * @param {boolean} isInitial - 是否为初始加载（如果是，则只显示最新的30条）
      */
     async function loadHistory(isInitial = true) {
@@ -338,22 +339,33 @@
                     const chatBox = document.getElementById('chat-box');
                     chatBox.innerHTML = ""; 
                     data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
+                    
+                    // 【关键修复点】：记录这30条中最旧的那一条的时间戳
+                    if (data.length > 0) {
+                        lastTimestamp = data[0].created_at;
+                    }
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }
             } else {
-                // 上拉加载：获取之前的消息（这里简化处理，实际可根据时间戳进一步优化）
+                // 上拉加载：请求时间戳小于 lastTimestamp 的消息，且按时间升序排列
                 const { data: oldData, error } = await supabaseClient
                     .from('messages')
                     .select('*')
                     .eq('room_code', currentRoomCode)
+                    .lt('created_at', lastTimestamp) // 确保只找比当前最旧消息更早的消息
                     .order('created_at', { ascending: true })
                     .limit(PAGE_SIZE);
 
                 if (!error && oldData) {
                     const chatBox = document.getElementById('chat-box');
-                    // 插入到最前面
+                    // 将新获取的旧消息插入到前面
                     oldData.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
                     
+                    // 更新 lastTimestamp 为这批数据中最旧的那一条
+                    if (oldData.length > 0) {
+                        lastTimestamp = oldData[0].created_at;
+                    }
+
                     // 保持滚动位置（防止上拉加载导致页面跳动）
                     const scrollPos = chatBox.scrollTop;
                     chatBox.scrollTop = scrollPos + (oldData.length * 60); 
@@ -365,9 +377,10 @@
     }
 
     // 上拉监听逻辑
-    const chatBox = document.getElementById('chat-box');
-    chatBox.addEventListener('scroll', () => {
-        if (chatBox.scrollTop <= 10 && !isFetchingHistory) {
+    const chatBoxEl = document.getElementById('chat-box');
+    chatBoxEl.addEventListener('scroll', () => {
+        // 如果用户滚动到顶部（距离顶部小于10px）且不是在向下快速滑动
+        if (chatBoxEl.scrollTop <= 10 && !isFetchingHistory) {
             loadHistory(false);
         }
     });
@@ -431,16 +444,12 @@
             };
 
             window.sendMessage();
-        } catch (e) {
-            console.error(e);
-            alert("上传失败，请检查网络或权限。");
-        }
+        } catch (e) { console.error(e); alert("上传失败，请检查网络或权限。"); }
     };
 
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
         let content = inputEl.value.trim();
-        
         if (!content && !pendingMedia) return;
 
         let finalContent = content;
@@ -460,14 +469,8 @@
                     created_at: new Date().toISOString()
                 }]);
 
-            if (error) {
-                console.error("发送失败:", error);
-                alert("消息发送失败。");
-            } else {
-                inputEl.value = ""; 
-                pendingMedia = null;
-                cancelReply();
-            }
+            if (error) { console.error("发送失败:", error); alert("消息发送失败。"); } 
+            else { inputEl.value = ""; pendingMedia = null; cancelReply(); }
         } catch (e) { console.error(e); }
     };
 
@@ -525,11 +528,8 @@
 
         const menuContainer = document.createElement('div');
         menuContainer.style.cssText = "display:flex; gap:8px; margin-bottom:5px; justify-content:flex-end;";
-        
         let options = [];
-        if (replyData) {
-            options.push({ label: '取消', action: () => cancelReply() });
-        }
+        if (replyData) { options.push({ label: '取消', action: () => cancelReply() }); }
 
         if (mediaType === 'audio') {
             options.push({ label: '转文字', action: async () => {
@@ -540,16 +540,10 @@
                     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
                     recognition.lang = 'zh-CN';
                     recognition.start();
-                    recognition.onresult = (event) => {
-                        const result = event.results[0][0].transcript;
-                        transcriptDiv.innerText = result;
-                    };
+                    recognition.onresult = (event) => { transcriptDiv.innerText = event.results[0][0].transcript; };
                     recognition.onerror = () => { transcriptDiv.innerText = "识别失败。"; };
                     recognition.onend = () => { if (transcriptDiv.innerText === "正在识别...") transcriptDiv.innerText = "未检测到语音内容。"; };
-                } catch (e) {
-                    console.error(e);
-                    transcriptDiv.innerText = "无法启动语音识别。";
-                }
+                } catch (e) { console.error(e); transcriptDiv.innerText = "无法启动语音识别。"; }
             }});
         }
 
@@ -563,10 +557,7 @@
 
         wrapper.prepend(menuContainer);
         chatBox.appendChild(wrapper);
-        
-        if (isNew) {
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
+        if (isNew) chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     const chatBoxEl = document.getElementById('chat-box');
