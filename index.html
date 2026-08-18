@@ -140,7 +140,7 @@
     <div class="update-modal-content">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 消息加载优化：修复了历史记录循环加载的Bug，支持更平滑的上拉加载<br>
+            • 消息加载优化：进入房间直接定位到最新内容，彻底取消滚动动画<br>
             • 功能精简：移除语音录制功能，界面更清爽<br>
             • UI适配：完美兼容苹果手机安全区域
         </p>
@@ -209,7 +209,7 @@
 </div>
 
 <script>
-    const APP_VERSION = "1.0.15"; 
+    const APP_VERSION = "1.0.14"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -227,7 +227,6 @@
     // 分页相关变量
     let isFetchingHistory = false;
     const PAGE_SIZE = 30;
-    let lastTimestamp = null; // 用于防止循环加载的关键变量
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -317,7 +316,8 @@
     }
 
     /**
-     * 加载历史记录逻辑 (修复循环加载问题)
+     * 加载历史记录逻辑
+     * @param {boolean} isInitial - 是否为初始加载（如果是，则只显示最新的30条）
      */
     async function loadHistory(isInitial = true) {
         if (isFetchingHistory) return;
@@ -325,8 +325,6 @@
 
         try {
             let data = [];
-            const chatBox = document.getElementById('chat-box');
-
             if (isInitial) {
                 // 初始加载：获取所有消息并只显示最后30条
                 const { data: allData, error } = await supabaseClient
@@ -337,31 +335,25 @@
                 
                 if (!error && allData) {
                     data = allData.slice(-PAGE_SIZE);
+                    const chatBox = document.getElementById('chat-box');
                     chatBox.innerHTML = ""; 
                     data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
-                    // 更新最后一条消息的时间戳作为上拉基准点
-                    lastTimestamp = data[data.length - 1].created_at;
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }
             } else {
-                // 上拉加载：获取比 lastTimestamp 更早的消息
-                if (!lastTimestamp) return;
-
+                // 上拉加载：获取之前的消息（这里简化处理，实际可根据时间戳进一步优化）
                 const { data: oldData, error } = await supabaseClient
                     .from('messages')
                     .select('*')
                     .eq('room_code', currentRoomCode)
-                    .lt('created_at', lastTimestamp) // 关键点：只查比当前最旧消息更早的
                     .order('created_at', { ascending: true })
                     .limit(PAGE_SIZE);
 
-                if (!error && oldData && oldData.length > 0) {
-                    // 将新加载的消息插入到 UI 最前面
+                if (!error && oldData) {
+                    const chatBox = document.getElementById('chat-box');
+                    // 插入到最前面
                     oldData.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
                     
-                    // 更新基准时间戳为这批数据中最旧的那一条
-                    lastTimestamp = oldData[0].created_at;
-
                     // 保持滚动位置（防止上拉加载导致页面跳动）
                     const scrollPos = chatBox.scrollTop;
                     chatBox.scrollTop = scrollPos + (oldData.length * 60); 
@@ -373,12 +365,9 @@
     }
 
     // 上拉监听逻辑
-    const chatBoxEl = document.getElementById('chat-box');
-    let pressTimer;
-
-    chatBoxEl.addEventListener('scroll', () => {
-        // 如果滚动到顶部附近且不是正在加载中，则触发上拉加载
-        if (chatBoxEl.scrollTop <= 10 && !isFetchingHistory) {
+    const chatBox = document.getElementById('chat-box');
+    chatBox.addEventListener('scroll', () => {
+        if (chatBox.scrollTop <= 10 && !isFetchingHistory) {
             loadHistory(false);
         }
     });
@@ -442,7 +431,10 @@
             };
 
             window.sendMessage();
-        } catch (e) { console.error(e); alert("上传失败，请检查网络或权限。"); }
+        } catch (e) {
+            console.error(e);
+            alert("上传失败，请检查网络或权限。");
+        }
     };
 
     window.sendMessage = async function() {
@@ -554,7 +546,10 @@
                     };
                     recognition.onerror = () => { transcriptDiv.innerText = "识别失败。"; };
                     recognition.onend = () => { if (transcriptDiv.innerText === "正在识别...") transcriptDiv.innerText = "未检测到语音内容。"; };
-                } catch (e) { console.error(e); transcriptDiv.innerText = "无法启动语音识别。"; }
+                } catch (e) {
+                    console.error(e);
+                    transcriptDiv.innerText = "无法启动语音识别。";
+                }
             }});
         }
 
