@@ -137,12 +137,12 @@
 
 <!-- 更新公告 -->
 <div id="update-modal" onclick="window.closeUpdateModal()">
-    <div class="update-modal-content">
+    <div class="update-modal-content" onclick="event.stopPropagation()">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-            • 消息加载优化：进入房间直接定位到最新内容，彻底取消滚动动画<br>
-            • 功能精简：移除语音录制功能，界面更清爽<br>
-            • UI适配：完美兼容苹果手机安全区域
+        • 历史记录分页加载：支持上拉加载更多历史消息，加载时会保持滚动位置，避免跳动；初始进入仅加载最近消息以加快渲染。<br>
+        • 本地缓存管理：新增“清除本地聊天记录”功能，仅影响本地显示，不会删除服务器数据。<br>
+        • 设置体验优化：修复弹窗点击关闭的问题，改善背景与气泡颜色设置
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -202,6 +202,13 @@
                     <input type="file" id="bg-upload-input" accept="image/*" style="display:none;" onchange="window.handleBgUpload(event)">
                     <button onclick="document.getElementById('bg-upload-input').click()">选择一张图片作为背景</button>
                 </div>
+                <div class="setting-item">
+                    <label>清除本地聊天记录</label>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <button onclick="window.clearLocalHistory()" style="padding:8px; font-size:14px;">清除本地记录</button>
+                        <span style="font-size:12px; color:#888;">仅清除本地显示与缓存，不会影响服务器数据</span>
+                    </div>
+                </div>
                 <button onclick="window.saveSettings()" style="margin-top:20px;">保存并应用</button>
             </div>
         </div>
@@ -227,6 +234,12 @@
     // 分页相关变量
     let isFetchingHistory = false;
     const PAGE_SIZE = 30;
+    // 用于分页：记录已加载的最早消息时间戳
+    let oldestLoadedAt = null;
+    // 是否已经没有更多历史可加载
+    let noMoreHistory = false;
+    // 加载历史时的标志（用于显示加载中）
+    let loadingHistory = false;
 
     window.onload = () => {
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -320,54 +333,81 @@
      * @param {boolean} isInitial - 是否为初始加载（如果是，则只显示最新的30条）
      */
     async function loadHistory(isInitial = true) {
-        if (isFetchingHistory) return;
+        if (isFetchingHistory || loadingHistory) return;
         isFetchingHistory = true;
+        loadingHistory = true;
+        const chatBox = document.getElementById('chat-box');
 
         try {
-            let data = [];
             if (isInitial) {
-                // 初始加载：获取所有消息并只显示最后30条
-                const { data: allData, error } = await supabaseClient
+                // 初始加载：获取最新 PAGE_SIZE 条（按时间降序取，再客户端 reverse 成升序）
+                const { data: recentData, error } = await supabaseClient
                     .from('messages')
                     .select('*')
                     .eq('room_code', currentRoomCode)
-                    .order('created_at', { ascending: true });
-                
-                if (!error && allData) {
-                    data = allData.slice(-PAGE_SIZE);
-                    const chatBox = document.getElementById('chat-box');
-                    chatBox.innerHTML = ""; 
-                    data.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                }
-            } else {
-                // 上拉加载：获取之前的消息（这里简化处理，实际可根据时间戳进一步优化）
-                const { data: oldData, error } = await supabaseClient
-                    .from('messages')
-                    .select('*')
-                    .eq('room_code', currentRoomCode)
-                    .order('created_at', { ascending: true })
+                    .order('created_at', { ascending: false })
                     .limit(PAGE_SIZE);
 
-                if (!error && oldData) {
-                    const chatBox = document.getElementById('chat-box');
-                    // 插入到最前面
-                    oldData.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
-                    
-                    // 保持滚动位置（防止上拉加载导致页面跳动）
-                    const scrollPos = chatBox.scrollTop;
-                    chatBox.scrollTop = scrollPos + (oldData.length * 60); 
+                if (!error && recentData) {
+                    const msgs = recentData.reverse();
+                    chatBox.innerHTML = "";
+                    msgs.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
+                    chatBox.scrollTop = chatBox.scrollHeight;
+
+                    if (msgs.length > 0) {
+                        // 记录当前最早消息的时间戳用于分页
+                        oldestLoadedAt = msgs[0].created_at;
+                    }
+                    noMoreHistory = msgs.length < PAGE_SIZE;
+                }
+            } else {
+                // 上拉加载：如果已经没有更多则直接返回
+                if (noMoreHistory) return;
+                if (!oldestLoadedAt) return;
+
+                const prevScrollHeight = chatBox.scrollHeight;
+                const prevScrollTop = chatBox.scrollTop;
+
+                const { data: olderData, error } = await supabaseClient
+                    .from('messages')
+                    .select('*')
+                    .eq('room_code', currentRoomCode)
+                    .lt('created_at', oldestLoadedAt)
+                    .order('created_at', { ascending: false })
+                    .limit(PAGE_SIZE);
+
+                if (!error && olderData) {
+                    if (olderData.length === 0) {
+                        noMoreHistory = true;
+                        return;
+                    }
+
+                    const msgs = olderData.reverse();
+                    // 插入到最前面（保持时间顺序）
+                    msgs.forEach(msg => appendMessageToUI(msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type, true));
+
+                    // 更新最早时间戳
+                    oldestLoadedAt = msgs[0].created_at;
+
+                    // 保持滚动位置，使用户看到与之前相同位置的消息
+                    const newScrollHeight = chatBox.scrollHeight;
+                    chatBox.scrollTop = newScrollHeight - prevScrollHeight + prevScrollTop;
+
+                    if (olderData.length < PAGE_SIZE) noMoreHistory = true;
                 }
             }
-        } catch (e) { console.error("LoadHistory Error:", e); } finally {
+        } catch (e) {
+            console.error("LoadHistory Error:", e);
+        } finally {
             isFetchingHistory = false;
+            loadingHistory = false;
         }
     }
 
     // 上拉监听逻辑
     const chatBox = document.getElementById('chat-box');
     chatBox.addEventListener('scroll', () => {
-        if (chatBox.scrollTop <= 10 && !isFetchingHistory) {
+        if (chatBox.scrollTop <= 10 && !isFetchingHistory && !noMoreHistory) {
             loadHistory(false);
         }
     });
@@ -471,7 +511,7 @@
         } catch (e) { console.error(e); }
     };
 
-    function appendMessageToUI(sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null) {
+    function appendMessageToUI(sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false) {
         const chatBox = document.getElementById('chat-box');
         const wrapper = document.createElement('div');
         wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
@@ -494,7 +534,7 @@
         let displayContent = content;
         let replyTagHtml = "";
 
-        if (content.includes("[回复:")) {
+        if (content && content.includes("[回复:")) {
             const parts = content.split("\n\n");
             displayContent = parts[0] || content; 
             const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
@@ -562,7 +602,13 @@
         });
 
         wrapper.prepend(menuContainer);
-        chatBox.appendChild(wrapper);
+        if (insertAtTop && chatBox.firstChild) {
+            chatBox.insertBefore(wrapper, chatBox.firstChild);
+        } else if (insertAtTop) {
+            chatBox.appendChild(wrapper);
+        } else {
+            chatBox.appendChild(wrapper);
+        }
         
         if (isNew) {
             chatBox.scrollTop = chatBox.scrollHeight;
@@ -606,7 +652,13 @@
 
     window.toggleSettings = function(e) {
         const modal = document.getElementById('settings-modal');
-        if (e) return; 
+        // If called with an event (overlay click), only close when clicking the overlay itself
+        if (e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+            return;
+        }
         modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
     };
 
@@ -628,6 +680,17 @@
         document.documentElement.style.setProperty('--bubble-color', color);
         localStorage.setItem('chat_theme_color', color);
         window.toggleSettings();
+    };
+
+    // 清除本地聊天记录（只影响本地显示与缓存）
+    window.clearLocalHistory = function() {
+        if (!confirm('确定要清除本地聊天记录吗？此操作不会删除服务器上的消息。')) return;
+        const chatBox = document.getElementById('chat-box');
+        chatBox.innerHTML = '';
+        oldestLoadedAt = null;
+        noMoreHistory = false;
+        localStorage.removeItem('chat_bg_url');
+        alert('本地聊天记录和缓存已清除。');
     };
 
     window.handleBgUpload = async function(event) {
