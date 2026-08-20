@@ -57,9 +57,10 @@
 
             /* 跳到最新按钮 */
             #jump-btn {
-                position: fixed; right: 16px; bottom: 90px; z-index: 60;
-                background: #fff; color: var(--btn-color); border: 1px solid #dbe5ff; padding: 9px 13px; border-radius: 18px;
-                box-shadow: 0 5px 16px rgba(32,33,36,0.1); cursor: pointer; display: none; font-weight: 600;
+                    position: fixed; right: 12px; bottom: 88px; z-index: 60;
+                    width: auto; min-width: 42px; height: 28px; padding: 0 9px; border-radius: 14px;
+                    background: rgba(255,255,255,.96); color: var(--btn-color); border: 1px solid #dbe5ff;
+                    box-shadow: 0 4px 12px rgba(32,33,36,0.12); cursor: pointer; display: none; font-size: 11px; font-weight: 600;
             }
 
         #chat-bg {
@@ -174,7 +175,12 @@
         .read-receipt { display:none; width:100%; margin-top:3px; color:#9aa0a8; font-size:10px; line-height:1.2; }
         .right .read-receipt { text-align:right; padding-right:3px; }
 
-        .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
+        .msg-img { width: auto; max-width: min(100%, 320px); max-height: 360px; object-fit: contain; border-radius: 8px; margin-top: 5px; display: block; cursor: zoom-in; }
+        .reply-media-preview { cursor: zoom-in; }
+        #image-lightbox { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.82); }
+        #image-lightbox.visible { display: flex; }
+        #image-lightbox img { max-width: 96vw; max-height: 90vh; object-fit: contain; border-radius: 8px; }
+        #image-lightbox button { position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); width: 38px; height: 38px; padding: 0; margin: 0; border-radius: 50%; background: rgba(255,255,255,.18); font-size: 24px; }
 
         /* --- 设置弹窗 --- */
         #settings-modal {
@@ -213,7 +219,7 @@
             .context-menu button { font-size:16px; padding:12px 14px; }
             #chat-box { padding: 16px 12px 72px; }
             .msg-wrapper { max-width: 88%; }
-            #nav-bar { padding: 0 12px; }
+            #nav-bar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
             #input-area { padding-left: 10px; padding-right: 10px; }
         }
 
@@ -231,6 +237,10 @@
         • 设置体验优化：修复弹窗点击关闭的问题，改善背景与气泡颜色设置
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
+    </div>
+    <div id="image-lightbox" onclick="closeImageLightbox(event)">
+        <button type="button" aria-label="关闭图片预览">×</button>
+        <img id="image-lightbox-img" alt="图片预览">
     </div>
 </div>
 
@@ -505,6 +515,24 @@
                 location.reload();
             }
         }
+
+        function openImageLightbox(url) {
+            const lightbox = document.getElementById('image-lightbox');
+            const image = document.getElementById('image-lightbox-img');
+            if (!lightbox || !image || !url) return;
+            image.src = url;
+            lightbox.classList.add('visible');
+        }
+
+        function closeImageLightbox(event) {
+            if (event && event.target.id === 'image-lightbox-img') return;
+            const lightbox = document.getElementById('image-lightbox');
+            const image = document.getElementById('image-lightbox-img');
+            if (lightbox) lightbox.classList.remove('visible');
+            if (image) image.removeAttribute('src');
+        }
+        window.openImageLightbox = openImageLightbox;
+        window.closeImageLightbox = closeImageLightbox;
 
         const savedColor = localStorage.getItem('chat_theme_color');
         if (savedColor) {
@@ -1023,6 +1051,7 @@
                 inputEl.value = ""; 
                 pendingMedia = null;
                 cancelReply();
+                requestAnimationFrame(() => scrollToBottom());
             }
         } catch (e) { console.error(e); }
     };
@@ -1178,7 +1207,7 @@
         let mediaHtml = "";
         if (mediaUrl) {
             if (mediaType === 'image') {
-                mediaHtml = `<img src="${mediaUrl}" class="msg-img" />`;
+                mediaHtml = `<img src="${escapeHtml(mediaUrl)}" class="msg-img" alt="图片消息" />`;
             } else if (mediaType === 'audio') {
                 mediaHtml = voiceMessageHtml(mediaUrl, displayContent);
                 displayContent = '';
@@ -1192,9 +1221,18 @@
                 ${replyTagHtml}
             </div>
         `;
+        const messageImage = wrapper.querySelector('.msg-img');
+        if (messageImage) messageImage.onclick = () => openImageLightbox(messageImage.src);
         const replyTarget = wrapper.querySelector('.reply-quote');
         if (replyTarget) {
             if (replyTarget.dataset.replyId) replyTarget.onclick = () => goToMessage(replyTarget.dataset.replyId);
+            const replyImage = replyTarget.querySelector('.reply-media-preview');
+            if (replyImage) {
+                replyImage.onclick = (event) => {
+                    event.stopPropagation();
+                    openImageLightbox(replyImage.src);
+                };
+            }
             const replyAudio = replyTarget.querySelector('.reply-audio-preview');
             if (replyAudio) {
                 replyAudio.onclick = (event) => {
@@ -1244,7 +1282,8 @@
                 // 增加未读计数并显示跳转按钮
                 unreadCount += 1;
                 const btn = document.getElementById('jump-btn');
-                btn.innerText = `未读 (${unreadCount})`;
+                btn.innerText = `↓ ${unreadCount}`;
+                btn.title = `${unreadCount} 条未读消息`;
                 btn.style.display = 'block';
             }
         }
@@ -1487,8 +1526,10 @@
             const contentDiv = wrapper.querySelector('.msg-content > div');
             if (contentDiv) {
                 // 更新文本与媒体
-                const mediaHtml = newMsg.media_url ? (newMsg.media_type === 'audio' ? voiceMessageHtml(newMsg.media_url, newMsg.content) : `<img src="${newMsg.media_url}" class="msg-img" />`) : '';
+                const mediaHtml = newMsg.media_url ? (newMsg.media_type === 'audio' ? voiceMessageHtml(newMsg.media_url, newMsg.content) : `<img src="${escapeHtml(newMsg.media_url)}" class="msg-img" alt="图片消息" />`) : '';
                 contentDiv.innerHTML = `${mediaHtml}${newMsg.media_type === 'audio' ? '' : newMsg.content}`;
+                const updatedImage = contentDiv.querySelector('.msg-img');
+                if (updatedImage) updatedImage.onclick = () => openImageLightbox(updatedImage.src);
             }
 
             // 同步本地缓存，以便搜索/撤回规则保持一致
