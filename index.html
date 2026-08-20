@@ -103,8 +103,9 @@
         }
         .left:hover .msg-content { background: #f8fafc; }
         .right:hover .msg-content { background: var(--bubble-color); }
-        .chat-idle::after { content:"暂时离线 · 点击页面继续在线"; position:absolute; inset:0; z-index:4; display:flex; align-items:center; justify-content:center; color:rgba(32,33,36,0.72); font-size:13px; background:rgba(255,255,255,0.22); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); pointer-events:none; }
         #chat-box { position:relative; }
+        #offline-overlay { position:absolute; top:62px; right:0; bottom:72px; left:0; z-index:4; display:none; align-items:center; justify-content:center; color:rgba(32,33,36,0.72); font-size:13px; background:rgba(255,255,255,0.28); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); pointer-events:none; }
+        #offline-overlay.visible { display:flex; }
         .system-message { align-self:center; color:#9aa0a8; font-size:12px; padding:5px 10px; margin:5px 0; }
         .left .msg-content { background: var(--msg-others); color: var(--text-main); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
         .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; }
@@ -239,6 +240,7 @@
     <div id="pinned-bar"></div>
 
     <div id="chat-box"></div>
+    <div id="offline-overlay">暂时离线 · 点击页面继续在线</div>
 
     <!-- 搜索结果 Modal -->
     <div id="search-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:9000; background:rgba(0,0,0,0.35);">
@@ -301,7 +303,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const APP_VERSION = "1.2.0"; 
+    const APP_VERSION = "1.3.0"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -559,7 +561,7 @@
         const el = document.getElementById('online-count');
         if (!el || !roomSubscription) return;
         const state = roomSubscription.presenceState();
-        const count = Object.values(state).reduce((total, metas) => total + metas.length, 0);
+        const count = Object.keys(state).length;
         el.innerText = `在线 ${presenceActive ? Math.max(1, count) : Math.max(0, count) } 人`;
     }
 
@@ -587,7 +589,7 @@
             });
             appendSystemMessage(active ? text : '你已暂时离线');
         }
-        document.getElementById('chat-box').classList.toggle('chat-idle', !active);
+        document.getElementById('offline-overlay').classList.toggle('visible', !active);
     }
 
     function appendSystemMessage(text) {
@@ -905,6 +907,7 @@
             btn.innerText = label;
             btn.onclick = (e) => { e.stopPropagation(); fn(); hideContextMenu(); };
             menu.appendChild(btn);
+            return btn;
         };
 
         addItem('回复', () => {
@@ -917,7 +920,10 @@
         addItem('复制', async () => { try { await navigator.clipboard.writeText(contentText); alert('已复制'); } catch (e) { alert('复制失败'); } });
 
         addItem('表情', () => toggleReactionMenu(messageId, wrapper));
-        addItem('置顶', () => pinMessage(messageId));
+        const pinButton = addItem('置顶', () => pinMessage(messageId));
+        isPinnedMessage(messageId).then((pinned) => {
+            if (menu.style.display !== 'none') pinButton.innerText = pinned ? '取消置顶' : '置顶';
+        });
 
         if (sender === mySender) {
             addItem('编辑', () => editMessage(messageId));
@@ -1103,20 +1109,54 @@
         } catch (e) { console.error('fetchReactions', e); }
     }
 
-    // 置顶消息（尝试保存到 pins 表，回退至 localStorage）
-    async function pinMessage(messageId) {
+    async function isPinnedMessage(messageId) {
+        const key = `pins_${currentRoomCode}`;
+        const localPins = JSON.parse(localStorage.getItem(key) || '[]').map(String);
+        if (localPins.includes(String(messageId))) return true;
         try {
-            await supabaseClient.from('pins').insert([{ room_code: currentRoomCode, message_id: messageId, user: mySender, created_at: new Date().toISOString() }]);
-            alert('消息已置顶（服务器）');
-            try { fetchPinnedMessages(); } catch (e) {}
+            const { data, error } = await supabaseClient
+                .from('pins')
+                .select('id')
+                .eq('room_code', currentRoomCode)
+                .eq('message_id', messageId)
+                .eq('user', mySender);
+            return !error && !!data && data.length > 0;
         } catch (e) {
-            const key = `pins_${currentRoomCode}`;
-            const cur = JSON.parse(localStorage.getItem(key) || '[]');
-            if (!cur.includes(messageId)) cur.push(messageId);
-            localStorage.setItem(key, JSON.stringify(cur));
-            alert('消息已本地置顶');
-            try { fetchPinnedMessages(); } catch (e) {}
+            return false;
         }
+    }
+
+    // 置顶消息：同一用户对同一消息再次操作时取消置顶，避免重复记录
+    async function pinMessage(messageId) {
+        const key = `pins_${currentRoomCode}`;
+        const localPins = JSON.parse(localStorage.getItem(key) || '[]').map(String);
+        try {
+            const { data, error } = await supabaseClient
+                .from('pins')
+                .select('id')
+                .eq('room_code', currentRoomCode)
+                .eq('message_id', messageId)
+                .eq('user', mySender);
+            if (error) throw error;
+            if (data && data.length) {
+                for (const pin of data) {
+                    const { error: deleteError } = await supabaseClient.from('pins').delete().eq('id', pin.id);
+                    if (deleteError) throw deleteError;
+                }
+            } else {
+                const { error: insertError } = await supabaseClient.from('pins').insert([{
+                    room_code: currentRoomCode, message_id: messageId, user: mySender, created_at: new Date().toISOString()
+                }]);
+                if (insertError) throw insertError;
+            }
+            localStorage.setItem(key, JSON.stringify(localPins.filter(id => id !== String(messageId))));
+        } catch (e) {
+            const index = localPins.indexOf(String(messageId));
+            if (index >= 0) localPins.splice(index, 1);
+            else localPins.push(String(messageId));
+            localStorage.setItem(key, JSON.stringify(localPins));
+        }
+        fetchPinnedMessages();
     }
 
     // 编辑消息（提示输入并更新）
@@ -1244,9 +1284,12 @@
             const { data: pinsData, error } = await supabaseClient.from('pins').select('*').eq('room_code', currentRoomCode).order('created_at', { ascending: false }).limit(10);
             let pinned = [];
             if (!error && pinsData && pinsData.length) {
-                const ids = pinsData.map(p => p.message_id);
+                const uniquePins = pinsData.filter((pin, index, all) =>
+                    all.findIndex(item => String(item.message_id) === String(pin.message_id)) === index
+                );
+                const ids = uniquePins.map(p => p.message_id);
                 const { data: msgs } = await supabaseClient.from('messages').select('*').in('id', ids);
-                pinned = pinsData.map(p => ({ pin: p, msg: msgs ? msgs.find(mm => String(mm.id) === String(p.message_id)) : null }));
+                pinned = uniquePins.map(p => ({ pin: p, msg: msgs ? msgs.find(mm => String(mm.id) === String(p.message_id)) : null }));
             } else {
                 const key = `pins_${currentRoomCode}`;
                 const cur = JSON.parse(localStorage.getItem(key) || '[]');
