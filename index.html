@@ -20,7 +20,7 @@
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg-color);
-            height: 100vh; width: 100vw;
+            height: 100vh; height: 100dvh; width: 100vw;
             display: flex; flex-direction: column; overflow: hidden;
         }
 
@@ -51,7 +51,7 @@
         /* --- 聊天主容器 --- */
         #chat-container { 
             display: flex; flex-direction: column; max-width: 920px; margin: 0 auto;
-            width: 100%; height: 100vh; background: #fff; position: relative;
+            width: 100%; height: 100vh; height: 100dvh; background: #fff; position: relative;
             padding-bottom: env(safe-area-inset-bottom);
         }
 
@@ -69,9 +69,9 @@
         }
 
         #nav-bar { 
-            height: 62px; background: rgba(255,255,255,0.94); backdrop-filter: blur(10px);
+            min-height: 62px; height: calc(62px + env(safe-area-inset-top)); background: rgba(255,255,255,0.94); backdrop-filter: blur(10px);
             border-bottom: 1px solid #eee; display: flex; align-items: center; 
-            padding: 0 18px; justify-content: space-between; z-index: 10;
+            padding: env(safe-area-inset-top) 18px 0; justify-content: space-between; z-index: 10; flex: 0 0 auto;
         }
         #back-btn { font-size: 24px; cursor: pointer; padding: 5px; }
         #room-title { font-weight: 600; font-size: 16px; color: var(--text-main); flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -81,7 +81,7 @@
 
         /* --- 聊天框内容层 --- */
         #chat-box { 
-            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 22px 20px; display: flex;
+            flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 22px 20px; display: flex;
             flex-direction: column; gap: 10px;
             background-color: transparent; 
             z-index: 1;
@@ -104,11 +104,21 @@
         .left:hover .msg-content { background: #f8fafc; }
         .right:hover .msg-content { background: var(--bubble-color); }
         #chat-box { position:relative; }
-        #offline-overlay { position:absolute; top:62px; right:0; bottom:72px; left:0; z-index:4; display:none; align-items:center; justify-content:center; color:rgba(32,33,36,0.72); font-size:13px; background:rgba(255,255,255,0.28); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); pointer-events:none; }
+        #offline-overlay { position:absolute; top:calc(62px + env(safe-area-inset-top)); right:0; bottom:72px; left:0; z-index:4; display:none; align-items:center; justify-content:center; color:rgba(32,33,36,0.72); font-size:13px; background:rgba(255,255,255,0.28); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); pointer-events:none; }
         #offline-overlay.visible { display:flex; }
         .system-message { align-self:center; color:#9aa0a8; font-size:12px; padding:5px 10px; margin:5px 0; }
         .left .msg-content { background: var(--msg-others); color: var(--text-main); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
         .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; }
+
+        @media (max-width: 600px) {
+            #nav-bar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+            #back-btn { flex: 0 0 40px; min-width: 40px; font-size: 27px; line-height: 1; }
+            #room-title { min-width: 0; padding: 0 6px; }
+            #nav-bar > div { flex: 0 0 auto; gap: 4px !important; }
+            .online-count { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
+            #chat-box { padding-left: 10px; padding-right: 10px; }
+            #input-area { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+        }
 
         .sender-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; display: block; opacity: 0.72; }
         .message-time-divider { align-self: center; color: #9aa0a8; font-size: 11px; line-height: 1; padding: 5px 9px; margin: 7px 0 3px; }
@@ -119,7 +129,7 @@
             border-radius: 8px; margin-bottom: 5px; display: none; border: 1px solid var(--line);
         }
 
-        #input-area { padding: 11px 16px calc(11px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; }
+        #input-area { padding: 11px 16px calc(11px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; flex: 0 0 auto; }
         .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
         #message-input { flex: 1; padding: 11px 15px; border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: 16px; resize: none; max-height: 150px; background: #fafbfc; }
         
@@ -440,6 +450,13 @@
     // 未读消息计数与滚动状态
     let unreadCount = 0;
     let readReceiptTimer = null;
+    let isLeavingRoom = false;
+
+    window.addEventListener('beforeunload', (event) => {
+        if (!currentRoomCode || isLeavingRoom) return;
+        event.preventDefault();
+        event.returnValue = '确定要退出当前房间吗？';
+    });
 
     window.onload = () => {
         const voiceButton = document.getElementById('voice-btn');
@@ -1647,6 +1664,7 @@
 
     window.leaveRoom = function() {
         if(confirm("确定要退出当前房间吗？（这将重置您的用户身份）")) {
+            isLeavingRoom = true;
             localStorage.removeItem('chat_auth_token');
             localStorage.removeItem('chat_last_room');
             localStorage.removeItem('chat_auth_expiry');
