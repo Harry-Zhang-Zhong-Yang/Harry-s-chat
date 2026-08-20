@@ -336,7 +336,7 @@
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (e) { console.error("Supabase 初始化失败:", e); }
 
-    const PUSH_PUBLIC_KEY = 'BO9iBsWlhRp3O3mw2bRhHyn05b9BRGBZr_dU69iElwScNQEjINVChx8vkBjtzGzKQlbL-tvLy2a3qP8ao_FcSB0';
+    const PUSH_PUBLIC_KEY = 'REPLACE_WITH_VAPID_PUBLIC_KEY';
 
     function urlBase64ToUint8Array(value) {
         const padding = '='.repeat((4 - value.length % 4) % 4);
@@ -346,7 +346,29 @@
 
     async function registerPushWorker() {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('当前浏览器不支持后台通知');
-        return navigator.serviceWorker.register('./sw.js', { scope: './' });
+        const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+        await registration.update();
+        if (!registration.active) {
+            await new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('Service Worker 激活超时，请刷新页面后重试')), 10000);
+                const onStateChange = () => {
+                    if (registration.active) {
+                        clearTimeout(timeout);
+                        resolve();
+                    }
+                };
+                if (registration.installing) {
+                    registration.installing.addEventListener('statechange', onStateChange);
+                } else if (registration.waiting) {
+                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    navigator.serviceWorker.addEventListener('controllerchange', onStateChange, { once: true });
+                } else {
+                    clearTimeout(timeout);
+                    reject(new Error('Service Worker 未能激活，请刷新页面后重试'));
+                }
+            });
+        }
+        return registration;
     }
 
     window.enablePushNotifications = async function() {
