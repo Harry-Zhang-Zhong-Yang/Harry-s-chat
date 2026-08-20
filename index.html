@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Harry的聊天室</title>
+    <title>极简高级聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -314,6 +314,11 @@
                         <span style="font-size:12px; color:#888;">仅清除本地显示与缓存，不会影响服务器数据</span>
                     </div>
                 </div>
+                <div class="setting-item">
+                    <label>后台消息通知</label>
+                    <button id="push-notification-btn" onclick="window.enablePushNotifications()" style="padding:8px; font-size:14px;">开启后台通知</button>
+                    <div id="push-notification-status" style="margin-top:6px; font-size:12px; color:#888;">需要 HTTPS 或 localhost</div>
+                </div>
                 <button onclick="window.saveSettings()" style="margin-top:20px;">保存并应用</button>
             </div>
         </div>
@@ -322,7 +327,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const APP_VERSION = "1.8.0"; 
+    const APP_VERSION = "1.9.0"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -330,6 +335,51 @@
     try {
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (e) { console.error("Supabase 初始化失败:", e); }
+
+    const PUSH_PUBLIC_KEY = 'REPLACE_WITH_VAPID_PUBLIC_KEY';
+
+    function urlBase64ToUint8Array(value) {
+        const padding = '='.repeat((4 - value.length % 4) % 4);
+        const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+        return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+    }
+
+    async function registerPushWorker() {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('当前浏览器不支持后台通知');
+        return navigator.serviceWorker.register('./sw.js', { scope: './' });
+    }
+
+    window.enablePushNotifications = async function() {
+        const status = document.getElementById('push-notification-status');
+        const button = document.getElementById('push-notification-btn');
+        if (PUSH_PUBLIC_KEY.startsWith('REPLACE_')) {
+            status.innerText = '请先在代码中配置 VAPID 公钥';
+            return;
+        }
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') throw new Error('通知权限未允许');
+            const registration = await registerPushWorker();
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: urlBase64ToUint8Array(PUSH_PUBLIC_KEY)
+            });
+            const { error } = await supabaseClient.from('push_subscriptions').upsert([{
+                room_code: currentRoomCode,
+                user_name: mySender,
+                endpoint: subscription.endpoint,
+                subscription: subscription.toJSON(),
+                updated_at: new Date().toISOString()
+            }], { onConflict: 'endpoint' });
+            if (error) throw error;
+            status.innerText = '后台通知已开启';
+            button.innerText = '通知已开启';
+            button.disabled = true;
+        } catch (error) {
+            console.error('开启后台通知失败:', error);
+            status.innerText = error.message || '开启失败，请检查浏览器权限';
+        }
+    };
 
     let currentRoomCode = "";
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
