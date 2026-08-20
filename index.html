@@ -961,10 +961,18 @@
 
     function toggleReplyAudio(button) {
         if (!button._audio) {
-            button._audio = new Audio(button.dataset.audioUrl);
+            const url = button.dataset.audioUrl;
+            if (!url) {
+                alert('引用语音地址不存在，无法播放。');
+                return;
+            }
+            button._audio = new Audio(url);
             button._audio.preload = 'metadata';
             button._audio.addEventListener('loadedmetadata', () => {
                 button.querySelector('.voice-duration').innerText = `${Math.max(1, Math.round(button._audio.duration))}″`;
+            });
+            button._audio.addEventListener('error', () => {
+                button.querySelector('.voice-play').innerText = '!';
             });
             button._audio.addEventListener('ended', () => { button.querySelector('.voice-play').innerText = '▶'; });
         }
@@ -1287,6 +1295,10 @@
         });
 
         addItem('复制', async () => { try { await navigator.clipboard.writeText(contentText); alert('已复制'); } catch (e) { alert('复制失败'); } });
+
+        if (wrapper && wrapper.dataset.replyId) {
+            addItem('定位原文', () => goToMessage(wrapper.dataset.replyId));
+        }
 
         if (wrapper && wrapper.querySelector('.voice-message')) {
             addItem('转文字', () => toggleVoiceTranscriptForMessage(wrapper));
