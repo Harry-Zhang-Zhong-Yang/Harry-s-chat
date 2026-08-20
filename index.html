@@ -7,17 +7,19 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --btn-color: #0084ff; 
-            --bubble-color: #0084ff; 
-            --bg-color: #f0f2f5; 
+            --btn-color: #2563eb;
+            --bubble-color: #2563eb;
+            --bg-color: #f7f8fa;
             --msg-others: #ffffff;
-            --text-main: #333333;
+            --text-main: #202124;
+            --muted: #8a9099;
+            --line: #eaedf0;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background-color: var(--bg-color); 
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
             height: 100vh; width: 100vw;
             display: flex; flex-direction: column; overflow: hidden;
         }
@@ -29,18 +31,18 @@
             backdrop-filter: blur(4px);
         }
         .update-modal-content {
-            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 400px; text-align: center;
+            background: white; padding: 28px; border-radius: 16px; width: 90%; max-width: 400px; text-align: center;
             animation: modalIn 0.3s ease-out;
         }
         @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
         /* --- 登录区域 --- */
-        #login-area { position: fixed; inset: 0; background: white; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
-        .login-box { width: 100%; max-width: 400px; padding: 40px; border: 1px solid #eee; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-        .login-box h2 { margin-bottom: 30px; text-align: center; color: #333; }
-        input { width: 100%; padding: 14px; margin: 10px 0; border: 1px solid #ddd; border-radius: 12px; font-size: 16px; outline: none; transition: all 0.2s; }
-        input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(0,132,255,0.1); }
-        button { width: 100%; padding: 14px; background: var(--btn-color); color: white; border: none; border-radius: 12px; font-size: 16px; cursor: pointer; margin-top: 15px; font-weight: bold; transition: opacity 0.2s; }
+        #login-area { position: fixed; inset: 0; background: #f7f8fa; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+        .login-box { width: 100%; max-width: 380px; padding: 34px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 12px 35px rgba(32,33,36,0.06); }
+        .login-box h2 { margin-bottom: 26px; text-align: center; color: var(--text-main); font-size: 22px; letter-spacing: -0.02em; }
+        input { width: 100%; padding: 13px 14px; margin: 8px 0; border: 1px solid #dfe3e8; border-radius: 9px; font-size: 16px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+        input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        button { width: 100%; padding: 13px 14px; background: var(--btn-color); color: white; border: none; border-radius: 9px; font-size: 15px; cursor: pointer; margin-top: 15px; font-weight: 600; transition: opacity 0.2s, transform 0.2s; }
         button:active { opacity: 0.8; }
 
         .remember-me { display: flex; align-items: center; gap: 8px; margin-top: -5px; margin-bottom: 15px; font-size: 14px; color: #666; cursor: pointer; }
@@ -48,16 +50,16 @@
 
         /* --- 聊天主容器 --- */
         #chat-container { 
-            display: flex; flex-direction: column; max-width: 900px; margin: 0 auto; 
-            width: 100%; height: 100vh; background: white; position: relative;
+            display: flex; flex-direction: column; max-width: 920px; margin: 0 auto;
+            width: 100%; height: 100vh; background: #fff; position: relative;
             padding-bottom: env(safe-area-inset-bottom);
         }
 
             /* 跳到最新按钮 */
             #jump-btn {
                 position: fixed; right: 16px; bottom: 90px; z-index: 60;
-                background: var(--btn-color); color: #fff; border: none; padding: 10px 14px; border-radius: 20px;
-                box-shadow: 0 6px 18px rgba(0,0,0,0.12); cursor: pointer; display: none; font-weight: bold;
+                background: #fff; color: var(--btn-color); border: 1px solid #dbe5ff; padding: 9px 13px; border-radius: 18px;
+                box-shadow: 0 5px 16px rgba(32,33,36,0.1); cursor: pointer; display: none; font-weight: 600;
             }
 
         #chat-bg {
@@ -67,57 +69,63 @@
         }
 
         #nav-bar { 
-            height: 65px; background: rgba(255,255,255,0.8); backdrop-filter: blur(10px);
+            height: 62px; background: rgba(255,255,255,0.94); backdrop-filter: blur(10px);
             border-bottom: 1px solid #eee; display: flex; align-items: center; 
-            padding: 0 15px; justify-content: space-between; z-index: 10;
+            padding: 0 18px; justify-content: space-between; z-index: 10;
         }
         #back-btn { font-size: 24px; cursor: pointer; padding: 5px; }
-        #room-title { font-weight: bold; font-size: 17px; color: #333; flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #room-title { font-weight: 600; font-size: 16px; color: var(--text-main); flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .nav-icon { width: 34px; height: 34px; padding: 0; margin: 0; background: transparent; color: #69707a; border: 0; border-radius: 50%; font-size: 24px; font-weight: 400; line-height: 1; }
+        .nav-icon:hover { background: #f2f4f7; color: #202124; }
+        .online-count { width: auto; padding: 0 4px; margin: 0; background: transparent; color: #8a9099; border: 0; font-size: 12px; font-weight: 400; white-space: nowrap; }
 
         /* --- 聊天框内容层 --- */
         #chat-box { 
-            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 20px; display: flex; 
-            flex-direction: column; gap: 12px; 
+            flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 22px 20px; display: flex;
+            flex-direction: column; gap: 10px;
             background-color: transparent; 
             z-index: 1;
             padding-bottom: 80px;
             touch-action: pan-y;
         }
 
-        .msg-wrapper { max-width: 85%; position: relative; animation: msgIn 0.3s ease-out; }
+        .msg-wrapper { max-width: min(75%, 620px); position: relative; animation: msgIn 0.2s ease-out; }
         @keyframes msgIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         .left { align-self: flex-start; }
         .right { align-self: flex-end; text-align: right; }
 
         .msg-content { 
-            padding: 12px 16px; border-radius: 16px; font-size: 15px; line-height: 1.6; 
-            position: relative; box-shadow: 0 6px 20px rgba(0,0,0,0.04);
-            display: flex; flex-direction: column; gap: 8px;
-            background: rgba(255,255,255,0.95);
-            transition: transform 0.12s ease, box-shadow 0.12s ease;
+            padding: 10px 13px; border-radius: 14px; font-size: 15px; line-height: 1.55;
+            position: relative; box-shadow: none;
+            display: flex; flex-direction: column; gap: 6px;
+            background: #fff; transition: background 0.12s ease;
         }
-        .msg-wrapper:hover .msg-content { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(0,0,0,0.06); }
-        .left .msg-content { background: var(--msg-others); color: #333; border: 1px solid #eef0f2; border-bottom-left-radius: 4px; }
-        .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .left:hover .msg-content { background: #f8fafc; }
+        .right:hover .msg-content { background: var(--bubble-color); }
+        .chat-idle::after { content:"暂时离线 · 点击页面继续在线"; position:absolute; inset:0; z-index:4; display:flex; align-items:center; justify-content:center; color:rgba(32,33,36,0.72); font-size:13px; background:rgba(255,255,255,0.22); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); pointer-events:none; }
+        #chat-box { position:relative; }
+        .system-message { align-self:center; color:#9aa0a8; font-size:12px; padding:5px 10px; margin:5px 0; }
+        .left .msg-content { background: var(--msg-others); color: var(--text-main); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+        .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; }
 
-        .sender-name { font-size: 12px; font-weight: bold; margin-bottom: 4px; display: block; opacity: 0.8; }
-        .msg-time { font-size: 10px; margin-top: 6px; display: block; opacity: 0.5; }
+        .sender-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; display: block; opacity: 0.72; }
+        .message-time-divider { align-self: center; color: #9aa0a8; font-size: 11px; line-height: 1; padding: 5px 9px; margin: 7px 0 3px; }
 
         #reply-preview {
             height: auto; min-height: 40px; display: flex; align-items: center; justify-content: space-between;
-            padding: 8px 12px; font-size: 13px; color: #666; background: #eef0f2;
-            border-radius: 10px; margin-bottom: 5px; display: none; border: 1px solid #ddd;
+            padding: 8px 11px; font-size: 13px; color: #69707a; background: #f5f7f9;
+            border-radius: 8px; margin-bottom: 5px; display: none; border: 1px solid var(--line);
         }
 
-        #input-area { padding: 15px; border-top: 1px solid #eee; background: white; z-index: 10; }
+        #input-area { padding: 11px 16px calc(11px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; }
         .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
-        #message-input { flex: 1; padding: 12px 18px; border: 1px solid #ddd; border-radius: 24px; outline: none; font-size: 16px; resize: none; max-height: 150px; }
+        #message-input { flex: 1; padding: 11px 15px; border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: 16px; resize: none; max-height: 150px; background: #fafbfc; }
         
         .action-btn { 
-            width: 45px; height: 45px; border-radius: 50%; background: #eee; 
+            width: 42px; height: 42px; border-radius: 50%; background: #f0f2f5; color: #606770;
             display: flex; align-items: center; justify-content: center; 
-            font-size: 24px; cursor: pointer; transition: all 0.2s; border: none;
+            font-size: 22px; cursor: pointer; transition: all 0.2s; border: none; margin-top: 0;
             flex-shrink: 0;
         }
         .action-btn:active { transform: scale(0.9); background: #ddd; }
@@ -126,20 +134,27 @@
 
         /* --- 设置弹窗 --- */
         #settings-modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none;
-            align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(2px);
+            position: fixed; inset: 0; background: rgba(20,25,35,0.58); display: none;
+            align-items: center; justify-content: center; z-index: 8000; backdrop-filter: blur(3px);
         }
         .modal-content { 
-            background: white; padding: 30px; border-radius: 24px; width: 90%; max-width: 450px; 
-            position: relative; box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            background: white; padding: 26px; border-radius: 16px; width: 90%; max-width: 450px;
+            position: relative; box-shadow: 0 16px 45px rgba(20,25,35,0.16);
         }
-        .close-settings { 
-            position: absolute; top: 15px; right: 15px; font-size: 28px; cursor: pointer; 
-            color: #999; border: none; background: none; line-height: 1; padding: 0;
+        .settings-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+        .settings-header h3 { font-size:20px; font-weight:600; color:var(--text-main); }
+        .close-settings {
+            position: static; width:32px; height:32px; display:flex; align-items:center; justify-content:center;
+            font-size:24px; cursor:pointer; color:#8a9099; border:0; background:#f3f5f7;
+            line-height:1; padding:0; margin:0; border-radius:50%;
+        }
+        .close-settings:hover { background:#e9edf1; color:#202124;
         }
         .setting-item { margin-bottom: 20px; }
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        .settings-search-button { margin:0 0 22px; background:#f5f7f9; color:#30343b; border:1px solid var(--line); text-align:left; font-weight:500; }
+        .settings-search-button:hover { background:#eef2f6; }
 
 
         /* 置顶条 */
@@ -147,8 +162,8 @@
             display: none;
             gap: 10px;
             padding: 8px 12px;
-            background: linear-gradient(90deg, #fffbea, #fff7e6);
-            border-bottom: 1px solid #ffeac2;
+            background: #fffdf5;
+            border-bottom: 1px solid #f2ead0;
             align-items: center;
             overflow-x: auto;
             z-index: 20;
@@ -156,10 +171,11 @@
             top: 65px;
             width: 100%;
         }
-        .pinned-item { background: #fff; padding:6px 10px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,0.04); font-size:13px; cursor:pointer; display:inline-flex; gap:8px; align-items:center; }
+        .pinned-item { background: #fff; padding:6px 10px; border-radius:10px; border:1px solid #f1ead4; font-size:13px; cursor:pointer; display:inline-flex; gap:8px; align-items:center; color:#6d5d2f; }
+        .pinned-item:focus { outline:none; }
 
         /* 上下文菜单 */
-        .context-menu { position:fixed; z-index:6000; background:#fff; color:#1f2937; box-shadow:0 8px 24px rgba(0,0,0,0.18); border:1px solid #e5e7eb; border-radius:8px; padding:6px; display:none; min-width:160px; }
+        .context-menu { position:fixed; z-index:6000; background:#fff; color:#1f2937; box-shadow:0 12px 30px rgba(20,25,35,0.18); border:1px solid #e5e7eb; border-radius:10px; padding:5px; display:none; min-width:160px; }
         .context-menu button { display:block; width:100%; text-align:left; padding:10px 12px; border:none; background:transparent; color:#1f2937; cursor:pointer; font:inherit; font-size:15px; line-height:1.4; border-radius:6px; margin:0; }
         .context-menu button:hover, .context-menu button:focus-visible { background:#f5f7fb; color:#111827; outline:none; }
         .context-menu .hint { font-size:12px; color:#888; padding:6px 10px; }
@@ -171,6 +187,10 @@
             .context-menu { min-width: 200px; right: 8px !important; left: auto !important; }
             .context-menu button { font-size:16px; padding:12px 14px; }
             .pinned-item { font-size:14px; padding:8px 12px; }
+            #chat-box { padding: 16px 12px 72px; }
+            .msg-wrapper { max-width: 88%; }
+            #nav-bar { padding: 0 12px; }
+            #input-area { padding-left: 10px; padding-right: 10px; }
         }
 
     </style>
@@ -211,9 +231,8 @@
         <span id="back-btn" onclick="window.leaveRoom()">←</span>
         <span id="room-title">正在加载...</span>
         <div style="display:flex; gap:10px; align-items:center;">
-            <button onclick="searchMessages()" style="background:transparent; border:none; font-size:16px; cursor:pointer;">🔍</button>
-            <button id="typing-indicator" style="background:transparent; border:none; color:#888; font-size:13px; display:none;">正在输入…</button>
-            <span id="settings-btn" style="cursor:pointer; font-size:20px;" onclick="window.toggleSettings()">⚙️</span>
+            <button id="online-count" class="online-count" aria-live="polite">在线 1 人</button>
+            <button id="settings-btn" class="nav-icon" onclick="window.toggleSettings()" aria-label="设置">⋯</button>
         </div>
     </div>
 
@@ -222,7 +241,7 @@
     <div id="chat-box"></div>
 
     <!-- 搜索结果 Modal -->
-    <div id="search-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:7000; background:rgba(0,0,0,0.35);">
+    <div id="search-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:9000; background:rgba(0,0,0,0.35);">
         <div style="background:white; width:95%; max-width:720px; max-height:80vh; overflow:auto; border-radius:12px; padding:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <strong>搜索结果</strong>
@@ -248,8 +267,11 @@
         <!-- 设置弹窗 -->
         <div id="settings-modal" onclick="window.toggleSettings(event)">
             <div class="modal-content" onclick="event.stopPropagation()">
-                <button class="close-settings" onclick="window.toggleSettings()">&times;</button>
-                <h3 style="margin-bottom:20px; text-align:center;">个性化设置</h3>
+                <div class="settings-header">
+                    <h3>设置</h3>
+                    <button class="close-settings" onclick="window.toggleSettings()" aria-label="关闭设置">&times;</button>
+                </div>
+                <button class="settings-search-button" onclick="searchMessages()">⌕&nbsp;&nbsp;搜索消息</button>
                 <div class="setting-item">
                     <label>修改当前房间名称</label>
                     <input type="text" id="custom-room-name" placeholder="输入新名字...">
@@ -279,7 +301,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const APP_VERSION = "1.0.15"; 
+    const APP_VERSION = "1.2.0"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -292,7 +314,10 @@
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
-    let pendingMedia = null; 
+    let pendingMedia = null;
+    let presenceActive = false;
+    let presenceIdleTimer = null;
+    const PRESENCE_IDLE_MS = 60 * 1000;
 
     // 分页相关变量
     let isFetchingHistory = false;
@@ -483,7 +508,16 @@
     function initRealtime() {
         if (roomSubscription) roomSubscription.unsubscribe();
 
-        roomSubscription = supabaseClient.channel(`room_${currentRoomCode}`)
+        roomSubscription = supabaseClient.channel(`room_${currentRoomCode}`, {
+            config: { presence: { key: `${currentRoomCode}:${mySender}` } }
+        })
+            .on('presence', { event: 'sync' }, updateOnlineCount)
+            .on('broadcast', { event: 'presence_notice' }, (payload) => {
+                const notice = payload.payload || {};
+                if (notice.user && notice.user !== mySender && notice.room === currentRoomCode) {
+                    appendSystemMessage(notice.text);
+                }
+            })
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -510,11 +544,72 @@
                 const room = payload.new;
                 document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
             })
-            .subscribe();
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await setPresenceActive(true, true);
+                    resetPresenceIdleTimer();
+                }
+            });
 
         // 拉取并展示置顶消息
         try { fetchPinnedMessages(); } catch (e) { }
     }
+
+    function updateOnlineCount() {
+        const el = document.getElementById('online-count');
+        if (!el || !roomSubscription) return;
+        const state = roomSubscription.presenceState();
+        const count = Object.values(state).reduce((total, metas) => total + metas.length, 0);
+        el.innerText = `在线 ${presenceActive ? Math.max(1, count) : Math.max(0, count) } 人`;
+    }
+
+    async function setPresenceActive(active, announce = true) {
+        if (!roomSubscription || presenceActive === active) {
+            updateOnlineCount();
+            return;
+        }
+        const wasActive = presenceActive;
+        presenceActive = active;
+        if (active) {
+            await roomSubscription.track({ user: mySender, room: currentRoomCode });
+        } else {
+            await roomSubscription.untrack();
+        }
+        updateOnlineCount();
+        if (announce) {
+            const text = active
+                ? (wasActive ? `${mySender} 重新在线` : `${mySender} 加入了房间`)
+                : `${mySender} 暂时离线`;
+            await roomSubscription.send({
+                type: 'broadcast',
+                event: 'presence_notice',
+                payload: { user: mySender, room: currentRoomCode, text }
+            });
+            appendSystemMessage(active ? text : '你已暂时离线');
+        }
+        document.getElementById('chat-box').classList.toggle('chat-idle', !active);
+    }
+
+    function appendSystemMessage(text) {
+        const chatBox = document.getElementById('chat-box');
+        if (!chatBox || !text) return;
+        const el = document.createElement('div');
+        el.className = 'system-message';
+        el.innerText = text;
+        chatBox.appendChild(el);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function resetPresenceIdleTimer() {
+        clearTimeout(presenceIdleTimer);
+        if (!roomSubscription) return;
+        if (!presenceActive) setPresenceActive(true);
+        presenceIdleTimer = setTimeout(() => setPresenceActive(false), PRESENCE_IDLE_MS);
+    }
+
+    ['pointerdown', 'keydown', 'touchstart', 'input', 'scroll'].forEach((eventName) => {
+        document.addEventListener(eventName, resetPresenceIdleTimer, { passive: true });
+    });
 
     window.triggerImageUpload = function() {
         document.getElementById('file-input').click();
@@ -640,20 +735,14 @@
         wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
         if (id) wrapper.dataset.msgId = id;
 
-        let timeStr = "00:00";
-        if (timestamp_str) {
-            const date = new Date(timestamp_str);
-            const now = new Date();
-            const isToday = date.toDateString() === now.toDateString();
-            if (!isToday) {
-                timeStr = `${date.getMonth() + 1}-${date.getDate()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-            } else {
-                timeStr = date.getHours().toString().padStart(2, '0') + ":" + date.getMinutes().toString().padStart(2, '0');
-            }
-        } else {
-            const now = new Date();
-            timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-        }
+        const messageDate = new Date(timestamp_str || new Date().toISOString());
+        const currentMessages = messagesCache;
+        const adjacentMessage = insertAtTop ? currentMessages[0] : currentMessages[currentMessages.length - 1];
+        const adjacentTime = adjacentMessage ? new Date(adjacentMessage.created_at).getTime() : 0;
+        const shouldShowTime = !adjacentTime || Math.abs(messageDate.getTime() - adjacentTime) >= 5 * 60 * 1000;
+        const timeDivider = shouldShowTime
+            ? `<div class="message-time-divider">${formatMessageTime(messageDate)}</div>`
+            : '';
 
         let displayContent = content;
         let replyTagHtml = "";
@@ -683,7 +772,6 @@
                 ${sender !== mySender ? `<span class="sender-name">${sender}</span>` : ''}
                 <div style="white-space: pre-wrap; word-break: break-word;">${mediaHtml}${displayContent}</div>
                 ${replyTagHtml}
-                <span class="msg-time">${timeStr}</span>
             </div>
         `;
 
@@ -695,24 +783,12 @@
             chatBox.appendChild(wrapper);
         }
 
-        // 插入日期分隔（如果需要）
-        try {
-            const lastMsg = messagesCache.length ? messagesCache[messagesCache.length - 1] : null;
-            const msgDate = new Date(timestamp_str || new Date().toISOString());
-            const dateKey = `${msgDate.getFullYear()}-${msgDate.getMonth()+1}-${msgDate.getDate()}`;
-            if (!lastMsg || (new Date(lastMsg.created_at)).toDateString() !== msgDate.toDateString()) {
-                const sep = document.createElement('div');
-                sep.style.cssText = 'text-align:center; font-size:12px; color:#888; margin:8px 0;';
-                sep.innerText = `${msgDate.getFullYear()}-${(msgDate.getMonth()+1).toString().padStart(2,'0')}-${msgDate.getDate().toString().padStart(2,'0')}`;
-                if (insertAtTop && chatBox.firstChild) {
-                    chatBox.insertBefore(sep, wrapper);
-                } else if (insertAtTop) {
-                    chatBox.appendChild(sep);
-                } else {
-                    chatBox.insertBefore(sep, wrapper);
-                }
-            }
-        } catch (e) { console.error('date sep error', e); }
+        if (timeDivider) {
+            const divider = document.createElement('div');
+            divider.className = 'message-time-divider';
+            divider.innerText = formatMessageTime(messageDate);
+            chatBox.insertBefore(divider, wrapper);
+        }
 
         // 存入本地缓存（用于导出和未读计数）
         try {
@@ -722,6 +798,7 @@
             } else {
                 messagesCache.push(msgObj);
             }
+
         } catch (e) { console.error('cache error', e); }
 
         // 判断是否在底部以决定是否自动滚动或增加未读计数
@@ -739,6 +816,14 @@
                 btn.style.display = 'block';
             }
         }
+    }
+
+    function formatMessageTime(date) {
+        const now = new Date();
+        const sameDay = date.toDateString() === now.toDateString();
+        const time = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        if (sameDay) return time;
+        return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
     }
 
     const chatBoxEl = document.getElementById('chat-box');
@@ -1209,15 +1294,17 @@
 
     window.updateRoomName = async function() {
         const newName = document.getElementById('custom-room-name').value.trim();
-        if (!newName) return alert("请输入新名字");
+        if (!newName) return;
         try {
             const { error } = await supabaseClient
                 .from('rooms')
                 .update({ room_name: newName })
                 .eq('room_code', currentRoomCode);
             if (error) throw error;
-            alert("名称已更新，所有人可见");
-        } catch (e) { alert("修改失败。"); }
+            document.getElementById('room-title').innerText = newName;
+            document.getElementById('custom-room-name').value = '';
+            window.toggleSettings();
+        } catch (e) { console.error("修改房间名称失败:", e); }
     };
 
     window.saveSettings = function() {
@@ -1283,16 +1370,8 @@
 
     // 发送 typing 通知（短时广播）
     function sendTypingNotification() {
-        try {
-            const channel = supabaseClient.channel(`room_${currentRoomCode}`);
-            channel.send({ type: 'broadcast', event: 'typing', payload: { user: mySender, room: currentRoomCode } });
-        } catch (e) { /* ignore if unsupported */ }
-
-        // 本地显示
-        const el = document.getElementById('typing-indicator');
-        el.style.display = 'inline-block';
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => { el.style.display = 'none'; }, 2000);
+        // 在线人数已取代顶部的正在输入提示，保留函数避免旧事件处理器报错。
+        return;
     }
 
     // 订阅 broadcast typing（尝试）
@@ -1302,10 +1381,8 @@
                 if (payload?.payload?.room !== currentRoomCode) return;
                 const user = payload.payload.user;
                 if (user === mySender) return;
-                const el = document.getElementById('typing-indicator');
-                el.innerText = user + ' 正在输入…';
-                el.style.display = 'inline-block';
-                setTimeout(() => { el.style.display = 'none'; }, 2000);
+                const el = document.getElementById('online-count');
+                if (!el) return;
             });
         }
     } catch (e) { /* best-effort */ }
