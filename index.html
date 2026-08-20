@@ -132,6 +132,7 @@
         .action-btn:active { transform: scale(0.9); background: #ddd; }
         #voice-btn { user-select:none; touch-action:none; }
         #voice-btn.recording { background:#fee2e2; color:#dc2626; }
+        #voice-btn.voice-mode { background:#dbeafe; color:#2563eb; }
         .voice-recording-overlay { position:fixed; inset:0; z-index:10000; display:none; align-items:center; justify-content:center; background:rgba(20,25,35,0.18); pointer-events:none; }
         .voice-recording-overlay.visible { display:flex; }
         .voice-recording-card { min-width:190px; padding:24px 26px; border-radius:16px; color:#fff; text-align:center; background:rgba(30,34,42,0.88); box-shadow:0 12px 36px rgba(0,0,0,0.2); }
@@ -145,6 +146,11 @@
         .voice-wave i { width:2px; border-radius:2px; background:currentColor; opacity:.7; }
         .voice-wave i:nth-child(1){height:8px}.voice-wave i:nth-child(2){height:14px}.voice-wave i:nth-child(3){height:20px}.voice-wave i:nth-child(4){height:12px}.voice-wave i:nth-child(5){height:17px}.voice-wave i:nth-child(6){height:9px}.voice-wave i:nth-child(7){height:15px}.voice-wave i:nth-child(8){height:7px}
         .voice-duration { font-size:12px; opacity:.72; white-space:nowrap; }
+        .voice-message-wrap { display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+        .right .voice-message-wrap { align-items:flex-end; }
+        .voice-transcribe { border:0; padding:0; background:transparent; color:inherit; opacity:.7; font-size:12px; cursor:pointer; }
+        .voice-transcript { display:none; max-width:220px; padding:5px 8px; border-radius:6px; background:rgba(0,0,0,.06); font-size:13px; line-height:1.4; white-space:pre-wrap; word-break:break-word; }
+        .voice-transcript.visible { display:block; }
 
         .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
 
@@ -195,8 +201,6 @@
         .context-menu button { display:block; width:100%; text-align:left; padding:10px 12px; border:none; background:transparent; color:#1f2937; cursor:pointer; font:inherit; font-size:15px; line-height:1.4; border-radius:6px; margin:0; }
         .context-menu button:hover, .context-menu button:focus-visible { background:#f5f7fb; color:#111827; outline:none; }
         .context-menu .hint { font-size:12px; color:#888; padding:6px 10px; }
-
-        .reaction-bar button { background:#fff; border:1px solid #eee; padding:6px 8px; border-radius:8px; }
 
         /* Mobile adjustments */
         @media (max-width: 600px) {
@@ -277,7 +281,7 @@
     <div id="input-area">
         <div id="reply-preview"></div>
         <div class="input-wrapper">
-            <button id="voice-btn" class="action-btn" aria-label="按住录音">🎙</button>
+            <button id="voice-btn" class="action-btn" aria-label="语音输入">🎙</button>
             <input type="text" id="message-input" placeholder="输入消息并按回车..." autocomplete="off">
             <button id="add-btn" class="action-btn" onclick="window.triggerImageUpload()" aria-label="发送图片或音频">+</button>
         </div>
@@ -325,7 +329,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const APP_VERSION = "1.5.0"; 
+    const APP_VERSION = "1.6.0"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -344,6 +348,10 @@
     let recordingStartedAt = 0;
     let recordingPointerId = null;
     let recordingCancelled = false;
+    let recordingStartCancelled = false;
+    let mobileVoiceMode = false;
+    let speechRecognition = null;
+    let speechTranscript = '';
     let presenceActive = false;
     let presenceIdleTimer = null;
     const PRESENCE_IDLE_MS = 60 * 1000;
@@ -365,11 +373,30 @@
 
     window.onload = () => {
         const voiceButton = document.getElementById('voice-btn');
-        voiceButton.addEventListener('pointerdown', startVoiceRecording);
-        voiceButton.addEventListener('pointerup', stopVoiceRecording);
-        voiceButton.addEventListener('pointercancel', stopVoiceRecording);
-        voiceButton.addEventListener('pointermove', (event) => {
-            if (mediaRecorder) recordingCancelled = event.clientY < voiceButton.getBoundingClientRect().top - 70;
+        const messageInput = document.getElementById('message-input');
+        const isMobile = () => window.matchMedia('(max-width: 600px), (pointer: coarse)').matches;
+        voiceButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (isMobile()) {
+                mobileVoiceMode = !mobileVoiceMode;
+                voiceButton.classList.toggle('voice-mode', mobileVoiceMode);
+                messageInput.placeholder = mobileVoiceMode ? '长按此处录音，松开发送' : '输入消息并按回车...';
+                return;
+            }
+            if (mediaRecorder) stopVoiceRecording();
+            else startVoiceRecording({ pointerId: null, inputSource: 'desktop' });
+        });
+        messageInput.addEventListener('pointerdown', (event) => {
+            if (!mobileVoiceMode || !isMobile()) return;
+            event.preventDefault();
+            startVoiceRecording({ pointerId: event.pointerId, inputSource: 'mobile-input' });
+        });
+        messageInput.addEventListener('pointerup', stopVoiceRecording);
+        messageInput.addEventListener('pointercancel', stopVoiceRecording);
+        messageInput.addEventListener('pointermove', (event) => {
+            if (mediaRecorder && recordingPointerId === event.pointerId) {
+                recordingCancelled = event.clientY < messageInput.getBoundingClientRect().top - 70;
+            }
         });
 
         const savedToken = localStorage.getItem('chat_auth_token');
@@ -702,14 +729,44 @@
         return candidates.find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || '';
     }
 
+    function startSpeechRecognition() {
+        const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        speechTranscript = '';
+        if (!Recognition) return;
+        speechRecognition = new Recognition();
+        speechRecognition.lang = 'zh-CN';
+        speechRecognition.continuous = true;
+        speechRecognition.interimResults = true;
+        speechRecognition.onresult = (event) => {
+            let text = '';
+            for (let i = 0; i < event.results.length; i++) text += event.results[i][0].transcript;
+            speechTranscript = text.trim();
+        };
+        speechRecognition.onerror = (event) => {
+            if (event.error !== 'no-speech' && event.error !== 'aborted') console.warn('speech recognition failed:', event.error);
+        };
+        speechRecognition.onend = () => { speechRecognition = null; };
+        try { speechRecognition.start(); } catch (error) { speechRecognition = null; }
+    }
+
+    function stopSpeechRecognition() {
+        if (!speechRecognition) return;
+        try { speechRecognition.stop(); } catch (error) { console.warn('speech recognition stop failed:', error); }
+    }
+
     async function startVoiceRecording(event) {
         if (mediaRecorder) return;
+        recordingStartCancelled = false;
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
             alert('当前浏览器不支持录音，请使用最新版 Chrome、Edge 或 Safari。');
             return;
         }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (recordingStartCancelled) {
+                stream.getTracks().forEach(track => track.stop());
+                return;
+            }
             const mimeType = getAudioMimeType();
             mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
             recordingChunks = [];
@@ -727,14 +784,18 @@
                 document.getElementById('voice-btn').classList.remove('recording');
                 document.getElementById('voice-btn').innerText = '🎙';
                 document.getElementById('voice-recording-overlay').classList.remove('visible');
+                stopSpeechRecognition();
                 if (recordingCancelled || duration < 500 || !recordingChunks.length) return;
-                await uploadRecordedAudio(recordingChunks, recorder.mimeType || mimeType || 'audio/webm');
+                await uploadRecordedAudio(recordingChunks, recorder.mimeType || mimeType || 'audio/webm', speechTranscript);
             }, { once: true });
             mediaRecorder.start();
+            startSpeechRecognition();
             const button = document.getElementById('voice-btn');
             button.classList.add('recording');
             document.getElementById('voice-recording-overlay').classList.add('visible');
-            button.setPointerCapture?.(event.pointerId);
+            const label = document.querySelector('.voice-recording-label');
+            if (label) label.innerHTML = event.inputSource === 'desktop' ? '再次点击停止' : '松开发送<br><small>上滑取消</small>';
+            if (event.pointerId !== null && event.pointerId !== undefined) button.setPointerCapture?.(event.pointerId);
         } catch (error) {
             console.error('voice recording permission failed:', error);
             alert('无法使用麦克风，请允许浏览器访问麦克风后重试。');
@@ -742,13 +803,16 @@
     }
 
     function stopVoiceRecording(event) {
-        if (!mediaRecorder) return;
+        if (!mediaRecorder) {
+            recordingStartCancelled = true;
+            return;
+        }
         if (recordingPointerId !== null && event && event.pointerId !== recordingPointerId) return;
         mediaRecorder.stop();
         recordingPointerId = null;
     }
 
-    async function uploadRecordedAudio(chunks, mimeType) {
+    async function uploadRecordedAudio(chunks, mimeType, transcript = '') {
         const extension = mimeType.includes('mp4') ? 'm4a' : 'webm';
         const file = new File([new Blob(chunks, { type: mimeType })], `voice_${Date.now()}.${extension}`, { type: mimeType });
         if (file.size > 15 * 1024 * 1024) {
@@ -761,6 +825,7 @@
             if (error) throw error;
             const { data } = supabaseClient.storage.from('chat_media').getPublicUrl(filePath);
             pendingMedia = { url: data.publicUrl, type: 'audio' };
+            if (transcript) document.getElementById('message-input').value = transcript;
             await window.sendMessage();
         } catch (error) {
             console.error('voice upload failed:', error);
@@ -837,14 +902,30 @@
         } catch (e) { console.error(e); }
     };
 
-    function voiceMessageHtml(mediaUrl) {
-        const safeUrl = String(mediaUrl).replace(/"/g, '&quot;');
-        return `<button class="voice-message" data-audio-url="${safeUrl}" onclick="toggleVoiceMessage(this)" aria-label="播放语音">
-            <span class="voice-play">▶</span>
-            <span class="voice-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
-            <span class="voice-duration">--″</span>
-        </button>`;
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
     }
+
+    function voiceMessageHtml(mediaUrl, transcript = '') {
+        const safeUrl = String(mediaUrl).replace(/"/g, '&quot;');
+        const safeTranscript = escapeHtml(transcript);
+        return `<span class="voice-message-wrap">
+            <button class="voice-message" data-audio-url="${safeUrl}" onclick="toggleVoiceMessage(this)" aria-label="播放语音">
+                <span class="voice-play">▶</span>
+                <span class="voice-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                <span class="voice-duration">--″</span>
+            </button>
+            ${safeTranscript ? `<button class="voice-transcribe" onclick="toggleVoiceTranscript(event, this)">转文字</button><span class="voice-transcript">${safeTranscript}</span>` : ''}
+        </span>`;
+    }
+
+    window.toggleVoiceTranscript = function(event, button) {
+        event.stopPropagation();
+        const transcript = button.nextElementSibling;
+        if (!transcript) return;
+        const visible = transcript.classList.toggle('visible');
+        button.innerText = visible ? '收起文字' : '转文字';
+    };
 
     window.toggleVoiceMessage = function(button) {
         let audio = button._audio;
@@ -898,7 +979,8 @@
             if (mediaType === 'image') {
                 mediaHtml = `<img src="${mediaUrl}" class="msg-img" />`;
             } else if (mediaType === 'audio') {
-                mediaHtml = voiceMessageHtml(mediaUrl);
+                mediaHtml = voiceMessageHtml(mediaUrl, content);
+                displayContent = '';
             }
         }
 
@@ -1052,15 +1134,12 @@
 
         addItem('复制', async () => { try { await navigator.clipboard.writeText(contentText); alert('已复制'); } catch (e) { alert('复制失败'); } });
 
-        addItem('表情', () => toggleReactionMenu(messageId, wrapper));
         const pinButton = addItem('置顶', () => pinMessage(messageId));
         isPinnedMessage(messageId).then((pinned) => {
             if (menu.style.display !== 'none') pinButton.innerText = pinned ? '取消置顶' : '置顶';
         });
 
         if (sender === mySender) {
-            addItem('编辑', () => editMessage(messageId));
-            addItem('删除', () => deleteMessage(messageId));
             addItem('撤回', () => recallMessage(messageId));
         }
 
@@ -1139,7 +1218,7 @@
         if (!menu.contains(e.target)) menu.style.display = 'none';
     });
 
-    // 更新消息（用于处理编辑/删除/撤回）并同步本地缓存
+    // 更新消息（用于处理撤回）并同步本地缓存
     function updateMessageInUI(newMsg) {
         try {
             const chatBox = document.getElementById('chat-box');
@@ -1148,8 +1227,8 @@
             const contentDiv = wrapper.querySelector('.msg-content > div');
             if (contentDiv) {
                 // 更新文本与媒体
-                const mediaHtml = newMsg.media_url ? (newMsg.media_type === 'audio' ? voiceMessageHtml(newMsg.media_url) : `<img src="${newMsg.media_url}" class="msg-img" />`) : '';
-                contentDiv.innerHTML = `${mediaHtml}${newMsg.content}`;
+                const mediaHtml = newMsg.media_url ? (newMsg.media_type === 'audio' ? voiceMessageHtml(newMsg.media_url, newMsg.content) : `<img src="${newMsg.media_url}" class="msg-img" />`) : '';
+                contentDiv.innerHTML = `${mediaHtml}${newMsg.media_type === 'audio' ? '' : newMsg.content}`;
             }
 
             // 同步本地缓存，以便搜索/撤回规则保持一致
@@ -1165,81 +1244,6 @@
                 }
             } catch (e2) { /* ignore cache sync errors */ }
         } catch (e) { console.error('updateMessageInUI', e); }
-    }
-
-    // 表情/反应菜单切换
-    function toggleReactionMenu(messageId, wrapper) {
-        // 如果已有菜单则移除
-        const existing = wrapper.querySelector('.reaction-bar');
-        if (existing) { existing.remove(); return; }
-        const bar = document.createElement('div');
-        bar.className = 'reaction-bar';
-        bar.style.cssText = 'display:flex; gap:6px; margin-top:6px;';
-        const emojis = ['👍','❤️','😂','😮','🎉','😢'];
-        emojis.forEach(emo => {
-            const b = document.createElement('button');
-            b.innerText = emo;
-            b.style.cssText = 'padding:4px 6px; font-size:14px; border-radius:8px; background:#f5f5f5; border:none;';
-            b.onclick = async (e) => { e.stopPropagation(); await toggleReaction(messageId, emo); fetchReactions(messageId, wrapper); };
-            bar.appendChild(b);
-        });
-        wrapper.appendChild(bar);
-        // 初始加载反应
-        fetchReactions(messageId, wrapper);
-    }
-
-    // 切换反应（向 reactions 表插入/删除）
-    async function toggleReaction(messageId, emoji) {
-        try {
-            // 检查是否已存在本用户对该消息同表情的反应
-            const { data: existing, error: selErr } = await supabaseClient
-                .from('reactions')
-                .select('*')
-                .eq('message_id', messageId)
-                .eq('user', mySender)
-                .eq('emoji', emoji)
-                .limit(1);
-            if (!selErr && existing && existing.length > 0) {
-                // 删除
-                await supabaseClient.from('reactions').delete().eq('id', existing[0].id);
-            } else {
-                // 插入
-                await supabaseClient.from('reactions').insert([{ message_id: messageId, user: mySender, emoji, created_at: new Date().toISOString() }]);
-            }
-        } catch (e) {
-            // 回退到本地存储（简单实现）
-            console.warn('toggleReaction failed, falling back to localStorage', e);
-            const key = `reactions_${currentRoomCode}_${messageId}`;
-            const cur = JSON.parse(localStorage.getItem(key) || '[]');
-            const idx = cur.findIndex(r => r.user === mySender && r.emoji === emoji);
-            if (idx >= 0) cur.splice(idx,1); else cur.push({ user: mySender, emoji });
-            localStorage.setItem(key, JSON.stringify(cur));
-        }
-    }
-
-    async function fetchReactions(messageId, wrapper) {
-        try {
-            const { data, error } = await supabaseClient
-                .from('reactions')
-                .select('*')
-                .eq('message_id', messageId);
-            let counts = {};
-            if (!error && data) {
-                data.forEach(r => { counts[r.emoji] = (counts[r.emoji]||0)+1; });
-            } else {
-                // fallback local
-                const key = `reactions_${currentRoomCode}_${messageId}`;
-                const cur = JSON.parse(localStorage.getItem(key) || '[]');
-                cur.forEach(r => { counts[r.emoji] = (counts[r.emoji]||0)+1; });
-            }
-            // render under wrapper
-            let container = wrapper.querySelector('.reaction-summary');
-            if (!container) { container = document.createElement('div'); container.className = 'reaction-summary'; container.style.cssText='display:flex; gap:6px; margin-top:6px;'; wrapper.appendChild(container); }
-            container.innerHTML = '';
-            Object.keys(counts).forEach(k => {
-                const el = document.createElement('span'); el.innerText = `${k} ${counts[k]}`; el.style.cssText='font-size:13px; background:#fafafa; padding:4px 6px; border-radius:8px;'; container.appendChild(el);
-            });
-        } catch (e) { console.error('fetchReactions', e); }
     }
 
     async function isPinnedMessage(messageId) {
@@ -1288,30 +1292,6 @@
             localStorage.setItem(key, JSON.stringify(localPins));
         }
         fetchPinnedMessages();
-    }
-
-    // 编辑消息（提示输入并更新）
-    async function editMessage(messageId) {
-        try {
-            const wrapper = document.querySelector(`[data-msg-id="${messageId}"]`);
-            if (!wrapper) return alert('未找到消息元素');
-            const contentDiv = wrapper.querySelector('.msg-content > div');
-            const old = contentDiv ? contentDiv.innerText : '';
-            const newText = prompt('编辑消息：', old);
-            if (newText === null) return;
-            await supabaseClient.from('messages').update({ content: `${newText} (已编辑)` }).eq('id', messageId);
-            // 立即更新界面以提升响应性（realtime 也会推送）
-            updateMessageInUI({ id: messageId, sender: mySender, content: `${newText} (已编辑)`, media_url: null, media_type: null });
-        } catch (e) { console.error('editMessage', e); alert('编辑失败'); }
-    }
-
-    // 删除消息（将内容替换为已删除）
-    async function deleteMessage(messageId) {
-        if (!confirm('确认删除此消息？（将被替换为已删除）')) return;
-        try {
-            await supabaseClient.from('messages').update({ content: '[已删除]' }).eq('id', messageId);
-            updateMessageInUI({ id: messageId, sender: mySender, content: '[已删除]', media_url: null, media_type: null });
-        } catch (e) { console.error('deleteMessage', e); alert('删除失败'); }
     }
 
     // 撤回消息（仅在短时间内允许）
