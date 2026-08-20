@@ -317,7 +317,7 @@
                 <div class="setting-item">
                     <label>后台消息通知</label>
                     <button id="push-notification-btn" onclick="window.enablePushNotifications()" style="padding:8px; font-size:14px;">开启后台通知</button>
-                    <div id="push-notification-status" style="margin-top:6px; font-size:12px; color:#888;">需要 HTTPS 或 localhost</div>
+                    <div id="push-notification-status" style="margin-top:6px; font-size:12px; color:#888;">点击按钮开启通知</div>
                 </div>
                 <button onclick="window.saveSettings()" style="margin-top:20px;">保存并应用</button>
             </div>
@@ -336,7 +336,7 @@
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (e) { console.error("Supabase 初始化失败:", e); }
 
-    const PUSH_PUBLIC_KEY = 'BO9iBsWlhRp3O3mw2bRhHyn05b9BRGBZr_dU69iElwScNQEjINVChx8vkBjtzGzKQlbL-tvLy2a3qP8ao_FcSB0';
+    const PUSH_PUBLIC_KEY = 'REPLACE_WITH_VAPID_PUBLIC_KEY';
 
     function urlBase64ToUint8Array(value) {
         const padding = '='.repeat((4 - value.length % 4) % 4);
