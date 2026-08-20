@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Harry的聊天室</title>
+    <title>极简高级聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -151,6 +151,16 @@
         .voice-transcribe { border:0; padding:0; background:transparent; color:inherit; opacity:.7; font-size:12px; cursor:pointer; }
         .voice-transcript { display:none; max-width:220px; padding:5px 8px; border-radius:6px; background:rgba(0,0,0,.06); font-size:13px; line-height:1.4; white-space:pre-wrap; word-break:break-word; }
         .voice-transcript.visible { display:block; }
+        .reply-quote { display:flex; flex-direction:column; align-items:flex-start; gap:5px; width:fit-content; max-width:100%; margin-top:5px; padding:7px 9px; border-radius:7px; background:rgba(0,0,0,.07); color:inherit; font-size:12px; cursor:pointer; text-align:left; }
+        .reply-quote.legacy { cursor:default; opacity:.9; }
+        .right .reply-quote { align-self:flex-end; align-items:flex-end; background:rgba(255,255,255,.82); color:#4b5563; }
+        .reply-quote strong { opacity:.78; white-space:nowrap; font-weight:600; }
+        .reply-quote .reply-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px; }
+        .reply-media-preview { width:36px; height:36px; object-fit:cover; border-radius:5px; flex-shrink:0; }
+        .reply-audio-preview { display:flex; align-items:center; gap:9px; min-width:145px; border:0; border-radius:5px; padding:2px 2px; background:transparent; color:inherit; cursor:pointer; }
+        .reply-audio-preview .voice-play { width:24px; height:24px; background:rgba(37,99,235,.14); }
+        .reply-audio-preview .voice-wave { height:20px; gap:2px; }
+        .reply-audio-preview .voice-duration { margin-left:auto; }
         .read-receipt { display:none; width:100%; margin-top:2px; color:#8a929c; font-size:11px; line-height:1.3; }
 
         .msg-img { max-width: 100%; border-radius: 8px; margin-top: 5px; display: block; }
@@ -205,7 +215,9 @@
     <div class="update-modal-content" onclick="event.stopPropagation()">
         <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-        • 增加了语音功能
+        • 历史记录分页加载：支持上拉加载更多历史消息，加载时会保持滚动位置，避免跳动；初始进入仅加载最近消息以加快渲染。<br>
+        • 本地缓存管理：新增“清除本地聊天记录”功能，仅影响本地显示，不会删除服务器数据。<br>
+        • 设置体验优化：修复弹窗点击关闭的问题，改善背景与气泡颜色设置
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -309,7 +321,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const APP_VERSION = "1.7.0"; 
+    const APP_VERSION = "1.8.0"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -895,7 +907,8 @@
 
         let finalContent = content;
         if (replyData) {
-            finalContent = `${content}\n\n[回复: ${replyData.content}]`;
+            const replyMeta = encodeURIComponent(JSON.stringify(replyData));
+            finalContent = `${content}\n\n[回复元数据:${replyMeta}]`;
         }
 
         try {
@@ -923,6 +936,45 @@
 
     function escapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+
+    function replyPreviewHtml(meta) {
+        const preview = meta.mediaType === 'image' ? '图片' : meta.mediaType === 'audio' ? '语音' : (meta.content || '消息');
+        const mediaPreview = meta.mediaType === 'image' && meta.mediaUrl
+            ? `<img src="${escapeHtml(meta.mediaUrl)}" class="reply-media-preview" alt="引用图片">`
+            : meta.mediaType === 'audio' && meta.mediaUrl
+                ? `<button class="reply-audio-preview" data-audio-url="${escapeHtml(meta.mediaUrl)}" aria-label="播放引用语音">
+                    <span class="voice-play">▶</span>
+                    <span class="voice-wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+                    <span class="voice-duration">--″</span>
+                </button>`
+                : '';
+        return `<div class="reply-quote${meta.legacy ? ' legacy' : ''}" ${meta.id ? `data-reply-id="${escapeHtml(meta.id)}"` : ''} title="${meta.id ? '点击定位原消息' : ''}">
+            ${meta.legacy ? '' : `<strong>${escapeHtml(meta.sender || '')}</strong>`}
+            ${mediaPreview}${meta.mediaType ? '' : `<span class="reply-text">${escapeHtml(preview).slice(0, 120)}</span>`}
+        </div>`;
+    }
+
+    function stripReplyMetadata(content) {
+        return String(content || '').replace(/\n\n\[回复元数据:[^\]]+\]$/, '');
+    }
+
+    function toggleReplyAudio(button) {
+        if (!button._audio) {
+            button._audio = new Audio(button.dataset.audioUrl);
+            button._audio.preload = 'metadata';
+            button._audio.addEventListener('loadedmetadata', () => {
+                button.querySelector('.voice-duration').innerText = `${Math.max(1, Math.round(button._audio.duration))}″`;
+            });
+            button._audio.addEventListener('ended', () => { button.querySelector('.voice-play').innerText = '▶'; });
+        }
+        if (button._audio.paused) {
+            button._audio.play().then(() => { button.querySelector('.voice-play').innerText = '❚❚'; })
+                .catch(() => alert('引用语音播放失败，请检查网络或 Storage 权限。'));
+        } else {
+            button._audio.pause();
+            button.querySelector('.voice-play').innerText = '▶';
+        }
     }
 
     function voiceMessageHtml(mediaUrl, transcript = '') {
@@ -985,6 +1037,9 @@
         if (id) wrapper.dataset.msgId = id;
         wrapper.dataset.sender = sender;
         wrapper.dataset.createdAt = timestamp_str || new Date().toISOString();
+        wrapper.dataset.originalContent = content || '';
+        wrapper.dataset.mediaUrl = mediaUrl || '';
+        wrapper.dataset.mediaType = mediaType || '';
 
         const messageDate = new Date(timestamp_str || new Date().toISOString());
         const currentMessages = messagesCache;
@@ -998,11 +1053,25 @@
         let displayContent = content;
         let replyTagHtml = "";
 
-        if (content && content.includes("[回复:")) {
-            const parts = content.split("\n\n");
-            displayContent = parts[0] || content; 
-            const rawReply = parts[1] ? parts[1].replace("[回复:", "").replace("]", "") : "";
-            replyTagHtml = `<div style="font-size:12px; background:#eef0f2; padding:4px 8px; border-radius:6px; margin-top:5px; color:#555;">${rawReply}</div>`;
+        const replyMatch = content && content.match(/\n\n\[回复元数据:([^\]]+)\]$/);
+        if (replyMatch) {
+            try {
+                const meta = JSON.parse(decodeURIComponent(replyMatch[1]));
+                displayContent = content.slice(0, replyMatch.index);
+                wrapper.dataset.replyId = meta.id || '';
+                replyTagHtml = replyPreviewHtml(meta);
+            } catch (error) {
+                console.warn('引用数据解析失败:', error);
+            }
+        } else {
+            const legacyReplyMatch = content && content.match(/\n\n\[回复:\s*([\s\S]*)\]$/);
+            if (legacyReplyMatch) {
+                displayContent = content.slice(0, legacyReplyMatch.index);
+                replyTagHtml = replyPreviewHtml({
+                    content: legacyReplyMatch[1],
+                    legacy: true
+                });
+            }
         }
 
         let mediaHtml = "";
@@ -1010,7 +1079,7 @@
             if (mediaType === 'image') {
                 mediaHtml = `<img src="${mediaUrl}" class="msg-img" />`;
             } else if (mediaType === 'audio') {
-                mediaHtml = voiceMessageHtml(mediaUrl, content);
+                mediaHtml = voiceMessageHtml(mediaUrl, displayContent);
                 displayContent = '';
             }
         }
@@ -1022,6 +1091,17 @@
                 ${replyTagHtml}
             </div>
         `;
+        const replyTarget = wrapper.querySelector('.reply-quote');
+        if (replyTarget) {
+            if (replyTarget.dataset.replyId) replyTarget.onclick = () => goToMessage(replyTarget.dataset.replyId);
+            const replyAudio = replyTarget.querySelector('.reply-audio-preview');
+            if (replyAudio) {
+                replyAudio.onclick = (event) => {
+                    event.stopPropagation();
+                    toggleReplyAudio(replyAudio);
+                };
+            }
+        }
 
         if (insertAtTop && chatBox.firstChild) {
             chatBox.insertBefore(wrapper, chatBox.firstChild);
@@ -1194,10 +1274,16 @@
         };
 
         addItem('回复', () => {
-            replyData = { content: contentText };
+            replyData = {
+                id: messageId,
+                sender,
+                content: stripReplyMetadata(wrapper?.dataset.originalContent || contentText),
+                mediaUrl: wrapper?.dataset.mediaUrl || '',
+                mediaType: wrapper?.dataset.mediaType || ''
+            };
             const preview = document.getElementById('reply-preview');
             preview.style.display = 'flex';
-            preview.innerHTML = `正在回复：${replyData.content} <span style="cursor:pointer; color:#07c475;" onclick="window.cancelReply()">✕</span>`;
+            preview.innerHTML = `正在回复：${escapeHtml(replyData.mediaType === 'image' ? '图片' : replyData.mediaType === 'audio' ? '语音' : replyData.content)} <span style="cursor:pointer; color:#07c475;" onclick="window.cancelReply()">✕</span>`;
         });
 
         addItem('复制', async () => { try { await navigator.clipboard.writeText(contentText); alert('已复制'); } catch (e) { alert('复制失败'); } });
