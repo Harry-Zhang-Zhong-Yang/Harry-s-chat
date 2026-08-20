@@ -336,7 +336,7 @@
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (e) { console.error("Supabase 初始化失败:", e); }
 
-    const PUSH_PUBLIC_KEY = 'BO9iBsWlhRp3O3mw2bRhHyn05b9BRGBZr_dU69iElwScNQEjINVChx8vkBjtzGzKQlbL-tvLy2a3qP8ao_FcSB0';
+    const PUSH_PUBLIC_KEY = 'REPLACE_WITH_VAPID_PUBLIC_KEY';
 
     function urlBase64ToUint8Array(value) {
         const padding = '='.repeat((4 - value.length % 4) % 4);
@@ -379,7 +379,10 @@
             return;
         }
         try {
-            const permission = await Notification.requestPermission();
+            if (!('Notification' in window)) {
+                throw new Error('当前浏览器不支持网页通知，请使用最新版 Chrome 或 Edge，并通过 HTTPS 访问');
+            }
+            const permission = await window.Notification.requestPermission();
             if (permission !== 'granted') throw new Error('通知权限未允许');
             const registration = await registerPushWorker();
             const subscription = await registration.pushManager.subscribe({
