@@ -165,7 +165,7 @@
         .voice-recording-overlay.visible { display:flex; }
         .voice-recording-card { min-width:190px; padding:24px 26px; border-radius:16px; color:#fff; text-align:center; background:rgba(30,34,42,0.88); box-shadow:0 12px 36px rgba(0,0,0,0.2); }
         #emoji-btn { font-size:clamp(20px, 2.4vw, 24px); }
-        #emoji-panel { position:absolute; left:clamp(10px, 2vw, 16px); bottom:calc(100% + 8px); width:min(330px, calc(100vw - 20px)); max-height:min(280px, 42vh); overflow-y:auto; display:none; grid-template-columns:repeat(8, 1fr); gap:4px; padding:10px; border:1px solid var(--line); border-radius:14px; background:#fff; box-shadow:0 10px 30px rgba(20,25,35,.16); z-index:110; }
+        #emoji-panel { position:absolute; right:clamp(39px, calc(4.2vw + 5px), 50px); bottom:calc(100% - 1px); width:min(460px, calc(100vw - 80px)); max-height:min(360px, 52vh); overflow-y:auto; display:none; grid-template-columns:repeat(8, 1fr); gap:clamp(5px, 1vw, 9px); padding:clamp(12px, 1.8vw, 18px); border:1px solid var(--line); border-radius:16px 16px 5px 16px; background:#fff; box-shadow:0 10px 30px rgba(20,25,35,.16); z-index:110; }
         #emoji-panel.visible { display:grid; }
         .emoji-item { width:100%; aspect-ratio:1; border:0; margin:0; padding:0; background:transparent; border-radius:8px; font-size:clamp(21px, 3vw, 27px); cursor:pointer; }
         .emoji-item:hover { background:#f1f3f5; }
@@ -385,7 +385,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.0.4"; 
+    const CHAT_APP_VERSION = "2.0.5"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -506,7 +506,7 @@
     let speechTranscript = '';
     let presenceActive = false;
     let presenceIdleTimer = null;
-    const PRESENCE_IDLE_MS = 60 * 1000;
+    const PRESENCE_IDLE_MS = 2 * 60 * 1000;
 
     // 分页相关变量
     let isFetchingHistory = false;
@@ -541,6 +541,13 @@
         if (joinNoticeShown) return;
         joinNoticeShown = true;
         appendSystemMessage(`${mySender} 加入了房间`);
+        if (roomSubscription) {
+            realtimeReady.then(() => roomSubscription.send({
+                type: 'broadcast',
+                event: 'presence_notice',
+                payload: { user: mySender, room: currentRoomCode, text: `${mySender} 加入了房间` }
+            })).catch((error) => console.warn('发送加入通知失败:', error));
+        }
     }
 
     window.onload = () => {
@@ -580,6 +587,7 @@
             if (now < parseInt(expiry)) {
                 currentRoomCode = savedRoom;
                 mySender = savedToken; 
+                joinNoticeShown = false;
                 showRoomLoading();
                 document.getElementById('room-title').innerText = currentRoomCode;
                 applyRoomBackground();
@@ -587,9 +595,9 @@
                 ensureRoomExists().then(() => {
                     initRealtime();
                     hideRoomLoading();
-                    appendJoinNoticeOnce();
                     Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
                         if (results.some((result) => result.status === 'rejected')) console.warn('房间后台同步未完成');
+                        appendJoinNoticeOnce();
                     });
                 }).catch((error) => {
                     console.error('自动进入房间失败:', error);
@@ -642,6 +650,7 @@
     window.joinRoom = async function() {
         const nameInput = document.getElementById('username').value.trim();
         currentRoomCode = document.getElementById('room-input').value.trim();
+        joinNoticeShown = false;
         const isAutoLogin = document.getElementById('auto-login-check').checked;
         
         if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
@@ -667,10 +676,10 @@
         try {
             await ensureRoomExists();
             hideRoomLoading();
-            appendJoinNoticeOnce();
             initRealtime();
             Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
                 if (results.some((result) => result.status === 'rejected')) console.warn('房间后台同步未完成');
+                appendJoinNoticeOnce();
             });
         } catch (error) {
             console.error('进入房间失败:', error);
@@ -829,6 +838,7 @@
 
     function initRealtime() {
         if (roomSubscription) roomSubscription.unsubscribe();
+        presenceActive = false;
         realtimeReady = new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('实时连接超时')), 10000);
             realtimeReadyResolve = () => {
@@ -957,6 +967,10 @@
         } else {
             setPresenceActive(false, true);
         }
+    });
+
+    window.addEventListener('pagehide', () => {
+        if (roomSubscription && presenceActive) setPresenceActive(false, true);
     });
 
     ['pointerdown', 'keydown', 'touchstart', 'input', 'scroll'].forEach((eventName) => {
@@ -1219,7 +1233,12 @@
                 inputEl.value = ""; 
                 pendingMedia = null;
                 cancelReply();
-                requestAnimationFrame(() => scrollToBottom());
+                const forceScroll = () => {
+                    const chatBox = document.getElementById('chat-box');
+                    if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+                };
+                requestAnimationFrame(forceScroll);
+                [50, 150, 300].forEach((delay) => setTimeout(forceScroll, delay));
             }
         } catch (e) { console.error(e); }
     };
@@ -1251,10 +1270,14 @@
     function refreshMessageAvatars() {
         document.querySelectorAll('.msg-wrapper').forEach((wrapper) => {
             let previous = wrapper.previousElementSibling;
-            while (previous && !previous.classList.contains('msg-wrapper')) previous = previous.previousElementSibling;
+            let separatedByTime = false;
+            while (previous && !previous.classList.contains('msg-wrapper')) {
+                if (previous.classList.contains('message-time-divider')) separatedByTime = true;
+                previous = previous.previousElementSibling;
+            }
             const avatar = wrapper.querySelector('.message-avatar');
             if (!avatar) return;
-            const sameGroup = !!previous && previous.dataset.sender === wrapper.dataset.sender;
+            const sameGroup = !separatedByTime && !!previous && previous.dataset.sender === wrapper.dataset.sender;
             avatar.classList.toggle('is-hidden', sameGroup);
             const content = wrapper.querySelector('.msg-content');
             const senderLabel = wrapper.querySelector('.sender-name');
@@ -1383,9 +1406,9 @@
         const messageDate = new Date(timestamp_str || new Date().toISOString());
         const currentMessages = messagesCache;
         const adjacentMessage = insertAtTop ? currentMessages[0] : currentMessages[currentMessages.length - 1];
-        const isGroupStart = !adjacentMessage || adjacentMessage.sender !== sender;
         const adjacentTime = adjacentMessage ? new Date(adjacentMessage.created_at).getTime() : 0;
         const shouldShowTime = !adjacentTime || Math.abs(messageDate.getTime() - adjacentTime) >= 5 * 60 * 1000;
+        const isGroupStart = !adjacentMessage || adjacentMessage.sender !== sender || shouldShowTime;
         const timeDivider = shouldShowTime
             ? `<div class="message-time-divider">${formatMessageTime(messageDate)}</div>`
             : '';
