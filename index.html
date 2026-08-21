@@ -385,7 +385,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.0.5"; 
+    const CHAT_APP_VERSION = "2.0.6"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -1927,7 +1927,16 @@
     document.getElementById('message-input').addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
             e.preventDefault();
-            window.sendMessage();
+            const emojiPanel = document.getElementById('emoji-panel');
+            if (emojiPanel) emojiPanel.classList.remove('visible');
+            Promise.resolve(window.sendMessage()).then(() => {
+                [0, 80, 180, 350].forEach((delay) => {
+                    setTimeout(() => {
+                        const chatBox = document.getElementById('chat-box');
+                        if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+                    }, delay);
+                });
+            });
         }
     });
     document.getElementById('message-input').addEventListener('input', (e) => {
