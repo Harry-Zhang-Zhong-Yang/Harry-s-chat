@@ -224,6 +224,9 @@
         .settings-row-item input[type="color"] { width:42px; height:28px; padding:0; border:0; background:transparent; }
         .settings-row-button { border:0; background:transparent; color:#30343b; padding:0; margin:0; text-align:left; font-weight:400; }
         .settings-row-button::after { content:'›'; color:#a5abb2; float:right; font-size:22px; line-height:15px; }
+        .profile-avatar-preview { width:44px; height:44px; flex:0 0 44px; border-radius:50%; object-fit:cover; background:#dbe5f5; color:#52709d; display:grid; place-items:center; font-size:18px; font-weight:600; overflow:hidden; }
+        .profile-avatar-action { display:flex; align-items:center; gap:12px; border:0; background:transparent; color:#30343b; padding:0; margin:0; font-weight:400; }
+        .profile-avatar-action::after { content:'›'; color:#a5abb2; font-size:22px; line-height:15px; }
         .setting-row { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:42px; }
         .setting-row label { margin:0; }
         .switch { position:relative; width:48px; height:28px; flex:0 0 auto; }
@@ -357,7 +360,7 @@
                 </div>
                 <div class="settings-section">
                     <div class="settings-section-title">我的资料</div>
-                    <div class="settings-row-item"><label>我的头像</label><button class="settings-row-button" onclick="document.getElementById('avatar-upload-input').click()">更换头像</button></div>
+                    <div class="settings-row-item"><button class="profile-avatar-action" onclick="document.getElementById('avatar-upload-input').click()"><span id="profile-avatar-preview" class="profile-avatar-preview" aria-label="我的头像"></span><span>更换头像</span></button></div>
                 </div>
                 <div class="settings-section">
                     <div class="settings-section-title">其他</div>
@@ -365,7 +368,7 @@
                 </div>
                 <input type="file" id="bg-upload-input" accept="image/*" style="display:none;" onchange="window.handleBgUpload(event)">
                 <input type="file" id="avatar-upload-input" accept="image/*" style="display:none;" onchange="window.handleAvatarUpload(event)">
-                <div id="push-notification-status" style="padding-top:10px;text-align:center;font-size:12px;color:#8a9099;">未开启</div>
+                <div id="push-notification-status" style="display:none;padding-top:10px;text-align:center;font-size:12px;color:#8a9099;"></div>
             </div>
         </div>
     </div>
@@ -417,10 +420,16 @@
         return registration;
     }
 
-    window.enablePushNotifications = async function() {
+    function setPushStatus(text, visible = true) {
         const status = document.getElementById('push-notification-status');
+        if (!status) return;
+        status.innerText = text;
+        status.style.display = visible ? 'block' : 'none';
+    }
+
+    window.enablePushNotifications = async function() {
         if (PUSH_PUBLIC_KEY.startsWith('REPLACE_')) {
-            status.innerText = '请先在代码中配置 VAPID 公钥';
+            setPushStatus('请先配置通知服务', true);
             return;
         }
         try {
@@ -442,10 +451,10 @@
                 updated_at: new Date().toISOString()
             }], { onConflict: 'endpoint' });
             if (error) throw error;
-            status.innerText = '后台通知已开启';
+            setPushStatus('后台通知已开启', true);
         } catch (error) {
             console.error('开启后台通知失败:', error);
-            status.innerText = error.message || '开启失败，请检查浏览器权限';
+            setPushStatus(error.message || '开启失败，请检查浏览器权限', true);
             const toggle = document.getElementById('push-notification-toggle');
             if (toggle) toggle.checked = false;
         }
@@ -456,7 +465,6 @@
             await window.enablePushNotifications();
             return;
         }
-        const status = document.getElementById('push-notification-status');
         try {
             const registration = await navigator.serviceWorker.ready;
             const subscription = await registration.pushManager.getSubscription();
@@ -464,10 +472,10 @@
                 await supabaseClient.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
                 await subscription.unsubscribe();
             }
-            status.innerText = '未开启';
+            setPushStatus('', false);
         } catch (error) {
             toggle.checked = true;
-            status.innerText = '关闭通知失败';
+            setPushStatus('关闭通知失败', true);
         }
     };
 
@@ -1196,6 +1204,15 @@
             : `<span class="message-avatar" aria-label="${escapeHtml(sender)}的头像">${escapeHtml(String(sender || '?').slice(0, 1))}</span>`;
     }
 
+    function refreshProfileAvatar() {
+        const preview = document.getElementById('profile-avatar-preview');
+        if (!preview) return;
+        const avatar = localStorage.getItem(avatarStorageKey(mySender));
+        preview.innerHTML = avatar
+            ? `<img class="profile-avatar-preview" src="${escapeHtml(avatar)}" alt="我的头像">`
+            : escapeHtml(String(mySender || '?').slice(0, 1));
+    }
+
     function refreshMessageAvatars() {
         document.querySelectorAll('.msg-wrapper').forEach((wrapper) => {
             let previous = wrapper.previousElementSibling;
@@ -1819,6 +1836,7 @@
             return;
         }
         modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+        if (modal.style.display === 'flex') refreshProfileAvatar();
     };
 
     window.updateRoomName = async function() {
@@ -1873,6 +1891,7 @@
         const reader = new FileReader();
         reader.onload = () => {
             localStorage.setItem(avatarStorageKey(mySender), reader.result);
+            refreshProfileAvatar();
             document.querySelectorAll('.msg-wrapper').forEach((wrapper) => {
                 if (wrapper.dataset.sender !== mySender) return;
                 const avatar = wrapper.querySelector('.message-avatar');
