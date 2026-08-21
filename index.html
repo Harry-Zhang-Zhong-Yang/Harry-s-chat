@@ -145,9 +145,11 @@
             border-radius: 8px; margin-bottom: 5px; display: none; border: 1px solid var(--line);
         }
 
-        #input-area { padding: clamp(7px, 1.4vw, 11px) clamp(10px, 2vw, 16px) calc(clamp(7px, 1.4vw, 11px) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; flex: 0 0 auto; }
+        #input-area { position:relative; padding: clamp(7px, 1.4vw, 11px) clamp(10px, 2vw, 16px) calc(clamp(7px, 1.4vw, 11px) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; flex: 0 0 auto; }
         .input-wrapper { display: flex; align-items: center; gap: clamp(5px, 1vw, 8px); width: 100%; }
-        #message-input { flex: 1; padding: clamp(9px, 1.3vw, 11px) clamp(11px, 1.8vw, 15px); border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: clamp(14px, 1.6vw, 16px); resize: none; max-height: 150px; background: #fafbfc; }
+        #message-input { flex: 1; padding: clamp(9px, 1.3vw, 11px) clamp(11px, 1.8vw, 15px); border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: clamp(14px, 1.6vw, 16px); resize: none; overflow-y:auto; max-height: 150px; background: #fafbfc; }
+        #message-input::-webkit-scrollbar { width:0; height:0; }
+        #message-input { scrollbar-width:none; }
         
         .action-btn { 
             width: clamp(34px, 4.2vw, 42px); height: clamp(34px, 4.2vw, 42px); border-radius: 50%; background: #f0f2f5; color: #606770;
@@ -182,18 +184,16 @@
         .voice-transcribe { border:0; padding:0; background:transparent; color:inherit; opacity:.7; font-size:12px; cursor:pointer; }
         .voice-transcript { display:none; max-width:220px; padding:5px 8px; border-radius:6px; background:rgba(0,0,0,.06); font-size:13px; line-height:1.4; white-space:pre-wrap; word-break:break-word; }
         .voice-transcript.visible { display:block; }
-        .reply-quote { display:flex; flex-direction:column; align-items:flex-start; gap:5px; width:fit-content; max-width:100%; margin-top:5px; padding:7px 9px; border-radius:7px; background:rgba(0,0,0,.07); color:inherit; font-size:12px; cursor:pointer; text-align:left; }
+        .reply-quote { display:flex; flex-direction:column; align-items:flex-start; gap:5px; width:fit-content; max-width:100%; margin-top:5px; padding:7px 9px; border-left:3px solid rgba(71,85,105,.7); border-radius:7px; background:rgba(0,0,0,.07); color:inherit; font-size:12px; cursor:pointer; text-align:left; }
         .reply-quote.legacy { cursor:default; opacity:.9; }
-        .right .reply-quote { align-self:flex-end; align-items:flex-end; background:rgba(255,255,255,.82); color:#4b5563; }
-        .reply-quote strong { opacity:.78; white-space:nowrap; font-weight:600; }
+        .right .reply-quote { align-self:flex-end; align-items:flex-start; background:rgba(255,255,255,.82); color:#4b5563; border-left-color:#64748b; }
+        .reply-quote strong { align-self:flex-start; color:#334155; opacity:1; white-space:nowrap; font-weight:700; }
         .reply-quote .reply-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px; }
         .reply-media-preview { width:36px; height:36px; object-fit:cover; border-radius:5px; flex-shrink:0; }
         .reply-audio-preview { display:flex; align-items:center; gap:9px; min-width:145px; border:0; border-radius:5px; padding:2px 2px; background:transparent; color:inherit; cursor:pointer; }
         .reply-audio-preview .voice-play { width:24px; height:24px; background:rgba(37,99,235,.14); }
         .reply-audio-preview .voice-wave { height:20px; gap:2px; }
         .reply-audio-preview .voice-duration { margin-left:auto; }
-        .read-receipt { display:none; width:100%; margin-top:3px; color:#9aa0a8; font-size:10px; line-height:1.2; }
-        .right .read-receipt { text-align:right; padding-right:3px; }
 
         .msg-img { width: auto; max-width: min(100%, 320px); max-height: 360px; object-fit: contain; border-radius: 8px; margin-top: 5px; display: block; cursor: zoom-in; }
         .reply-media-preview { cursor: zoom-in; }
@@ -385,7 +385,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.0.3"; 
+    const CHAT_APP_VERSION = "2.0.4"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -520,10 +520,8 @@
 
     // 本地消息缓存（用于导出与未读计数）
     let messagesCache = [];
-    let readReceipts = [];
     // 未读消息计数与滚动状态
     let unreadCount = 0;
-    let readReceiptTimer = null;
     let isLeavingRoom = false;
     let offlineNoticeElement = null;
     let offlineHadMessages = false;
@@ -588,9 +586,10 @@
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 ensureRoomExists().then(() => {
                     initRealtime();
-                    return realtimeReady.then(() => loadHistory(true)).then(() => {
-                        hideRoomLoading();
-                        appendJoinNoticeOnce();
+                    hideRoomLoading();
+                    appendJoinNoticeOnce();
+                    Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
+                        if (results.some((result) => result.status === 'rejected')) console.warn('房间后台同步未完成');
                     });
                 }).catch((error) => {
                     console.error('自动进入房间失败:', error);
@@ -667,11 +666,12 @@
 
         try {
             await ensureRoomExists();
-            initRealtime();
-            await realtimeReady;
-            await loadHistory(true);
             hideRoomLoading();
             appendJoinNoticeOnce();
+            initRealtime();
+            Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
+                if (results.some((result) => result.status === 'rejected')) console.warn('房间后台同步未完成');
+            });
         } catch (error) {
             console.error('进入房间失败:', error);
             document.getElementById('login-area').style.display = 'flex';
@@ -751,8 +751,6 @@
                     console.info(`[chat] loaded ${msgs.length} recent messages`);
                     chatBox.scrollTop = chatBox.scrollHeight;
                     requestAnimationFrame(() => setTimeout(() => scrollToBottom(), 0));
-                    await reportReadPosition();
-
                     if (msgs.length > 0) {
                         // 记录当前最早消息的时间戳用于分页
                         oldestLoadedAt = msgs[0].created_at;
@@ -831,7 +829,6 @@
 
     function initRealtime() {
         if (roomSubscription) roomSubscription.unsubscribe();
-        if (readReceiptTimer) clearInterval(readReceiptTimer);
         realtimeReady = new Promise((resolve, reject) => {
             const timeout = setTimeout(() => reject(new Error('实时连接超时')), 10000);
             realtimeReadyResolve = () => {
@@ -839,9 +836,6 @@
                 resolve();
             };
         });
-        refreshReadReceipts();
-        readReceiptTimer = setInterval(refreshReadReceipts, 10000);
-
         roomSubscription = supabaseClient.channel(`room_${currentRoomCode}`, {
             config: { presence: { key: `${currentRoomCode}:${mySender}` } }
         })
@@ -1479,8 +1473,6 @@
             chatBox.insertBefore(divider, wrapper);
         }
         refreshMessageAvatars();
-        renderReadReceipt(wrapper, sender, timestamp_str || new Date().toISOString());
-
         // 存入本地缓存（用于导出和未读计数）
         try {
             const msgObj = { id: id || null, sender, content, created_at: timestamp_str || new Date().toISOString(), media_url: mediaUrl || null, media_type: mediaType || null };
@@ -1499,8 +1491,6 @@
                 if (atBottom) chatBox.scrollTop = chatBox.scrollHeight;
             } else if (atBottom) {
                 chatBox.scrollTop = chatBox.scrollHeight;
-                // 更新已读（向服务器报告已读时间）
-                try { reportReadPosition(); } catch (e) {}
             } else {
                 // 增加未读计数并显示跳转按钮
                 unreadCount += 1;
@@ -1533,63 +1523,6 @@
     }
 
 
-    // 报告已读位置信息（向服务器发送 last_read_at）
-    // 优先尝试调用 RPC upsert_message_read（如果已部署并授予权限），否则回退到直接 upsert
-    async function reportReadPosition() {
-        try {
-            const last = messagesCache.length ? messagesCache[messagesCache.length - 1] : null;
-            if (!last) return;
-            // 尝试 RPC
-            try {
-                const { error: rpcError } = await supabaseClient.rpc('upsert_message_read', { p_room_code: currentRoomCode, p_user: mySender, p_last_read_at: last.created_at });
-                if (!rpcError) {
-                    await refreshReadReceipts();
-                    return;
-                }
-            } catch (rpcErr) {
-                // 如果 RPC 不存在或权限不足，回退到 upsert
-                // console.warn('upsert_message_read rpc failed, falling back to upsert', rpcErr);
-            }
-
-            const { error: upsertError } = await supabaseClient.from('message_reads').upsert([{ room_code: currentRoomCode, user: mySender, last_read_at: last.created_at }]);
-            if (upsertError) throw upsertError;
-            await refreshReadReceipts();
-        } catch (e) {
-            // 如果表不存在或权限问题，则静默失败
-        }
-    }
-
-    async function refreshReadReceipts() {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('message_reads')
-                    .select('user,last_read_at')
-                    .eq('room_code', currentRoomCode);
-                if (error) throw error;
-                readReceipts = data || [];
-                document.querySelectorAll('.msg-wrapper[data-msg-id]').forEach(wrapper => {
-                    renderReadReceipt(wrapper, wrapper.dataset.sender, wrapper.dataset.createdAt);
-                });
-            } catch (e) {
-                console.warn('读取已读回执失败:', e);
-            }
-        }
-
-    function renderReadReceipt(wrapper, sender, createdAt) {
-            let el = wrapper.querySelector('.read-receipt');
-            if (!el) {
-                el = document.createElement('div');
-                el.className = 'read-receipt';
-                wrapper.appendChild(el);
-            }
-            const cutoff = new Date(createdAt).getTime();
-            const hasBeenRead = sender === mySender && readReceipts.some((receipt) =>
-                receipt.user !== mySender && new Date(receipt.last_read_at).getTime() >= cutoff
-            );
-            el.innerText = hasBeenRead ? '已读' : '';
-            el.style.display = hasBeenRead ? 'block' : 'none';
-    }
-
     // 滚动监听：当靠近底部时隐藏跳转按钮并重置未读计数
     chatBoxEl.addEventListener('scroll', () => {
         const chatBox = document.getElementById('chat-box');
@@ -1597,8 +1530,6 @@
         if (atBottom) {
             unreadCount = 0;
             const btn = document.getElementById('jump-btn'); if (btn) btn.style.display = 'none';
-            // 报告已读
-            try { reportReadPosition(); } catch (e) { }
         }
     });
 
