@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>极简高级聊天室</title>
+    <title>Harry的聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -69,6 +69,10 @@
             background-size: cover; background-position: center;
             transition: background-image 0.5s ease;
         }
+        #room-loading { position:absolute; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; background:#f7f8fa; color:#69707a; font-size:14px; }
+        #room-loading.hidden { display:none; }
+        .loading-spinner { width:28px; height:28px; border:3px solid #dce3ec; border-top-color:var(--btn-color); border-radius:50%; animation:spin .8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
 
         #nav-bar { 
             min-height: 62px; height: calc(62px + env(safe-area-inset-top)); background: rgba(255,255,255,0.94); backdrop-filter: blur(10px);
@@ -258,11 +262,11 @@
 <!-- 更新公告 -->
 <div id="update-modal" onclick="window.closeUpdateModal()">
     <div class="update-modal-content" onclick="event.stopPropagation()">
-        <h2 style="margin-bottom:15px;">✨ 版本更新公告</h2>
+        <h2 style="margin-bottom:15px;">✨ Harry的聊天室更新</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-        • 进入房间体验优化：实时连接与历史消息同步开始，最新消息和在线状态更快显示。<br>
-        • 手机端优化：支持安全区域、动态高度、消息换行和自适应设置面板。<br>
-        • 图片与背景优化：图片预览更稳定，聊天背景会按房间保存。
+        • 进入房间时会先完成历史消息和实时连接加载，避免内容跳动。<br>
+        • 消息显示、头像分组和设置界面进行了移动端优化。<br>
+        • 后台通知支持开关控制，聊天背景和头像会在本机保存。
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -275,7 +279,7 @@
 <!-- 登录区域 -->
 <div id="login-area">
     <div class="login-box">
-        <h2>进入聊天室</h2>
+        <h2>进入 Harry 的聊天室</h2>
         <input type="text" id="username" placeholder="输入你的名字" autocomplete="off">
         <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off">
         <div class="remember-me">
@@ -289,6 +293,7 @@
 <!-- 聊天主容器 -->
 <div id="chat-container" style="display:none;">
     <div id="chat-bg"></div>
+    <div id="room-loading"><span class="loading-spinner"></span><span>正在加载聊天室…</span></div>
     <div id="nav-bar">
         <span id="back-btn" onclick="window.leaveRoom()">←</span>
         <span id="room-title">正在加载...</span>
@@ -368,7 +373,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.0.1"; 
+    const CHAT_APP_VERSION = "2.0.2"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -470,6 +475,8 @@
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
     let replyData = null;
     let roomSubscription = null;
+    let realtimeReady = Promise.resolve();
+    let realtimeReadyResolve = null;
     let pendingMedia = null;
     let mediaRecorder = null;
     let recordingChunks = [];
@@ -503,6 +510,23 @@
     let isLeavingRoom = false;
     let offlineNoticeElement = null;
     let offlineHadMessages = false;
+    let joinNoticeShown = false;
+
+    function showRoomLoading() {
+        document.getElementById('login-area').style.display = 'none';
+        document.getElementById('chat-container').style.display = 'flex';
+        document.getElementById('room-loading').classList.remove('hidden');
+    }
+
+    function hideRoomLoading() {
+        document.getElementById('room-loading').classList.add('hidden');
+    }
+
+    function appendJoinNoticeOnce() {
+        if (joinNoticeShown) return;
+        joinNoticeShown = true;
+        appendSystemMessage(`${mySender} 加入了房间`);
+    }
 
     window.onload = () => {
         const voiceButton = document.getElementById('voice-btn');
@@ -541,14 +565,21 @@
             if (now < parseInt(expiry)) {
                 currentRoomCode = savedRoom;
                 mySender = savedToken; 
-                document.getElementById('login-area').style.display = 'none';
-                document.getElementById('chat-container').style.display = 'flex';
+                showRoomLoading();
                 document.getElementById('room-title').innerText = currentRoomCode;
                 applyRoomBackground();
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 ensureRoomExists().then(() => {
                     initRealtime();
-                    return loadHistory(true).then(() => appendSystemMessage(`${mySender} 加入了房间`));
+                    return realtimeReady.then(() => loadHistory(true)).then(() => {
+                        hideRoomLoading();
+                        appendJoinNoticeOnce();
+                    });
+                }).catch((error) => {
+                    console.error('自动进入房间失败:', error);
+                    hideRoomLoading();
+                    document.getElementById('login-area').style.display = 'flex';
+                    document.getElementById('chat-container').style.display = 'none';
                 });
             } else {
                 localStorage.clear();
@@ -612,8 +643,7 @@
             localStorage.setItem('chat_auth_expiry', expiryTime.toString());
         }
 
-        document.getElementById('login-area').style.display = 'none';
-        document.getElementById('chat-container').style.display = 'flex';
+        showRoomLoading();
         document.getElementById('room-title').innerText = currentRoomCode; 
         applyRoomBackground();
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
@@ -621,12 +651,15 @@
         try {
             await ensureRoomExists();
             initRealtime();
+            await realtimeReady;
             await loadHistory(true);
-            appendSystemMessage(`${mySender} 加入了房间`);
+            hideRoomLoading();
+            appendJoinNoticeOnce();
         } catch (error) {
             console.error('进入房间失败:', error);
             document.getElementById('login-area').style.display = 'flex';
             document.getElementById('chat-container').style.display = 'none';
+            document.getElementById('room-loading').classList.remove('hidden');
             alert('进入房间失败，请检查网络后重试。');
         }
     };
@@ -782,6 +815,13 @@
     function initRealtime() {
         if (roomSubscription) roomSubscription.unsubscribe();
         if (readReceiptTimer) clearInterval(readReceiptTimer);
+        realtimeReady = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => reject(new Error('实时连接超时')), 10000);
+            realtimeReadyResolve = () => {
+                clearTimeout(timeout);
+                resolve();
+            };
+        });
         refreshReadReceipts();
         readReceiptTimer = setInterval(refreshReadReceipts, 10000);
 
@@ -826,6 +866,7 @@
                 if (status === 'SUBSCRIBED') {
                     await setPresenceActive(true, false);
                     resetPresenceIdleTimer();
+                    if (realtimeReadyResolve) realtimeReadyResolve();
                 }
             });
 
