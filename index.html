@@ -75,12 +75,12 @@
         @keyframes spin { to { transform:rotate(360deg); } }
 
         #nav-bar { 
-            min-height: 62px; height: calc(62px + env(safe-area-inset-top)); background: rgba(255,255,255,0.94); backdrop-filter: blur(10px);
+            min-height: clamp(52px, 7vh, 62px); height: calc(clamp(52px, 7vh, 62px) + env(safe-area-inset-top)); background: rgba(255,255,255,0.94); backdrop-filter: blur(10px);
             border-bottom: 1px solid #eee; display: flex; align-items: center; 
-            padding: env(safe-area-inset-top) 18px 0; justify-content: space-between; z-index: 10; flex: 0 0 auto;
+            padding: env(safe-area-inset-top) clamp(12px, 2vw, 18px) 0; justify-content: space-between; z-index: 10; flex: 0 0 auto;
         }
-        #back-btn { font-size: 24px; cursor: pointer; padding: 5px; }
-        #room-title { position:absolute; left:50%; transform:translateX(-50%); max-width:45%; font-weight: 600; font-size: 16px; color: var(--text-main); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #back-btn { font-size: clamp(21px, 2.4vw, 24px); cursor: pointer; padding: 5px; }
+        #room-title { position:absolute; left:50%; transform:translateX(-50%); max-width:45%; font-weight: 600; font-size: clamp(14px, 1.6vw, 16px); color: var(--text-main); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .nav-icon { width: 34px; height: 34px; padding: 0; margin: 0; background: transparent; color: #69707a; border: 0; border-radius: 50%; font-size: 24px; font-weight: 400; line-height: 1; }
         .nav-icon:hover { background: #f2f4f7; color: #202124; }
         .online-count { width: auto; padding: 0 4px; margin: 0; background: transparent; color: #8a9099; border: 0; font-size: 12px; font-weight: 400; white-space: nowrap; }
@@ -110,7 +110,7 @@
         .right { align-self: flex-end; text-align: right; }
 
         .msg-content { 
-            width:fit-content; max-width:100%; padding: 10px 13px; border-radius: 14px; font-size: 15px; line-height: 1.55;
+            width:fit-content; max-width:100%; padding: clamp(8px, 1.1vw, 10px) clamp(10px, 1.4vw, 13px); border-radius: 14px; font-size: clamp(14px, 1.45vw, 15px); line-height: 1.55;
             position: relative; box-shadow: none;
             display: flex; flex-direction: column; gap: 6px;
             background: #fff; transition: background 0.12s ease;
@@ -121,8 +121,10 @@
         #offline-overlay { position:absolute; top:calc(62px + env(safe-area-inset-top)); right:0; bottom:72px; left:0; z-index:4; display:none; align-items:center; justify-content:center; color:rgba(32,33,36,0.72); font-size:13px; background:rgba(255,255,255,0.28); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); pointer-events:none; }
         #offline-overlay.visible { display:flex; }
         .system-message { align-self:center; color:#9aa0a8; font-size:12px; padding:5px 10px; margin:5px 0; }
-        .left .msg-content { background: var(--msg-others); color: var(--text-main); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
-        .right .msg-content { background: var(--bubble-color); color: white; border-bottom-right-radius: 4px; }
+        .left .msg-content { background: var(--msg-others); color: var(--text-main); border: 1px solid var(--line); }
+        .right .msg-content { background: var(--bubble-color); color: white; }
+        .msg-wrapper.media-only .msg-content { padding:0; border:0; background:transparent; box-shadow:none; }
+        .msg-wrapper.media-only .msg-content > div { display:contents; }
 
         @media (max-width: 600px) {
             #nav-bar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
@@ -143,14 +145,14 @@
             border-radius: 8px; margin-bottom: 5px; display: none; border: 1px solid var(--line);
         }
 
-        #input-area { padding: 11px 16px calc(11px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; flex: 0 0 auto; }
-        .input-wrapper { display: flex; align-items: center; gap: 8px; width: 100%; }
-        #message-input { flex: 1; padding: 11px 15px; border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: 16px; resize: none; max-height: 150px; background: #fafbfc; }
+        #input-area { padding: clamp(7px, 1.4vw, 11px) clamp(10px, 2vw, 16px) calc(clamp(7px, 1.4vw, 11px) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; flex: 0 0 auto; }
+        .input-wrapper { display: flex; align-items: center; gap: clamp(5px, 1vw, 8px); width: 100%; }
+        #message-input { flex: 1; padding: clamp(9px, 1.3vw, 11px) clamp(11px, 1.8vw, 15px); border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: clamp(14px, 1.6vw, 16px); resize: none; max-height: 150px; background: #fafbfc; }
         
         .action-btn { 
-            width: 42px; height: 42px; border-radius: 50%; background: #f0f2f5; color: #606770;
+            width: clamp(34px, 4.2vw, 42px); height: clamp(34px, 4.2vw, 42px); border-radius: 50%; background: #f0f2f5; color: #606770;
             display: flex; align-items: center; justify-content: center; 
-            font-size: 22px; cursor: pointer; transition: all 0.2s; border: none; margin-top: 0;
+            font-size: clamp(18px, 2.2vw, 22px); cursor: pointer; transition: all 0.2s; border: none; margin-top: 0;
             flex-shrink: 0;
         }
         .action-btn:active { transform: scale(0.9); background: #ddd; }
@@ -160,6 +162,11 @@
         .voice-recording-overlay { position:fixed; inset:0; z-index:10000; display:none; align-items:center; justify-content:center; background:rgba(20,25,35,0.18); pointer-events:none; }
         .voice-recording-overlay.visible { display:flex; }
         .voice-recording-card { min-width:190px; padding:24px 26px; border-radius:16px; color:#fff; text-align:center; background:rgba(30,34,42,0.88); box-shadow:0 12px 36px rgba(0,0,0,0.2); }
+        #emoji-btn { font-size:clamp(20px, 2.4vw, 24px); }
+        #emoji-panel { position:absolute; left:clamp(10px, 2vw, 16px); bottom:calc(100% + 8px); width:min(330px, calc(100vw - 20px)); max-height:min(280px, 42vh); overflow-y:auto; display:none; grid-template-columns:repeat(8, 1fr); gap:4px; padding:10px; border:1px solid var(--line); border-radius:14px; background:#fff; box-shadow:0 10px 30px rgba(20,25,35,.16); z-index:110; }
+        #emoji-panel.visible { display:grid; }
+        .emoji-item { width:100%; aspect-ratio:1; border:0; margin:0; padding:0; background:transparent; border-radius:8px; font-size:clamp(21px, 3vw, 27px); cursor:pointer; }
+        .emoji-item:hover { background:#f1f3f5; }
         .voice-recording-icon { font-size:34px; margin-bottom:10px; }
         .voice-recording-label { font-size:14px; }
         .voice-message { display:flex; align-items:center; gap:10px; width:auto; min-width:110px; max-width:220px; padding:0; border:0; margin:0; background:transparent; color:inherit; text-align:left; }
@@ -332,8 +339,10 @@
         <div class="input-wrapper">
             <button id="voice-btn" class="action-btn" aria-label="语音输入">🎙</button>
             <textarea id="message-input" rows="1" placeholder="输入消息并按回车..." autocomplete="off"></textarea>
+            <button id="emoji-btn" class="action-btn" onclick="window.toggleEmojiPanel(event)" aria-label="发送表情">☺</button>
             <button id="add-btn" class="action-btn" onclick="window.triggerImageUpload()" aria-label="发送图片或音频">+</button>
         </div>
+        <div id="emoji-panel" aria-label="表情面板"></div>
  
         <!-- 隐藏的文件选择器 -->
         <input type="file" id="file-input" accept="image/*,audio/*" style="display:none;" onchange="window.handleFileSelect(event)">
@@ -376,7 +385,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.0.2"; 
+    const CHAT_APP_VERSION = "2.0.3"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -964,6 +973,38 @@
         document.getElementById('file-input').click();
     };
 
+    const CHAT_EMOJIS = ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🫡','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','👍','👎','👏','🙌','🙏','💪','❤️','💔','💯','✨','🎉','🔥','✅','❌','⭐','☀️','🌈'];
+    function renderEmojiPanel() {
+        const panel = document.getElementById('emoji-panel');
+        if (!panel || panel.childElementCount) return;
+        CHAT_EMOJIS.forEach((emoji) => {
+            const button = document.createElement('button');
+            button.className = 'emoji-item';
+            button.type = 'button';
+            button.innerText = emoji;
+            button.onclick = () => {
+                const input = document.getElementById('message-input');
+                const start = input.selectionStart;
+                const end = input.selectionEnd;
+                input.value = `${input.value.slice(0, start)}${emoji}${input.value.slice(end)}`;
+                input.focus();
+                input.selectionStart = input.selectionEnd = start + emoji.length;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            };
+            panel.appendChild(button);
+        });
+    }
+    window.toggleEmojiPanel = function(event) {
+        event?.stopPropagation();
+        const panel = document.getElementById('emoji-panel');
+        renderEmojiPanel();
+        panel.classList.toggle('visible');
+    };
+    document.addEventListener('click', (event) => {
+        const panel = document.getElementById('emoji-panel');
+        if (panel && !panel.contains(event.target) && event.target.id !== 'emoji-btn') panel.classList.remove('visible');
+    });
+
     window.handleFileSelect = async function(event) {
         let file = event.target.files[0];
         if (!file) return;
@@ -1246,8 +1287,8 @@
                 </button>`
                 : '';
         return `<div class="reply-quote${meta.legacy ? ' legacy' : ''}" ${meta.id ? `data-reply-id="${escapeHtml(meta.id)}"` : ''} title="${meta.id ? '点击定位原消息' : ''}">
-            ${meta.legacy ? '' : `<strong>${escapeHtml(meta.sender || '')}</strong>`}
-            ${mediaPreview}${meta.mediaType ? '' : `<span class="reply-text">${escapeHtml(preview).slice(0, 120)}</span>`}
+            ${meta.legacy ? '' : `<strong>${escapeHtml(meta.sender || '未知用户')}</strong>`}
+            ${mediaPreview}<span class="reply-text">${escapeHtml(meta.mediaType ? preview : (meta.content || preview)).slice(0, 120)}</span>
         </div>`;
     }
 
@@ -1383,6 +1424,7 @@
         if (mediaUrl) {
             if (mediaType === 'image') {
                 mediaHtml = `<img src="${escapeHtml(mediaUrl)}" class="msg-img" alt="图片消息" />`;
+                wrapper.classList.add('media-only');
             } else if (mediaType === 'audio') {
                 mediaHtml = voiceMessageHtml(mediaUrl, displayContent);
                 displayContent = '';
