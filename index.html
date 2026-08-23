@@ -2186,17 +2186,17 @@
                 }
             });
             refreshMessageAvatars();
+            if (roomSubscription) {
+                roomSubscription.send({ type: 'broadcast', event: 'avatar_update', payload: { user: mySender, room: currentRoomCode, avatarUrl } });
+            }
             try {
                 await supabaseClient.from('user_profiles').upsert({
                     user_name: mySender,
                     avatar_url: avatarUrl,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_name' });
-                if (roomSubscription) {
-                    roomSubscription.send({ type: 'broadcast', event: 'avatar_update', payload: { user: mySender, room: currentRoomCode, avatarUrl } });
-                }
-                showToast('头像已更新！', 'success');
-            } catch (e) { console.warn('头像同步到服务器失败:', e); }
+            } catch (e) { console.warn('头像同步到数据库失败:', e); }
+            showToast('头像已更新！', 'success');
         };
         reader.readAsDataURL(file);
         event.target.value = '';
