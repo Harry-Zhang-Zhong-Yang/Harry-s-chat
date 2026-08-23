@@ -470,9 +470,7 @@
 
     function beijingISOString(date) {
         const d = date || new Date();
-        const beijingOffset = 8 * 60 * 60 * 1000;
-        const utcMs = d.getTime() + d.getTimezoneOffset() * 60 * 1000;
-        const beijingMs = utcMs + beijingOffset;
+        const beijingMs = d.getTime() + 8 * 60 * 60 * 1000;
         const bj = new Date(beijingMs);
         const year = bj.getUTCFullYear();
         const month = String(bj.getUTCMonth() + 1).padStart(2, '0');
@@ -2060,9 +2058,9 @@
 
     function formatMessageTime(date) {
         const now = new Date();
-        const nowBj = new Date(now.getTime() + now.getTimezoneOffset() * 60 * 1000 + 8 * 60 * 60 * 1000);
+        const nowBj = new Date(now.getTime() + 8 * 60 * 60 * 1000);
         const d = new Date(date);
-        const dBj = new Date(d.getTime() + d.getTimezoneOffset() * 60 * 1000 + 8 * 60 * 60 * 1000);
+        const dBj = new Date(d.getTime() + 8 * 60 * 60 * 1000);
         const sameDay = dBj.toDateString() === nowBj.toDateString();
         const yesterday = new Date(nowBj);
         yesterday.setDate(yesterday.getDate() - 1);
