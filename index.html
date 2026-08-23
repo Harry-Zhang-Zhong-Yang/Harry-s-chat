@@ -94,7 +94,12 @@
             z-index: 1;
             padding-bottom: 20px;
             touch-action: pan-y;
+            position: relative;
         }
+        #chat-box > *:last-child { margin-bottom: 0; }
+        #jump-bottom { position: fixed; bottom: 90px; right: 20px; z-index: 30; width: 40px; height: 40px; border-radius: 50%; background: var(--bubble-color); color: white; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: transform 0.2s, opacity 0.2s; }
+        #jump-bottom:active { transform: scale(0.9); }
+        #jump-bottom .badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 9px; background: #ef4444; color: white; font-size: 11px; display: flex; align-items: center; justify-content: center; padding: 0 4px; line-height: 1; }
 
         .msg-wrapper { max-width: min(75%, 620px); position: relative; animation: msgIn 0.2s ease-out; }
         .message-row { display:flex; align-items:flex-start; gap:8px; }
@@ -128,23 +133,29 @@
         .msg-content:hover .msg-meta { opacity: 0.6; }
         .left .msg-meta { text-align: left; }
 
-        .msg-img-placeholder { width: 100%; max-width: 320px; height: 180px; border-radius: 8px; background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%); background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite; margin-top: 5px; }
+        .msg-img-placeholder { width: 100%; max-width: 320px; height: 180px; border-radius: 8px; background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%); background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite; margin-top: 5px; display: block; }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
         .msg-img.loading { display: none; }
         .msg-img.loaded { display: block; }
+        .right .msg-img-placeholder { margin-left: auto; }
+        .left .msg-img-placeholder { margin-right: auto; }
 
         #connection-bar { position: absolute; top: calc(clamp(52px, 7vh, 62px) + env(safe-area-inset-top)); left: 0; right: 0; z-index: 50; height: 0; overflow: hidden; background: #fff3cd; color: #856404; font-size: 12px; text-align: center; line-height: 28px; transition: height 0.3s ease; }
         #connection-bar.visible { height: 28px; }
         #connection-bar.reconnected { background: #d4edda; color: #155724; }
 
-        #chat-box { position:relative; }
-        #offline-overlay { position:absolute; top:calc(62px + env(safe-area-inset-top)); right:0; bottom:72px; left:0; z-index:4; display:none; align-items:center; justify-content:center; color:rgba(32,33,36,0.72); font-size:13px; background:rgba(255,255,255,0.28); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); pointer-events:none; }
+        #offline-overlay { position:absolute; top:calc(62px + env(safe-area-inset-top)); right:0; bottom:72px; left:0; z-index:4; display:none; align-items:center; justify-content:center; color:rgba(32,33,36,0.72); font-size:13px; background:rgba(255,255,255,0.28); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); pointer-events:auto; cursor: pointer; }
         #offline-overlay.visible { display:flex; }
         .system-message { align-self:center; color:#9aa0a8; font-size:12px; padding:5px 10px; margin:5px 0; }
         .left .msg-content { background: var(--msg-others); color: var(--text-main); border: 1px solid var(--line); }
         .right .msg-content { background: var(--bubble-color); color: white; }
         .msg-wrapper.media-only .msg-content { padding:0; border:0; background:transparent; box-shadow:none; }
-        .msg-wrapper.media-only .msg-content > div { display:contents; }
+        .msg-wrapper.media-only .msg-content > div:first-child { line-height: 0; }
+        .msg-wrapper.media-only .msg-meta { position: absolute; bottom: -18px; right: 4px; opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
+        .msg-wrapper.media-only.left .msg-meta { right: auto; left: 4px; }
+        .msg-wrapper.media-only:hover .msg-meta { opacity: 0.7; }
+        .msg-wrapper.media-only .msg-content { position: relative; }
+        .msg-wrapper.media-only .reply-quote { margin-bottom: 4px; }
 
         @media (max-width: 600px) {
             #nav-bar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
@@ -217,6 +228,7 @@
         .reply-audio-preview .voice-duration { margin-left:auto; }
 
         .msg-img { width: auto; max-width: min(100%, 320px); max-height: 360px; object-fit: contain; border-radius: 8px; margin-top: 5px; display: block; cursor: zoom-in; }
+        .right .msg-img { margin-left: auto; }
         .reply-media-preview { cursor: zoom-in; }
         #image-lightbox { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.82); }
         #image-lightbox.visible { display: flex; }
@@ -320,10 +332,10 @@
         <button class="update-close-btn" onclick="window.closeUpdateModal()" aria-label="关闭更新公告">&times;</button>
         <h2 style="margin-bottom:15px;">✨ Harry的聊天室更新</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
-        • 所有时间戳已统一为北京时间（UTC+8）。<br>
-        • 聊天背景优先从数据库加载，本机仅作缓存。<br>
-        • 新增消息发送状态提示与失败重试功能。<br>
-        • 新增最近使用表情、悬停时间戳、连接状态提示。
+        • 新增极速模式：设置中开启，优先保证消息收发。<br>
+        • 修复消息加载偶发丢失的问题，优化加载稳定性。<br>
+        • 撤回消息显示优化，避免残留媒体内容。<br>
+        • 修复未读计数偶尔不准确的问题。
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -362,8 +374,9 @@
 
 
     <div id="chat-box"></div>
+    <button id="jump-bottom" title="跳到底部">↓<span class="badge" style="display:none"></span></button>
     <div id="connection-bar"></div>
-    <div id="offline-overlay">暂时离线 · 点击页面继续在线</div>
+    <div id="offline-overlay">已离线 · 点击重新连接</div>
     <div id="voice-recording-overlay" class="voice-recording-overlay">
         <div class="voice-recording-card">
             <div class="voice-recording-icon">🎙</div>
@@ -425,6 +438,14 @@
                     <div class="settings-row-item"><button class="profile-avatar-action" onclick="document.getElementById('avatar-upload-input').click()"><span id="profile-avatar-preview" class="profile-avatar-preview" aria-label="我的头像"></span><span>更换头像</span></button></div>
                 </div>
                 <div class="settings-section">
+                    <div class="settings-section-title">性能</div>
+                    <div class="settings-row-item">
+                        <label>极速模式</label>
+                        <label class="switch" aria-label="开启极速模式"><input id="speed-mode-toggle" type="checkbox" onchange="window.toggleSpeedMode(this)"><span class="switch-track"></span></label>
+                    </div>
+                    <div class="settings-row-item" style="font-size:12px;color:#8a9099;padding:8px 0;border-bottom:0;">开启后优先保证消息收发，暂停头像、背景等加载</div>
+                </div>
+                <div class="settings-section">
                     <div class="settings-section-title">其他</div>
                     <div class="settings-row-item"><button class="settings-row-button" onclick="window.clearLocalHistory()">清空聊天记录</button></div>
                 </div>
@@ -438,7 +459,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.0.8"; 
+    const CHAT_APP_VERSION = "2.1.0"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -586,6 +607,7 @@
     let realtimeReady = Promise.resolve();
     let realtimeReadyResolve = null;
     let pendingMedia = null;
+    let isSpeedMode = false;
     let mediaRecorder = null;
     let recordingChunks = [];
     let recordingStartedAt = 0;
@@ -606,8 +628,6 @@
     let oldestLoadedAt = null;
     // 是否已经没有更多历史可加载
     let noMoreHistory = false;
-    // 加载历史时的标志（用于显示加载中）
-    let loadingHistory = false;
 
     // 本地消息缓存（用于导出与未读计数）
     let messagesCache = [];
@@ -744,9 +764,36 @@
         }
 
         document.addEventListener('keydown', (e) => {
-            const lightbox = document.getElementById('image-lightbox');
-            if (e.key === 'Escape' && lightbox && lightbox.classList.contains('visible')) {
-                closeImageLightbox();
+            if (e.key === 'Escape') {
+                const lightbox = document.getElementById('image-lightbox');
+                if (lightbox && lightbox.classList.contains('visible')) {
+                    closeImageLightbox();
+                    return;
+                }
+                const searchModal = document.getElementById('search-modal');
+                if (searchModal && searchModal.style.display === 'flex') {
+                    closeSearchModal();
+                    return;
+                }
+                const settingsModal = document.getElementById('settings-modal');
+                if (settingsModal && settingsModal.style.display === 'flex') {
+                    settingsModal.style.display = 'none';
+                    return;
+                }
+                const emojiPanel = document.getElementById('emoji-panel');
+                if (emojiPanel && emojiPanel.classList.contains('visible')) {
+                    emojiPanel.classList.remove('visible');
+                    return;
+                }
+                if (replyData) {
+                    cancelReply();
+                    return;
+                }
+                hideContextMenu();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                searchMessages();
             }
         });
         window.openImageLightbox = openImageLightbox;
@@ -758,8 +805,12 @@
             document.getElementById('color-selector').value = savedColor;
         }
 
+        isSpeedMode = localStorage.getItem('chat_speed_mode') === '1';
+        const speedToggle = document.getElementById('speed-mode-toggle');
+        if (speedToggle) speedToggle.checked = isSpeedMode;
+
         const savedBg = localStorage.getItem(`chat_bg_url:${savedRoom || ''}`) || localStorage.getItem('chat_bg_url');
-        if (savedBg) {
+        if (savedBg && !isSpeedMode) {
             document.getElementById('chat-bg').style.backgroundImage = `url(${savedBg})`;
         }
 
@@ -777,6 +828,44 @@
         window.addEventListener('offline', () => {
             showConnectionBar('网络已断开', '');
             if (roomSubscription && presenceActive) setPresenceActive(false, true);
+        });
+
+        document.getElementById('offline-overlay').addEventListener('click', () => {
+            if (roomSubscription && !presenceActive) setPresenceActive(true, true);
+        });
+
+        const jumpBtn = document.getElementById('jump-bottom');
+        const jumpBadge = jumpBtn.querySelector('.badge');
+        const chatBoxEl = document.getElementById('chat-box');
+
+        function isNearBottom(el) {
+            return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }
+
+        jumpBtn.addEventListener('click', () => {
+            chatBoxEl.scrollTop = chatBoxEl.scrollHeight;
+            jumpBtn.style.display = 'none';
+            unreadCount = 0;
+            if (jumpBadge) jumpBadge.style.display = 'none';
+        });
+
+        const obs = new MutationObserver(() => {
+            if (!isNearBottom(chatBoxEl)) {
+                unreadCount++;
+                if (jumpBadge) {
+                    jumpBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                    jumpBadge.style.display = 'flex';
+                }
+                jumpBtn.style.display = 'flex';
+            }
+        });
+        obs.observe(chatBoxEl, { childList: true, subtree: false });
+        chatBoxEl.addEventListener('scroll', () => {
+            if (isNearBottom(chatBoxEl)) {
+                jumpBtn.style.display = 'none';
+                unreadCount = 0;
+                if (jumpBadge) jumpBadge.style.display = 'none';
+            }
         });
     };
 
@@ -851,6 +940,7 @@
     async function applyRoomBackground() {
         const background = document.getElementById('chat-bg');
         if (!background) return;
+        if (isSpeedMode) { background.style.backgroundImage = ''; return; }
         try {
             const { data: room } = await supabaseClient.from('rooms').select('background_url').eq('room_code', currentRoomCode).single();
             if (room && room.background_url) {
@@ -870,9 +960,8 @@
      * @param {boolean} isInitial - 是否为初始加载（如果是，则只显示最新的30条）
      */
     async function loadHistory(isInitial = true) {
-        if (isFetchingHistory || loadingHistory) return;
+        if (isFetchingHistory) return;
         isFetchingHistory = true;
-        loadingHistory = true;
         const chatBox = document.getElementById('chat-box');
 
         try {
@@ -895,7 +984,13 @@
                 if (recentData) {
                     const msgs = recentData.reverse();
                     chatBox.innerHTML = "";
-                    msgs.forEach(msg => appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type));
+                    const addedIds = new Set();
+                    msgs.forEach(msg => {
+                        if (!addedIds.has(String(msg.id))) {
+                            addedIds.add(String(msg.id));
+                            appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type);
+                        }
+                    });
                     console.info(`[chat] loaded ${msgs.length} recent messages`);
                     chatBox.scrollTop = chatBox.scrollHeight;
                     requestAnimationFrame(() => setTimeout(() => scrollToBottom(), 0));
@@ -904,13 +999,21 @@
                         oldestLoadedAt = msgs[0].created_at;
                     }
                     noMoreHistory = msgs.length < PAGE_SIZE;
-                    const senders = msgs.map(m => m.sender);
-                    fetchAndApplyUserAvatars(senders);
+                    if (!isSpeedMode) {
+                        const senders = msgs.map(m => m.sender);
+                        fetchAndApplyUserAvatars(senders);
+                    }
                 }
             } else {
                 // 上拉加载：如果已经没有更多则直接返回
-                if (noMoreHistory) return;
-                if (!oldestLoadedAt) return;
+                if (noMoreHistory) {
+                    isFetchingHistory = false;
+                    return;
+                }
+                if (!oldestLoadedAt) {
+                    isFetchingHistory = false;
+                    return;
+                }
 
                 const prevScrollHeight = chatBox.scrollHeight;
                 const prevScrollTop = chatBox.scrollTop;
@@ -927,13 +1030,18 @@
                 if (olderData) {
                     if (olderData.length === 0) {
                         noMoreHistory = true;
+                        isFetchingHistory = false;
                         return;
                     }
 
                     const msgs = olderData.reverse();
+                    const existingIds = new Set();
+                    chatBox.querySelectorAll('.msg-wrapper[data-msg-id]').forEach(el => existingIds.add(el.dataset.msgId));
                     for (let i = msgs.length - 1; i >= 0; i--) {
                         const msg = msgs[i];
-                        appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type, true, true);
+                        if (!existingIds.has(String(msg.id))) {
+                            appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type, true, true);
+                        }
                     }
                     refreshMessageAvatars();
 
@@ -945,8 +1053,10 @@
                     chatBox.scrollTop = newScrollHeight - prevScrollHeight + prevScrollTop;
 
                     if (olderData.length < PAGE_SIZE) noMoreHistory = true;
-                    const senders = msgs.map(m => m.sender);
-                    fetchAndApplyUserAvatars(senders);
+                    if (!isSpeedMode) {
+                        const senders = msgs.map(m => m.sender);
+                        fetchAndApplyUserAvatars(senders);
+                    }
                 }
             }
         } catch (e) {
@@ -957,7 +1067,6 @@
             }
         } finally {
             isFetchingHistory = false;
-            loadingHistory = false;
         }
     }
 
@@ -995,6 +1104,7 @@
                 }
             })
             .on('broadcast', { event: 'bg_update' }, (payload) => {
+                if (isSpeedMode) return;
                 const bg = payload.payload || {};
                 if (bg.room === currentRoomCode && bg.bgUrl) {
                     document.getElementById('chat-bg').style.backgroundImage = `url(${bg.bgUrl})`;
@@ -1002,6 +1112,7 @@
                 }
             })
             .on('broadcast', { event: 'avatar_update' }, (payload) => {
+                if (isSpeedMode) return;
                 const av = payload.payload || {};
                 if (av.room === currentRoomCode && av.user && av.avatarUrl) {
                     localStorage.setItem(avatarStorageKey(av.user), av.avatarUrl);
@@ -1022,6 +1133,9 @@
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
                 if (!presenceActive && payload.new.sender !== mySender) offlineHadMessages = true;
+                // Check if message already exists in DOM (avoid duplicates)
+                const existing = document.querySelector(`.msg-wrapper[data-msg-id="${payload.new.id}"]`);
+                if (existing) return;
                 if (payload.new.sender === mySender) {
                     const existingTemp = findTempMessage(payload.new.content, payload.new.created_at);
                     if (existingTemp && existingTemp.dataset.sending === 'true') {
@@ -1031,8 +1145,18 @@
                         if (idx >= 0) messagesCache[idx].id = payload.new.id;
                         existingTemp.style.opacity = '1';
                         existingTemp.title = '';
+                        // Update the status to "已发送"
+                        const statusEl = existingTemp.querySelector('.msg-send-status');
+                        if (statusEl) {
+                            statusEl.className = 'msg-send-status sent';
+                            statusEl.innerText = '已发送';
+                            statusEl.onclick = null;
+                            setTimeout(() => { if (statusEl.parentNode) statusEl.style.display = 'none'; }, 3000);
+                        }
                         return;
                     }
+                    // Also check if we already have a non-temp version of this message
+                    if (existingTemp && existingTemp.dataset.sending === 'false') return;
                 }
                 appendMessageToUI(payload.new.id, payload.new.sender, payload.new.content, true, payload.new.created_at, payload.new.media_url, payload.new.media_type);
             })
@@ -1053,7 +1177,7 @@
             }, (payload) => {
                 const room = payload.new;
                 document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
-                if (room.background_url && room.background_url !== payload.old.background_url) {
+                if (!isSpeedMode && room.background_url && room.background_url !== payload.old.background_url) {
                     document.getElementById('chat-bg').style.backgroundImage = `url(${room.background_url})`;
                     localStorage.setItem(`chat_bg_url:${currentRoomCode}`, room.background_url);
                 }
@@ -1065,6 +1189,7 @@
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
                 if (payload.eventType === 'DELETE') return;
+                if (isSpeedMode) return;
                 const profile = payload.new;
                 if (profile && profile.user_name && profile.avatar_url && profile.user_name !== mySender) {
                     localStorage.setItem(avatarStorageKey(profile.user_name), profile.avatar_url);
@@ -1076,6 +1201,14 @@
                             avatar.src = profile.avatar_url;
                         }
                     });
+                }
+            })
+            .on('broadcast', { event: 'bg_update' }, (payload) => {
+                if (isSpeedMode) return;
+                if (payload.payload && payload.payload.bgUrl) {
+                    document.getElementById('chat-bg').style.backgroundImage = `url(${payload.payload.bgUrl})`;
+                    localStorage.setItem(`chat_bg_url:${currentRoomCode}`, payload.payload.bgUrl);
+                    localStorage.setItem('chat_bg_url', payload.payload.bgUrl);
                 }
             })
             .subscribe(async (status) => {
@@ -1628,6 +1761,7 @@
     }
 
     function avatarHtml(sender) {
+        if (isSpeedMode) return `<span class="message-avatar" aria-label="${escapeHtml(sender)}的头像" data-sender="${escapeHtml(sender)}">${escapeHtml(String(sender || '?').slice(0, 1))}</span>`;
         const avatar = localStorage.getItem(avatarStorageKey(sender));
         return avatar
             ? `<img class="message-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(sender)}的头像" data-sender="${escapeHtml(sender)}">`
@@ -1636,6 +1770,7 @@
 
     async function fetchAndApplyUserAvatars(senders) {
         if (!senders || !senders.length) return;
+        if (isSpeedMode) return;
         const uniqueSenders = [...new Set(senders)].filter(s => s !== mySender && !localStorage.getItem(avatarStorageKey(s)));
         if (!uniqueSenders.length) return;
         try {
@@ -1834,7 +1969,12 @@
         }
 
         let mediaHtml = "";
-        if (mediaUrl) {
+        const isRecalled = content === '[已撤回]';
+        if (isRecalled) {
+            displayContent = '<span style="opacity:0.5;font-style:italic;">[已撤回]</span>';
+            mediaUrl = null;
+            mediaType = null;
+        } else if (mediaUrl) {
             if (mediaType === 'image') {
                 mediaHtml = `<div class="msg-img-placeholder"></div><img src="${escapeHtml(mediaUrl)}" class="msg-img loading" alt="图片消息" onload="this.classList.remove('loading');this.classList.add('loaded');this.previousElementSibling.remove();" onerror="this.previousElementSibling.innerText='图片加载失败';this.previousElementSibling.style.cssText='display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;';">`;
                 wrapper.classList.add('media-only');
@@ -2042,6 +2182,7 @@
         }
 
         if (sender === mySender) {
+            addItem('编辑', () => editMessage(messageId));
             addItem('撤回', () => recallMessage(messageId));
         }
 
@@ -2120,7 +2261,7 @@
         if (!menu.contains(e.target)) menu.style.display = 'none';
     });
 
-    // 更新消息（用于处理撤回）并同步本地缓存
+    // 更新消息（用于处理撤回/编辑）并同步本地缓存
     function updateMessageInUI(newMsg) {
         try {
             const chatBox = document.getElementById('chat-box');
@@ -2128,12 +2269,28 @@
             if (!wrapper) return;
             const contentDiv = wrapper.querySelector('.msg-content > div');
             if (contentDiv) {
-                // 更新文本与媒体
-                const mediaHtml = newMsg.media_url ? (newMsg.media_type === 'audio' ? voiceMessageHtml(newMsg.media_url, newMsg.content) : `<img src="${escapeHtml(newMsg.media_url)}" class="msg-img" alt="图片消息" />`) : '';
-                contentDiv.innerHTML = `${mediaHtml}${newMsg.media_type === 'audio' ? '' : newMsg.content}`;
-                const updatedImage = contentDiv.querySelector('.msg-img');
-                if (updatedImage) updatedImage.onclick = () => openImageLightbox(updatedImage.src);
+                const isRecalled = newMsg.content === '[已撤回]';
+                if (isRecalled) {
+                    contentDiv.innerHTML = '<span style="opacity:0.5;font-style:italic;">[已撤回]</span>';
+                    wrapper.dataset.originalContent = '[已撤回]';
+                    wrapper.dataset.mediaUrl = '';
+                    wrapper.dataset.mediaType = '';
+                    wrapper.classList.remove('media-only');
+                    const img = wrapper.querySelector('.msg-img');
+                    if (img) img.remove();
+                    const placeholder = wrapper.querySelector('.msg-img-placeholder');
+                    if (placeholder) placeholder.remove();
+                    const voiceMsg = wrapper.querySelector('.voice-message-wrap');
+                    if (voiceMsg) voiceMsg.remove();
+                } else {
+                    const mediaHtml = newMsg.media_url ? (newMsg.media_type === 'audio' ? voiceMessageHtml(newMsg.media_url, newMsg.content) : `<img src="${escapeHtml(newMsg.media_url)}" class="msg-img" alt="图片消息" />`) : '';
+                    const editedBadge = newMsg.edited_at ? ' <span style="font-size:10px;opacity:0.6;">(已编辑)</span>' : '';
+                    contentDiv.innerHTML = `${mediaHtml}${newMsg.media_type === 'audio' ? '' : escapeHtml(newMsg.content || '')}${editedBadge}`;
+                    const updatedImage = contentDiv.querySelector('.msg-img');
+                    if (updatedImage) updatedImage.onclick = () => openImageLightbox(updatedImage.src);
+                }
             }
+            wrapper.dataset.originalContent = newMsg.content || '';
 
             // 同步本地缓存，以便搜索/撤回规则保持一致
             try {
@@ -2157,11 +2314,32 @@
             if (!msg) return showToast('无法找到消息或已过期', 'error');
             const created = new Date(msg.created_at).getTime();
             const now = Date.now();
-            const windowMs = 2 * 60 * 1000; // 2 分钟
+            const windowMs = 2 * 60 * 1000;
             if (now - created > windowMs) return showToast('撤回时间已过（仅支持发送后2分钟内撤回）', 'error');
-            await supabaseClient.from('messages').update({ content: '[已撤回]' }).eq('id', messageId);
+            await supabaseClient.from('messages').update({ content: '[已撤回]', media_url: null, media_type: null }).eq('id', messageId);
             updateMessageInUI({ id: messageId, sender: mySender, content: '[已撤回]', media_url: null, media_type: null });
         } catch (e) { console.error('recallMessage', e); showToast('撤回失败', 'error'); }
+    }
+
+    async function editMessage(messageId) {
+        try {
+            const msg = messagesCache.find(m => String(m.id) === String(messageId));
+            if (!msg) return showToast('无法找到消息或已过期', 'error');
+            if (msg.media_type === 'audio' || msg.media_type === 'image') return showToast('暂不支持编辑媒体消息', 'error');
+            const created = new Date(msg.created_at).getTime();
+            const now = Date.now();
+            const windowMs = 2 * 60 * 1000;
+            if (now - created > windowMs) return showToast('编辑时间已过（仅支持发送后2分钟内编辑）', 'error');
+            const currentContent = msg.content || '';
+            const cleanContent = stripReplyMetadata(currentContent);
+            const newContent = prompt('编辑消息：', cleanContent);
+            if (newContent === null || newContent.trim() === '') return;
+            if (newContent.trim() === cleanContent.trim()) return;
+            const finalContent = newContent.trim();
+            await supabaseClient.from('messages').update({ content: finalContent, edited_at: beijingISOString() }).eq('id', messageId);
+            updateMessageInUI({ id: messageId, sender: mySender, content: finalContent, edited_at: beijingISOString() });
+            showToast('消息已编辑', 'success');
+        } catch (e) { console.error('editMessage', e); showToast('编辑失败', 'error'); }
     }
 
     // 搜索消息（升级版：用 modal 显示搜索结果并支持点击跳转）
@@ -2264,7 +2442,25 @@
             return;
         }
         modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
-        if (modal.style.display === 'flex') refreshProfileAvatar();
+        if (modal.style.display === 'flex') {
+            refreshProfileAvatar();
+            const speedToggle = document.getElementById('speed-mode-toggle');
+            if (speedToggle) speedToggle.checked = isSpeedMode;
+        }
+    };
+
+    window.toggleSpeedMode = function(toggle) {
+        isSpeedMode = toggle.checked;
+        localStorage.setItem('chat_speed_mode', isSpeedMode ? '1' : '0');
+        if (isSpeedMode) {
+            showToast('极速模式已开启，优先保证消息收发', 'success', 2000);
+        } else {
+            showToast('已切换为正常模式，将加载头像和背景', 'info', 2000);
+            if (currentRoomCode) {
+                applyRoomBackground();
+                fetchAndApplyUserAvatars(messagesCache.map(m => m.sender));
+            }
+        }
     };
 
     window.updateRoomName = async function() {
@@ -2322,20 +2518,30 @@
             return;
         }
         try {
-            const reader = new FileReader();
-            reader.onerror = () => showToast('背景图片读取失败。', 'error');
-            reader.onload = async () => {
-                const bgUrl = reader.result;
-                localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bgUrl);
-                localStorage.setItem('chat_bg_url', bgUrl);
+            let uploadFile = file;
+            try {
+                const compressed = await compressImageFile(file, 1920, 0.7);
+                if (compressed) uploadFile = compressed;
+            } catch (e) { /* use original */ }
+            const fileExt = file.name.split('.').pop();
+            const filePath = `chat_backgrounds/bg_${currentRoomCode}_${Date.now()}.${fileExt}`;
+            const { data: uploadData, error: uploadError } = await supabaseClient.storage.from('chat_media').upload(filePath, uploadFile, { upsert: true });
+            if (uploadError) throw uploadError;
+            const { data: publicData } = supabaseClient.storage.from('chat_media').getPublicUrl(filePath);
+            const bgUrl = publicData.publicUrl;
+            localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bgUrl);
+            localStorage.setItem('chat_bg_url', bgUrl);
+            if (!isSpeedMode) {
                 document.getElementById('chat-bg').style.backgroundImage = `url(${bgUrl})`;
-                try {
-                    await supabaseClient.from('rooms').update({ background_url: bgUrl, updated_at: beijingISOString() }).eq('room_code', currentRoomCode);
-                    showToast('背景已更新！', 'success');
-                } catch (e) { console.warn('背景同步到服务器失败:', e); }
-            };
-            reader.readAsDataURL(file);
-        } catch (e) { console.error(e); showToast('背景图片上传失败。', 'error'); }
+            }
+            try {
+                await supabaseClient.from('rooms').update({ background_url: bgUrl, updated_at: beijingISOString() }).eq('room_code', currentRoomCode);
+                if (roomSubscription) {
+                    roomSubscription.send({ type: 'broadcast', event: 'bg_update', payload: { room: currentRoomCode, bgUrl } });
+                }
+                showToast('背景已更新！', 'success');
+            } catch (e) { console.warn('背景同步到服务器失败:', e); }
+        } catch (e) { console.error(e); showToast('背景图片上传失败，请检查网络。', 'error'); }
         event.target.value = '';
     };
 
@@ -2414,11 +2620,14 @@
 
     // 输入事件：发送 typing 通知 并发送消息
     let typingTimeout = null;
-    document.getElementById('message-input').addEventListener('input', (e) => {
+    const msgInput = document.getElementById('message-input');
+    msgInput.addEventListener('input', (e) => {
         sendTypingNotification();
+        msgInput.style.height = 'auto';
+        msgInput.style.height = `${Math.min(msgInput.scrollHeight, 150)}px`;
     });
 
-    document.getElementById('message-input').addEventListener('keydown', (e) => {
+    msgInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
             e.preventDefault();
             const emojiPanel = document.getElementById('emoji-panel');
@@ -2431,13 +2640,7 @@
                     }, delay);
                 });
             });
-        }
-    });
-    document.getElementById('message-input').addEventListener('input', (e) => {
-        const input = e.currentTarget;
-        input.style.height = 'auto';
-        input.style.height = `${Math.min(input.scrollHeight, 150)}px`;
-    });
+    }
 
     // 发送 typing 通知（短时广播）
     function sendTypingNotification() {
