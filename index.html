@@ -125,7 +125,7 @@
         .left:hover .msg-content { background: #f8fafc; }
         .right:hover .msg-content { background: var(--bubble-color); }
 
-        .msg-send-status { font-size: 10px; opacity: 0.65; text-align: right; margin-top: 2px; display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+        .msg-send-status { font-size: 10px; opacity: 0.65; text-align: right; margin-top: 1px; line-height: 1; display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
         .msg-send-status.sending { animation: pulse 1.2s ease-in-out infinite; }
         .msg-send-status.failed { color: #dc3545; opacity: 1; cursor: pointer; }
         .msg-send-status.failed:hover { text-decoration: underline; }
@@ -1587,8 +1587,7 @@
             const statusEl = document.createElement('span');
             statusEl.className = 'msg-send-status sending';
             statusEl.innerText = '发送中...';
-            const contentDiv = tempEl.querySelector('.msg-content');
-            if (contentDiv) contentDiv.appendChild(statusEl);
+            tempEl.appendChild(statusEl);
         }
 
         const forceScroll = () => {
@@ -1667,8 +1666,7 @@
         if (!statusEl && status) {
             statusEl = document.createElement('span');
             statusEl.className = 'msg-send-status';
-            const contentDiv = wrapper.querySelector('.msg-content');
-            if (contentDiv) contentDiv.appendChild(statusEl);
+            wrapper.appendChild(statusEl);
         }
         if (!statusEl) return;
         statusEl.className = 'msg-send-status ' + status;
