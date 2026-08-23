@@ -1657,8 +1657,26 @@
                     tempEl.dataset.sending = 'false';
                     const idx = messagesCache.findIndex(m => String(m.id) === tempId);
                     if (idx >= 0) messagesCache[idx].id = data.id;
+                    const statusEl = tempEl.querySelector('.msg-send-status');
+                    if (statusEl) {
+                        statusEl.className = 'msg-send-status sent';
+                        statusEl.innerText = '已发送';
+                        statusEl.onclick = null;
+                        setTimeout(() => { if (statusEl && statusEl.parentNode) statusEl.style.display = 'none'; }, 3000);
+                    }
+                } else {
+                    // realtime 已抢先更新了ID，用真实ID再找一次
+                    const realEl = document.querySelector(`[data-msg-id="${data.id}"]`);
+                    if (realEl) {
+                        const statusEl = realEl.querySelector('.msg-send-status');
+                        if (statusEl) {
+                            statusEl.className = 'msg-send-status sent';
+                            statusEl.innerText = '已发送';
+                            statusEl.onclick = null;
+                            setTimeout(() => { if (statusEl && statusEl.parentNode) statusEl.style.display = 'none'; }, 3000);
+                        }
+                    }
                 }
-                updateMessageStatus(tempId, 'sent');
             }
         } catch (e) {
             console.error(e);
@@ -1730,7 +1748,13 @@
             if (data && data.id) {
                 wrapper.dataset.msgId = String(data.id);
                 wrapper.dataset.sending = 'false';
-                updateMessageStatus(msgId, 'sent');
+                const statusEl = wrapper.querySelector('.msg-send-status');
+                if (statusEl) {
+                    statusEl.className = 'msg-send-status sent';
+                    statusEl.innerText = '已发送';
+                    statusEl.onclick = null;
+                    setTimeout(() => { if (statusEl && statusEl.parentNode) statusEl.style.display = 'none'; }, 3000);
+                }
                 showToast('消息已重新发送', 'success');
             }
         } catch (e) {
