@@ -953,7 +953,7 @@
                 messagesCache = [];
                 const unreadButton = document.getElementById('jump-btn');
                 if (unreadButton) unreadButton.style.display = 'none';
-                // 初始加载：获取最新 PAGE_SIZE 条（按时间降序取，再客户端 reverse 成升序）
+
                 let { data: recentData, error } = await supabaseClient
                     .from('messages')
                     .select('id,room_code,sender,content,media_url,media_type,created_at')
@@ -961,29 +961,35 @@
                     .order('created_at', { ascending: false })
                     .limit(PAGE_SIZE);
 
-                if (error) throw error;
-                if (recentData) {
-                    const msgs = recentData.reverse();
-                    chatBox.innerHTML = "";
-                    const addedIds = new Set();
-                    msgs.forEach(msg => {
-                        if (!addedIds.has(String(msg.id))) {
-                            addedIds.add(String(msg.id));
-                            appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type);
-                        }
-                    });
-                    console.info(`[chat] loaded ${msgs.length} recent messages`);
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                    requestAnimationFrame(() => setTimeout(() => scrollToBottom(), 0));
-                    if (msgs.length > 0) {
-                        // 记录当前最早消息的时间戳用于分页
-                        oldestLoadedAt = msgs[0].created_at;
+                if (error) {
+                    console.error('[chat] 查询消息失败:', error.message, error.code, error.details);
+                    throw error;
+                }
+
+                if (!recentData || recentData.length === 0) {
+                    console.warn('[chat] 未查询到任何消息，房间:', currentRoomCode, '可能原因: RLS未配置或表中无数据');
+                    chatBox.innerHTML = '<div style="padding:18px;text-align:center;color:#8a929c;font-size:13px;">暂无消息，开始聊天吧</div>';
+                    noMoreHistory = true;
+                    isFetchingHistory = false;
+                    return;
+                }
+
+                const msgs = recentData.reverse();
+                chatBox.innerHTML = "";
+                const addedIds = new Set();
+                msgs.forEach(msg => {
+                    if (!addedIds.has(String(msg.id))) {
+                        addedIds.add(String(msg.id));
+                        appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type);
                     }
-                    noMoreHistory = msgs.length < PAGE_SIZE;
-                    if (!isSpeedMode) {
-                        const senders = msgs.map(m => m.sender);
-                        fetchAndApplyUserAvatars(senders);
-                    }
+                });
+                console.info(`[chat] 加载了 ${msgs.length} 条历史消息`);
+                chatBox.scrollTop = chatBox.scrollHeight;
+                requestAnimationFrame(() => setTimeout(() => scrollToBottom(), 0));
+                oldestLoadedAt = msgs[0].created_at;
+                noMoreHistory = msgs.length < PAGE_SIZE;
+                if (!isSpeedMode) {
+                    fetchAndApplyUserAvatars(msgs.map(m => m.sender));
                 }
             } else {
                 // 上拉加载：如果已经没有更多则直接返回
