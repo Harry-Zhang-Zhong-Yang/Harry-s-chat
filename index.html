@@ -38,13 +38,14 @@
         @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
         /* --- 登录区域 --- */
-        #login-area { position: fixed; inset: 0; background: #f7f8fa; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; }
+        #login-area { position: fixed; inset: 0; background: #f7f8fa; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; transition: opacity 0.25s ease; }
         .login-box { width: 100%; max-width: 380px; padding: 34px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 12px 35px rgba(32,33,36,0.06); }
         .login-box h2 { margin-bottom: 26px; text-align: center; color: var(--text-main); font-size: 22px; letter-spacing: -0.02em; }
         input { width: 100%; padding: 13px 14px; margin: 8px 0; border: 1px solid #dfe3e8; border-radius: 9px; font-size: 16px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
         input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
         button { width: 100%; padding: 13px 14px; background: var(--btn-color); color: white; border: none; border-radius: 9px; font-size: 15px; cursor: pointer; margin-top: 15px; font-weight: 600; transition: opacity 0.2s, transform 0.2s; }
         button:active { opacity: 0.8; }
+        button:disabled { opacity: 0.55; cursor: not-allowed; }
 
         .remember-me { display: flex; align-items: center; gap: 8px; margin-top: -5px; margin-bottom: 15px; font-size: 14px; color: #666; cursor: pointer; }
         .remember-me input { width: auto; margin: 0; }
@@ -322,7 +323,7 @@
             <input type="checkbox" id="auto-login-check" checked>
             <label for="auto-login-check">10天内免登录（自动进入上次房间）</label>
         </div>
-        <button onclick="window.joinRoom()">开始聊天</button>
+        <button id="join-btn" onclick="window.joinRoom()">开始聊天</button>
     </div>
 </div>
 
@@ -389,6 +390,7 @@
                 </div>
                 <div class="settings-section">
                     <div class="settings-section-title">聊天设置</div>
+                    <div class="settings-row-item"><button class="settings-row-button" onclick="window.updateRoomName()">修改房间名称</button></div>
                     <div class="settings-row-item"><button class="settings-row-button" onclick="window.searchMessages()">查找聊天内容</button></div>
                     <div class="settings-row-item">
                         <label>后台消息通知</label>
@@ -658,12 +660,29 @@
                     hideRoomLoading();
                     document.getElementById('login-area').style.display = 'flex';
                     document.getElementById('chat-container').style.display = 'none';
+                    if (savedToken) {
+                        document.getElementById('username').value = savedToken;
+                        document.getElementById('room-input').focus();
+                    }
                 });
             } else {
-                localStorage.clear();
-                location.reload();
+                localStorage.removeItem('chat_last_room');
+                localStorage.removeItem('chat_auth_expiry');
             }
         }
+
+        var savedName = localStorage.getItem('chat_auth_token');
+        if (savedName) {
+            document.getElementById('username').value = savedName;
+            document.getElementById('room-input').focus();
+        }
+
+        document.getElementById('username').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('room-input').focus(); }
+        });
+        document.getElementById('room-input').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); window.joinRoom(); }
+        });
 
         function openImageLightbox(url) {
             const lightbox = document.getElementById('image-lightbox');
@@ -714,12 +733,16 @@
         currentRoomCode = document.getElementById('room-input').value.trim();
         joinNoticeShown = false;
         const isAutoLogin = document.getElementById('auto-login-check').checked;
+        const joinBtn = document.getElementById('join-btn');
         
         if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
             return showToast("房间代码格式不正确，请只使用字母、数字或符号。", 'error');
         }
 
         if (!nameInput || !currentRoomCode) return showToast("请输入名字和房间代码", 'error');
+
+        joinBtn.disabled = true;
+        joinBtn.textContent = '正在进入...';
 
         localStorage.setItem('chat_auth_token', nameInput);
         mySender = nameInput; 
@@ -747,8 +770,11 @@
             console.error('进入房间失败:', error);
             document.getElementById('login-area').style.display = 'flex';
             document.getElementById('chat-container').style.display = 'none';
-            document.getElementById('room-loading').classList.remove('hidden');
+            document.getElementById('room-loading').classList.add('hidden');
             showToast('进入房间失败，请检查网络后重试。', 'error');
+        } finally {
+            joinBtn.disabled = false;
+            joinBtn.textContent = '开始聊天';
         }
     };
 
@@ -1447,7 +1473,7 @@
         const uniqueSenders = [...new Set(senders)].filter(s => s !== mySender && !localStorage.getItem(avatarStorageKey(s)));
         if (!uniqueSenders.length) return;
         try {
-            const { data: profiles } = await supabaseClient.from('user_profiles').select('user_name,avatar_url').in('user_name', uniqueSenders).eq('room_code', currentRoomCode);
+            const { data: profiles } = await supabaseClient.from('user_profiles').select('user_name,avatar_url').in('user_name', uniqueSenders);
             if (profiles && profiles.length) {
                 profiles.forEach(p => {
                     if (p.avatar_url) localStorage.setItem(avatarStorageKey(p.user_name), p.avatar_url);
@@ -2072,17 +2098,23 @@
     };
 
     window.updateRoomName = async function() {
-        const newName = prompt('输入新的房间名称：');
+        var newName = prompt('输入新的房间名称：');
         if (!newName) return;
+        newName = newName.trim();
+        if (!newName) return showToast('房间名称不能为空', 'error');
         try {
-            const { error } = await supabaseClient
+            var { error } = await supabaseClient
                 .from('rooms')
                 .update({ room_name: newName })
                 .eq('room_code', currentRoomCode);
             if (error) throw error;
             document.getElementById('room-title').innerText = newName;
             window.toggleSettings();
-        } catch (e) { console.error("修改房间名称失败:", e); }
+            showToast('房间名称已更新！', 'success');
+        } catch (e) {
+            console.error('修改房间名称失败:', e);
+            showToast('修改房间名称失败，请重试', 'error');
+        }
     };
 
     window.saveSettings = function() {
@@ -2095,11 +2127,15 @@
     // 清除本地聊天记录（只影响本地显示与缓存）
     window.clearLocalHistory = function() {
         if (!confirm('确定要清除本地聊天记录吗？此操作不会删除服务器上的消息。')) return;
-        const chatBox = document.getElementById('chat-box');
+        var chatBox = document.getElementById('chat-box');
         chatBox.innerHTML = '';
         oldestLoadedAt = null;
         noMoreHistory = false;
         localStorage.removeItem('chat_bg_url');
+        if (currentRoomCode) {
+            localStorage.removeItem('chat_bg_url:' + currentRoomCode);
+            document.getElementById('chat-bg').style.backgroundImage = '';
+        }
         showToast('本地聊天记录和缓存已清除。', 'success');
     };
 
@@ -2153,10 +2189,9 @@
             try {
                 await supabaseClient.from('user_profiles').upsert({
                     user_name: mySender,
-                    room_code: currentRoomCode,
                     avatar_url: avatarUrl,
                     updated_at: new Date().toISOString()
-                }, { onConflict: 'user_name,room_code' });
+                }, { onConflict: 'user_name' });
                 if (roomSubscription) {
                     roomSubscription.send({ type: 'broadcast', event: 'avatar_update', payload: { user: mySender, room: currentRoomCode, avatarUrl } });
                 }
@@ -2168,15 +2203,27 @@
     };
 
     window.leaveRoom = function() {
-        if(confirm("确定要退出当前房间吗？（这将重置您的用户身份）")) {
+        if(confirm("确定要退出当前房间吗？")) {
             isLeavingRoom = true;
-            localStorage.removeItem('chat_auth_token');
+            if (roomSubscription) { roomSubscription.unsubscribe(); roomSubscription = null; }
+            presenceActive = false;
+            if (presenceIdleTimer) { clearTimeout(presenceIdleTimer); presenceIdleTimer = null; }
             localStorage.removeItem('chat_last_room');
             localStorage.removeItem('chat_auth_expiry');
             currentRoomCode = "";
+            mySender = "";
+            document.getElementById('chat-box').innerHTML = '';
+            document.getElementById('room-title').innerText = '正在加载...';
+            document.getElementById('online-count').innerText = '在线 0 人';
+            document.getElementById('chat-bg').style.backgroundImage = '';
             document.getElementById('login-area').style.display = 'flex';
             document.getElementById('chat-container').style.display = 'none';
-            location.reload(); 
+            var savedName = localStorage.getItem('chat_auth_token');
+            if (savedName) {
+                document.getElementById('username').value = savedName;
+            }
+            document.getElementById('room-input').value = '';
+            document.getElementById('room-input').focus();
         }
     };
 
