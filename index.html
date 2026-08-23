@@ -143,6 +143,7 @@
             height: auto; min-height: 40px; display: flex; align-items: center; justify-content: space-between;
             padding: 8px 11px; font-size: 13px; color: #69707a; background: #f5f7f9;
             border-radius: 8px; margin-bottom: 5px; display: none; border: 1px solid var(--line);
+            overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
         }
 
         #input-area { position:relative; padding: clamp(7px, 1.4vw, 11px) clamp(10px, 2vw, 16px) calc(clamp(7px, 1.4vw, 11px) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; flex: 0 0 auto; }
@@ -184,13 +185,13 @@
         .voice-transcribe { border:0; padding:0; background:transparent; color:inherit; opacity:.7; font-size:12px; cursor:pointer; }
         .voice-transcript { display:none; max-width:220px; padding:5px 8px; border-radius:6px; background:rgba(0,0,0,.06); font-size:13px; line-height:1.4; white-space:pre-wrap; word-break:break-word; }
         .voice-transcript.visible { display:block; }
-        .reply-quote { display:flex; flex-direction:column; align-items:flex-start; gap:5px; width:fit-content; max-width:100%; margin-top:5px; padding:7px 9px; border-left:3px solid rgba(71,85,105,.7); border-radius:7px; background:rgba(0,0,0,.07); color:inherit; font-size:12px; cursor:pointer; text-align:left; }
+        .reply-quote { display:flex; flex-direction:column; align-items:flex-start; gap:5px; width:fit-content; max-width:100%; min-width:0; margin-top:5px; padding:7px 9px; border-left:3px solid rgba(71,85,105,.7); border-radius:7px; background:rgba(0,0,0,.07); color:inherit; font-size:12px; cursor:pointer; text-align:left; overflow:hidden; }
         .reply-quote.legacy { cursor:default; opacity:.9; }
         .right .reply-quote { align-self:flex-end; align-items:flex-start; background:rgba(255,255,255,.82); color:#4b5563; border-left-color:#64748b; }
-        .reply-quote strong { align-self:flex-start; color:#334155; opacity:1; white-space:nowrap; font-weight:700; }
-        .reply-quote .reply-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px; }
-        .reply-media-preview { width:36px; height:36px; object-fit:cover; border-radius:5px; flex-shrink:0; }
-        .reply-audio-preview { display:flex; align-items:center; gap:9px; min-width:145px; border:0; border-radius:5px; padding:2px 2px; background:transparent; color:inherit; cursor:pointer; }
+        .reply-quote strong { align-self:flex-start; color:#334155; opacity:1; white-space:nowrap; font-weight:700; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+        .reply-quote .reply-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
+        .reply-media-preview { max-width:80px; max-height:60px; border-radius:4px; object-fit:cover; flex-shrink:0; }
+        .reply-audio-preview { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:6px; background:rgba(0,0,0,.06); border:none; cursor:pointer; font-size:12px; flex-shrink:0; }
         .reply-audio-preview .voice-play { width:24px; height:24px; background:rgba(37,99,235,.14); }
         .reply-audio-preview .voice-wave { height:20px; gap:2px; }
         .reply-audio-preview .voice-duration { margin-left:auto; }
@@ -265,13 +266,38 @@
             .msg-wrapper { max-width:92%; }
         }
 
+        /* Toast 通知 */
+        #toast-container {
+            position: fixed; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+            z-index: 99999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+        }
+        .toast {
+            padding: 10px 18px; border-radius: 10px; font-size: 14px; color: #fff; pointer-events: auto;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.18); animation: toastIn 0.3s ease-out;
+            text-align: center; white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis;
+        }
+        .toast.info { background: rgba(30,34,42,0.88); }
+        .toast.success { background: #20c997; }
+        .toast.error { background: #dc3545; }
+        .toast.out { animation: toastOut 0.3s ease-in forwards; }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); } }
+
+        /* 更新弹窗关闭按钮 */
+        .update-close-btn { position: absolute; top: 8px; right: 12px; width: 32px; height: 32px; padding: 0; margin: 0; background: transparent; border: 0; font-size: 22px; color: #8a9099; cursor: pointer; border-radius: 50%; line-height: 1; }
+        .update-close-btn:hover { background: #f3f5f7; color: #202124; }
+
     </style>
 </head>
 <body id="app-body">
 
+<!-- Toast 通知容器 -->
+<div id="toast-container"></div>
+
 <!-- 更新公告 -->
 <div id="update-modal" onclick="window.closeUpdateModal()">
-    <div class="update-modal-content" onclick="event.stopPropagation()">
+    <div class="update-modal-content" onclick="event.stopPropagation()" style="position:relative;">
+        <button class="update-close-btn" onclick="window.closeUpdateModal()" aria-label="关闭更新公告">&times;</button>
         <h2 style="margin-bottom:15px;">✨ Harry的聊天室更新</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
         • 进入房间时会先完成历史消息和实时连接加载，避免内容跳动。<br>
@@ -325,12 +351,16 @@
 
     <!-- 搜索结果 Modal -->
     <div id="search-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:9000; background:rgba(0,0,0,0.35);">
-        <div style="background:white; width:95%; max-width:720px; max-height:80vh; overflow:auto; border-radius:12px; padding:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <strong>搜索结果</strong>
-                <button onclick="closeSearchModal()" style="border:none; background:none; font-size:20px;">✕</button>
+        <div style="background:white; width:95%; max-width:720px; max-height:80vh; border-radius:12px; padding:12px; display:flex; flex-direction:column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <strong>搜索消息</strong>
+                <button onclick="closeSearchModal()" style="border:none; background:none; font-size:20px; cursor:pointer;">✕</button>
             </div>
-            <div class="search-list" style="margin-top:10px;"></div>
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <input id="search-modal-input" type="text" placeholder="输入搜索关键字..." style="flex:1; padding:8px 12px; border:1px solid #ddd; border-radius:8px; font-size:14px;" onkeydown="if(event.key==='Enter')window.doSearchModal()">
+                <button onclick="window.doSearchModal()" style="padding:8px 16px; background:#07c475; color:white; border:none; border-radius:8px; cursor:pointer; font-size:14px;">搜索</button>
+            </div>
+            <div class="search-list" style="flex:1; overflow-y:auto; min-height:200px;"></div>
         </div>
     </div>
 
@@ -385,7 +415,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.0.6"; 
+    const CHAT_APP_VERSION = "2.0.7"; 
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -393,6 +423,23 @@
     try {
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     } catch (e) { console.error("Supabase 初始化失败:", e); }
+
+    function showToast(message, type = 'info', duration = 2500) {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            document.body.appendChild(container);
+        }
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerText = message;
+        container.appendChild(toast);
+        setTimeout(() => {
+            toast.classList.add('out');
+            toast.addEventListener('animationend', () => toast.remove());
+        }, duration);
+    }
 
     const PUSH_PUBLIC_KEY = 'BO9iBsWlhRp3O3mw2bRhHyn05b9BRGBZr_dU69iElwScNQEjINVChx8vkBjtzGzKQlbL-tvLy2a3qP8ao_FcSB0';
 
@@ -541,6 +588,13 @@
         if (joinNoticeShown) return;
         joinNoticeShown = true;
         appendSystemMessage(`${mySender} 加入了房间`);
+        try {
+            supabaseClient.from('join_logs').insert([{
+                user_name: mySender,
+                room_code: currentRoomCode,
+                joined_at: new Date().toISOString()
+            }]).then(({ error }) => { if (error) console.warn('加入日志记录失败:', error); });
+        } catch (e) { console.warn('加入日志记录失败:', e); }
         if (roomSubscription) {
             realtimeReady.then(() => roomSubscription.send({
                 type: 'broadcast',
@@ -616,6 +670,7 @@
             const image = document.getElementById('image-lightbox-img');
             if (!lightbox || !image || !url) return;
             image.src = url;
+            image.onerror = () => { showToast('图片加载失败', 'error'); closeImageLightbox(); };
             lightbox.classList.add('visible');
         }
 
@@ -624,8 +679,15 @@
             const lightbox = document.getElementById('image-lightbox');
             const image = document.getElementById('image-lightbox-img');
             if (lightbox) lightbox.classList.remove('visible');
-            if (image) image.removeAttribute('src');
+            if (image) { image.removeAttribute('src'); image.onerror = null; }
         }
+
+        document.addEventListener('keydown', (e) => {
+            const lightbox = document.getElementById('image-lightbox');
+            if (e.key === 'Escape' && lightbox && lightbox.classList.contains('visible')) {
+                closeImageLightbox();
+            }
+        });
         window.openImageLightbox = openImageLightbox;
         window.closeImageLightbox = closeImageLightbox;
 
@@ -654,10 +716,10 @@
         const isAutoLogin = document.getElementById('auto-login-check').checked;
         
         if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
-            return alert("房间代码格式不正确，请只使用字母、数字或符号。");
+            return showToast("房间代码格式不正确，请只使用字母、数字或符号。", 'error');
         }
 
-        if (!nameInput || !currentRoomCode) return alert("请输入名字和房间代码");
+        if (!nameInput || !currentRoomCode) return showToast("请输入名字和房间代码", 'error');
 
         localStorage.setItem('chat_auth_token', nameInput);
         mySender = nameInput; 
@@ -686,7 +748,7 @@
             document.getElementById('login-area').style.display = 'flex';
             document.getElementById('chat-container').style.display = 'none';
             document.getElementById('room-loading').classList.remove('hidden');
-            alert('进入房间失败，请检查网络后重试。');
+            showToast('进入房间失败，请检查网络后重试。', 'error');
         }
     };
 
@@ -708,10 +770,20 @@
 
     }
 
-    function applyRoomBackground() {
+    async function applyRoomBackground() {
         const savedBg = localStorage.getItem(`chat_bg_url:${currentRoomCode}`) || localStorage.getItem('chat_bg_url');
         const background = document.getElementById('chat-bg');
-        if (background) background.style.backgroundImage = savedBg ? `url(${savedBg})` : '';
+        if (savedBg) {
+            if (background) background.style.backgroundImage = `url(${savedBg})`;
+        } else {
+            try {
+                const { data: room } = await supabaseClient.from('rooms').select('background_url').eq('room_code', currentRoomCode).single();
+                if (room && room.background_url && background) {
+                    background.style.backgroundImage = `url(${room.background_url})`;
+                    localStorage.setItem(`chat_bg_url:${currentRoomCode}`, room.background_url);
+                }
+            } catch (e) { /* ignore */ }
+        }
     }
 
     /**
@@ -740,19 +812,7 @@
                     .order('created_at', { ascending: false })
                     .limit(PAGE_SIZE);
 
-                if (error) {
-                    const fallback = await supabaseClient
-                        .from('messages')
-                        .select('*')
-                        .eq('room_code', currentRoomCode)
-                        .order('created_at', { ascending: false })
-                        .limit(PAGE_SIZE);
-                    recentData = fallback.data;
-                    error = fallback.error;
-                }
-                if (error) {
-                    throw error;
-                }
+                if (error) throw error;
                 if (recentData) {
                     const msgs = recentData.reverse();
                     chatBox.innerHTML = "";
@@ -765,6 +825,8 @@
                         oldestLoadedAt = msgs[0].created_at;
                     }
                     noMoreHistory = msgs.length < PAGE_SIZE;
+                    const senders = msgs.map(m => m.sender);
+                    fetchAndApplyUserAvatars(senders);
                 }
             } else {
                 // 上拉加载：如果已经没有更多则直接返回
@@ -782,20 +844,7 @@
                     .order('created_at', { ascending: false })
                     .limit(PAGE_SIZE);
 
-                if (error) {
-                    const fallback = await supabaseClient
-                        .from('messages')
-                        .select('*')
-                        .eq('room_code', currentRoomCode)
-                        .lt('created_at', oldestLoadedAt)
-                        .order('created_at', { ascending: false })
-                        .limit(PAGE_SIZE);
-                    olderData = fallback.data;
-                    error = fallback.error;
-                }
-                if (error) {
-                    throw error;
-                }
+                if (error) throw error;
                 if (olderData) {
                     if (olderData.length === 0) {
                         noMoreHistory = true;
@@ -803,8 +852,11 @@
                     }
 
                     const msgs = olderData.reverse();
-                    // 插入到最前面（保持时间顺序）
-                    msgs.forEach(msg => appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type, true));
+                    for (let i = msgs.length - 1; i >= 0; i--) {
+                        const msg = msgs[i];
+                        appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type, true, true);
+                    }
+                    refreshMessageAvatars();
 
                     // 更新最早时间戳
                     oldestLoadedAt = msgs[0].created_at;
@@ -814,6 +866,8 @@
                     chatBox.scrollTop = newScrollHeight - prevScrollHeight + prevScrollTop;
 
                     if (olderData.length < PAGE_SIZE) noMoreHistory = true;
+                    const senders = msgs.map(m => m.sender);
+                    fetchAndApplyUserAvatars(senders);
                 }
             }
         } catch (e) {
@@ -828,11 +882,16 @@
         }
     }
 
-    // 上拉监听逻辑
+    // 上拉监听逻辑（防抖）
     const chatBox = document.getElementById('chat-box');
+    let scrollDebounceTimer = null;
     chatBox.addEventListener('scroll', () => {
+        if (scrollDebounceTimer) return;
         if (chatBox.scrollTop <= 10 && !isFetchingHistory && !noMoreHistory) {
-            loadHistory(false);
+            scrollDebounceTimer = setTimeout(() => {
+                scrollDebounceTimer = null;
+                loadHistory(false);
+            }, 300);
         }
     });
 
@@ -856,6 +915,27 @@
                     appendSystemMessage(notice.text);
                 }
             })
+            .on('broadcast', { event: 'bg_update' }, (payload) => {
+                const bg = payload.payload || {};
+                if (bg.room === currentRoomCode && bg.bgUrl) {
+                    document.getElementById('chat-bg').style.backgroundImage = `url(${bg.bgUrl})`;
+                    localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bg.bgUrl);
+                }
+            })
+            .on('broadcast', { event: 'avatar_update' }, (payload) => {
+                const av = payload.payload || {};
+                if (av.room === currentRoomCode && av.user && av.avatarUrl) {
+                    localStorage.setItem(avatarStorageKey(av.user), av.avatarUrl);
+                    const safeUser = av.user.replace(/"/g, '\\"');
+                    document.querySelectorAll(`.message-avatar[data-sender="${safeUser}"]`).forEach(avatar => {
+                        if (avatar.tagName === 'SPAN') {
+                            avatar.outerHTML = `<img class="message-avatar" src="${escapeHtml(av.avatarUrl)}" alt="${escapeHtml(av.user)}的头像" data-sender="${escapeHtml(av.user)}">`;
+                        } else {
+                            avatar.src = av.avatarUrl;
+                        }
+                    });
+                }
+            })
             .on('postgres_changes', {
                 event: 'INSERT',
                 schema: 'public',
@@ -863,6 +943,18 @@
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
                 if (!presenceActive && payload.new.sender !== mySender) offlineHadMessages = true;
+                if (payload.new.sender === mySender) {
+                    const existingTemp = findTempMessage(payload.new.content, payload.new.created_at);
+                    if (existingTemp && existingTemp.dataset.sending === 'true') {
+                        existingTemp.dataset.msgId = String(payload.new.id);
+                        existingTemp.dataset.sending = 'false';
+                        const idx = messagesCache.findIndex(m => m.id && m.id.startsWith && m.id.startsWith('temp_') && m.sender === mySender);
+                        if (idx >= 0) messagesCache[idx].id = payload.new.id;
+                        existingTemp.style.opacity = '1';
+                        existingTemp.title = '';
+                        return;
+                    }
+                }
                 appendMessageToUI(payload.new.id, payload.new.sender, payload.new.content, true, payload.new.created_at, payload.new.media_url, payload.new.media_type);
             })
             .on('postgres_changes', {
@@ -895,10 +987,17 @@
 
     function updateOnlineCount() {
         const el = document.getElementById('online-count');
-        if (!el || !roomSubscription) return;
-        const state = roomSubscription.presenceState();
-        const count = Object.keys(state).length;
-        el.innerText = `在线 ${presenceActive ? Math.max(1, count) : Math.max(0, count) } 人`;
+        if (!el) return;
+        let count = 0;
+        try {
+            if (roomSubscription) {
+                const state = roomSubscription.presenceState();
+                if (state && typeof state === 'object') {
+                    count = Object.keys(state).length;
+                }
+            }
+        } catch (e) { /* presence state unavailable */ }
+        el.innerText = `在线 ${presenceActive ? Math.max(1, count) : Math.max(0, count)} 人`;
     }
 
     async function setPresenceActive(active, announce = true) {
@@ -1017,7 +1116,13 @@
         let file = event.target.files[0];
         if (!file) return;
 
-        // 如果是图片，尝试进行客户端压缩以减少带宽
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'audio/mpeg', 'audio/wav', 'audio/webm', 'audio/mp4', 'audio/ogg', 'audio/aac'];
+        if (!allowedTypes.some(t => file.type.startsWith(t.split('/')[0]) || file.type === t)) {
+            showToast('不支持的文件类型，请选择图片或音频文件。', 'error');
+            event.target.value = '';
+            return;
+        }
+
         if (file.type && file.type.startsWith('image/')) {
             try {
                 const compressed = await compressImageFile(file, 1200, 0.75);
@@ -1026,7 +1131,7 @@
         }
 
         if (file.size > 15 * 1024 * 1024) {
-            return alert("文件太大啦！请选择小于15MB的文件。");
+            return showToast("文件太大啦！请选择小于15MB的文件。", 'error');
         }
 
         try {
@@ -1046,15 +1151,18 @@
                 .from('chat_media')
                 .getPublicUrl(filePath);
 
+            const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|webm|m4a|ogg|aac|flac)$/i.test(file.name);
             pendingMedia = {
                 url: publicData.publicUrl,
-                type: fileExt.toLowerCase().includes('mp3') || fileExt.toLowerCase().includes('wav') ? 'audio' : 'image'
+                type: isAudio ? 'audio' : 'image'
             };
 
             window.sendMessage();
         } catch (e) {
             console.error(e);
-            alert("上传失败，请检查网络或权限。");
+            showToast("上传失败，请检查网络或权限。", 'error');
+        } finally {
+            event.target.value = '';
         }
     };
 
@@ -1092,7 +1200,7 @@
         if (mediaRecorder) return;
         recordingStartCancelled = false;
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
-            alert('当前浏览器不支持录音，请使用最新版 Chrome、Edge 或 Safari。');
+            showToast('当前浏览器不支持录音，请使用最新版 Chrome、Edge 或 Safari。', 'error');
             return;
         }
         try {
@@ -1132,7 +1240,7 @@
             if (event.pointerId !== null && event.pointerId !== undefined) button.setPointerCapture?.(event.pointerId);
         } catch (error) {
             console.error('voice recording permission failed:', error);
-            alert('无法使用麦克风，请允许浏览器访问麦克风后重试。');
+            showToast('无法使用麦克风，请允许浏览器访问麦克风后重试。', 'error');
         }
     }
 
@@ -1150,7 +1258,7 @@
         const extension = mimeType.includes('mp4') ? 'm4a' : 'webm';
         const file = new File([new Blob(chunks, { type: mimeType })], `voice_${Date.now()}.${extension}`, { type: mimeType });
         if (file.size > 15 * 1024 * 1024) {
-            alert('语音文件过大，请缩短录音后重试。');
+            showToast('语音文件过大，请缩短录音后重试。', 'error');
             return;
         }
         try {
@@ -1163,15 +1271,16 @@
             await window.sendMessage();
         } catch (error) {
             console.error('voice upload failed:', error);
-            alert('语音发送失败，请检查 Storage 权限或网络连接。');
+            showToast('语音发送失败，请检查 Storage 权限或网络连接。', 'error');
         }
     }
 
     // 图片压缩工具：返回压缩后的 File/Blob
     function compressImageFile(file, maxWidth = 1200, quality = 0.8) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             try {
                 const reader = new FileReader();
+                reader.onerror = (err) => resolve(null);
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
@@ -1196,7 +1305,6 @@
                     img.onerror = () => resolve(null);
                     img.src = e.target.result;
                 };
-                reader.onerror = (err) => resolve(null);
                 reader.readAsDataURL(file);
             } catch (e) { resolve(null); }
         });
@@ -1204,6 +1312,7 @@
 
     window.sendMessage = async function() {
         const inputEl = document.getElementById('message-input');
+        if (!inputEl) return;
         let content = inputEl.value.trim();
         
         if (!content && !pendingMedia) return;
@@ -1214,37 +1323,88 @@
             finalContent = `${content}\n\n[回复元数据:${replyMeta}]`;
         }
 
+        const now = new Date().toISOString();
+        const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        const pendingMediaCopy = pendingMedia ? { ...pendingMedia } : null;
+
+        inputEl.value = "";
+        pendingMedia = null;
+        cancelReply();
+
+        appendMessageToUI(tempId, mySender, finalContent, true, now, pendingMediaCopy ? pendingMediaCopy.url : null, pendingMediaCopy ? pendingMediaCopy.type : null);
+
+        const tempEl = document.querySelector(`[data-msg-id="${tempId}"]`);
+        if (tempEl) tempEl.dataset.sending = 'true';
+
+        const forceScroll = () => {
+            const chatBox = document.getElementById('chat-box');
+            if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+        };
+        requestAnimationFrame(forceScroll);
+        [50, 150, 300].forEach((delay) => setTimeout(forceScroll, delay));
+
         try {
-            const { error } = await supabaseClient
+            const { data, error } = await supabaseClient
                 .from('messages')
                 .insert([{ 
                     room_code: currentRoomCode, 
                     content: finalContent, 
                     sender: mySender,
-                    media_url: pendingMedia ? pendingMedia.url : null,
-                    media_type: pendingMedia ? pendingMedia.type : null,
-                    created_at: new Date().toISOString()
-                }]);
+                    media_url: pendingMediaCopy ? pendingMediaCopy.url : null,
+                    media_type: pendingMediaCopy ? pendingMediaCopy.type : null,
+                    created_at: now
+                }])
+                .select('id')
+                .single();
 
             if (error) {
                 console.error("发送失败:", error);
-                alert("消息发送失败。");
-            } else {
-                inputEl.value = ""; 
-                pendingMedia = null;
-                cancelReply();
-                const forceScroll = () => {
-                    const chatBox = document.getElementById('chat-box');
-                    if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-                };
-                requestAnimationFrame(forceScroll);
-                [50, 150, 300].forEach((delay) => setTimeout(forceScroll, delay));
+                const tempEl = document.querySelector(`[data-msg-id="${tempId}"]`);
+                if (tempEl) {
+                    tempEl.style.opacity = '0.5';
+                    tempEl.title = '发送失败';
+                    tempEl.dataset.sending = 'false';
+                }
+                showToast("消息发送失败，请检查网络后重试。", 'error');
+            } else if (data && data.id) {
+                const tempEl = document.querySelector(`[data-msg-id="${tempId}"]`);
+                if (tempEl) {
+                    tempEl.dataset.msgId = String(data.id);
+                    tempEl.dataset.sending = 'false';
+                    const idx = messagesCache.findIndex(m => String(m.id) === tempId);
+                    if (idx >= 0) messagesCache[idx].id = data.id;
+                }
             }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+            console.error(e);
+            const tempEl = document.querySelector(`[data-msg-id="${tempId}"]`);
+            if (tempEl) {
+                tempEl.style.opacity = '0.5';
+                tempEl.title = '发送失败';
+                tempEl.dataset.sending = 'false';
+            }
+            showToast("消息发送失败，请检查网络后重试。", 'error');
+        }
     };
 
     function escapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+
+    function findTempMessage(content, createdAt) {
+        const chatBox = document.getElementById('chat-box');
+        if (!chatBox) return null;
+        const wrappers = chatBox.querySelectorAll('.msg-wrapper[data-msg-id^="temp_"]');
+        const newTime = createdAt ? new Date(createdAt).getTime() : 0;
+        const normalizedContent = (content || '').replace(/\s+/g, '');
+        for (const wrapper of wrappers) {
+            if (wrapper.dataset.sender !== mySender) continue;
+            const wrapperContent = (wrapper.dataset.originalContent || '').replace(/\s+/g, '');
+            const wrapperTime = new Date(wrapper.dataset.createdAt).getTime();
+            if (wrapperContent === normalizedContent && newTime && Math.abs(wrapperTime - newTime) < 5000) return wrapper;
+            if (wrapperContent === normalizedContent && !newTime) return wrapper;
+        }
+        return null;
     }
 
     function avatarStorageKey(sender) {
@@ -1254,8 +1414,31 @@
     function avatarHtml(sender) {
         const avatar = localStorage.getItem(avatarStorageKey(sender));
         return avatar
-            ? `<img class="message-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(sender)}的头像">`
-            : `<span class="message-avatar" aria-label="${escapeHtml(sender)}的头像">${escapeHtml(String(sender || '?').slice(0, 1))}</span>`;
+            ? `<img class="message-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(sender)}的头像" data-sender="${escapeHtml(sender)}">`
+            : `<span class="message-avatar" aria-label="${escapeHtml(sender)}的头像" data-sender="${escapeHtml(sender)}">${escapeHtml(String(sender || '?').slice(0, 1))}</span>`;
+    }
+
+    async function fetchAndApplyUserAvatars(senders) {
+        if (!senders || !senders.length) return;
+        const uniqueSenders = [...new Set(senders)].filter(s => s !== mySender && !localStorage.getItem(avatarStorageKey(s)));
+        if (!uniqueSenders.length) return;
+        try {
+            const { data: profiles } = await supabaseClient.from('user_profiles').select('user_name,avatar_url').in('user_name', uniqueSenders).eq('room_code', currentRoomCode);
+            if (profiles && profiles.length) {
+                profiles.forEach(p => {
+                    if (p.avatar_url) localStorage.setItem(avatarStorageKey(p.user_name), p.avatar_url);
+                });
+                document.querySelectorAll('.message-avatar[data-sender]').forEach(avatar => {
+                    const sender = avatar.dataset.sender;
+                    const saved = localStorage.getItem(avatarStorageKey(sender));
+                    if (saved && avatar.tagName === 'SPAN') {
+                        avatar.outerHTML = `<img class="message-avatar" src="${escapeHtml(saved)}" alt="${escapeHtml(sender)}的头像" data-sender="${escapeHtml(sender)}">`;
+                    } else if (saved && avatar.tagName === 'IMG') {
+                        avatar.src = saved;
+                    }
+                });
+            }
+        } catch (e) { /* ignore */ }
     }
 
     function refreshProfileAvatar() {
@@ -1317,7 +1500,7 @@
         if (!button._audio) {
             const url = button.dataset.audioUrl;
             if (!url) {
-                alert('引用语音地址不存在，无法播放。');
+                showToast('引用语音地址不存在，无法播放。', 'error');
                 return;
             }
             button._audio = new Audio(url);
@@ -1332,7 +1515,7 @@
         }
         if (button._audio.paused) {
             button._audio.play().then(() => { button.querySelector('.voice-play').innerText = '❚❚'; })
-                .catch(() => alert('引用语音播放失败，请检查网络或 Storage 权限。'));
+                .catch(() => showToast('引用语音播放失败，请检查网络或 Storage 权限。', 'error'));
         } else {
             button._audio.pause();
             button.querySelector('.voice-play').innerText = '▶';
@@ -1363,7 +1546,7 @@
     function toggleVoiceTranscriptForMessage(wrapper) {
         const transcript = wrapper.querySelector('.voice-transcript');
         if (!transcript) {
-            alert('这条语音没有可显示的识别文字。');
+            showToast('这条语音没有可显示的识别文字。', 'info');
             return;
         }
         transcript.classList.toggle('visible');
@@ -1384,14 +1567,14 @@
         }
         if (audio.paused) {
             audio.play().then(() => { button.querySelector('.voice-play').innerText = '❚❚'; })
-                .catch(() => alert('语音播放失败，请检查浏览器声音权限或网络连接。'));
+                .catch(() => showToast('语音播放失败，请检查浏览器声音权限或网络连接。', 'error'));
         } else {
             audio.pause();
             button.querySelector('.voice-play').innerText = '▶';
         }
     };
 
-    function appendMessageToUI(id, sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false) {
+    function appendMessageToUI(id, sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false, skipAvatarRefresh = false) {
         const chatBox = document.getElementById('chat-box');
         if (isNew && id && Array.from(chatBox.querySelectorAll('.msg-wrapper[data-msg-id]')).some((item) => item.dataset.msgId === String(id))) return;
         const wrapper = document.createElement('div');
@@ -1408,10 +1591,7 @@
         const adjacentMessage = insertAtTop ? currentMessages[0] : currentMessages[currentMessages.length - 1];
         const adjacentTime = adjacentMessage ? new Date(adjacentMessage.created_at).getTime() : 0;
         const shouldShowTime = !adjacentTime || Math.abs(messageDate.getTime() - adjacentTime) >= 5 * 60 * 1000;
-        const isGroupStart = !adjacentMessage || adjacentMessage.sender !== sender || shouldShowTime;
-        const timeDivider = shouldShowTime
-            ? `<div class="message-time-divider">${formatMessageTime(messageDate)}</div>`
-            : '';
+        const isGroupStart = insertAtTop ? true : (!adjacentMessage || adjacentMessage.sender !== sender || shouldShowTime);
 
         let displayContent = content;
         let replyTagHtml = "";
@@ -1489,13 +1669,17 @@
             chatBox.appendChild(wrapper);
         }
 
-        if (timeDivider) {
+        if (shouldShowTime) {
             const divider = document.createElement('div');
             divider.className = 'message-time-divider';
-            divider.innerText = formatMessageTime(messageDate);
-            chatBox.insertBefore(divider, wrapper);
+            divider.innerText = insertAtTop ? formatMessageTime(new Date(adjacentTime)) : formatMessageTime(messageDate);
+            if (insertAtTop) {
+                chatBox.insertBefore(divider, wrapper.nextSibling);
+            } else {
+                chatBox.insertBefore(divider, wrapper);
+            }
         }
-        refreshMessageAvatars();
+        if (!skipAvatarRefresh) refreshMessageAvatars();
         // 存入本地缓存（用于导出和未读计数）
         try {
             const msgObj = { id: id || null, sender, content, created_at: timestamp_str || new Date().toISOString(), media_url: mediaUrl || null, media_type: mediaType || null };
@@ -1528,8 +1712,12 @@
     function formatMessageTime(date) {
         const now = new Date();
         const sameDay = date.toDateString() === now.toDateString();
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        const isYesterday = date.toDateString() === yesterday.toDateString();
         const time = `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
         if (sameDay) return time;
+        if (isYesterday) return `昨天 ${time}`;
         return `${date.getMonth() + 1}月${date.getDate()}日 ${time}`;
     }
 
@@ -1539,7 +1727,8 @@
     // 跳到最新按钮行为
     function scrollToBottom() {
         const chatBox = document.getElementById('chat-box');
-        chatBox.scrollTop = chatBox.scrollHeight;
+        if (!chatBox) return;
+        chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
         unreadCount = 0;
         const btn = document.getElementById('jump-btn');
         if (btn) btn.style.display = 'none';
@@ -1565,6 +1754,7 @@
     window.cancelReply = function() {
         replyData = null;
         document.getElementById('reply-preview').style.display = 'none';
+        document.querySelectorAll('.msg-wrapper.reply-highlight').forEach(el => el.classList.remove('reply-highlight'));
     };
 
     // 显示上下文菜单（长按或右键）
@@ -1605,7 +1795,23 @@
             preview.innerHTML = `正在回复：${escapeHtml(replyData.mediaType === 'image' ? '图片' : replyData.mediaType === 'audio' ? '语音' : replyData.content)} <span style="cursor:pointer; color:#07c475;" onclick="window.cancelReply()">✕</span>`;
         });
 
-        addItem('复制', async () => { try { await navigator.clipboard.writeText(contentText); alert('已复制'); } catch (e) { alert('复制失败'); } });
+        addItem('复制', async () => {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(contentText);
+                } else {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = contentText;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                }
+                showToast('已复制', 'success', 1500);
+            } catch (e) { showToast('复制失败', 'error'); }
+        });
 
         if (wrapper && wrapper.dataset.replyId) {
             addItem('定位原文', () => goToMessage(wrapper.dataset.replyId));
@@ -1728,31 +1934,32 @@
     async function recallMessage(messageId) {
         try {
             const msg = messagesCache.find(m => String(m.id) === String(messageId));
-            if (!msg) return alert('无法找到消息或已过期');
+            if (!msg) return showToast('无法找到消息或已过期', 'error');
             const created = new Date(msg.created_at).getTime();
             const now = Date.now();
             const windowMs = 2 * 60 * 1000; // 2 分钟
-            if (now - created > windowMs) return alert('撤回时间已过（仅支持发送后2分钟内撤回）');
+            if (now - created > windowMs) return showToast('撤回时间已过（仅支持发送后2分钟内撤回）', 'error');
             await supabaseClient.from('messages').update({ content: '[已撤回]' }).eq('id', messageId);
             updateMessageInUI({ id: messageId, sender: mySender, content: '[已撤回]', media_url: null, media_type: null });
-        } catch (e) { console.error('recallMessage', e); alert('撤回失败'); }
+        } catch (e) { console.error('recallMessage', e); showToast('撤回失败', 'error'); }
     }
 
     // 搜索消息（升级版：用 modal 显示搜索结果并支持点击跳转）
-    async function searchMessages() {
-        const term = prompt('输入搜索关键字：');
+    window.doSearchModal = async function() {
+        const input = document.getElementById('search-modal-input');
+        const term = input ? input.value.trim() : '';
         if (!term) return;
+        const list = document.querySelector('#search-modal .search-list');
+        list.innerHTML = '<div style="padding:12px; color:#666; text-align:center;">搜索中...</div>';
+
         const results = [];
-        // 本地搜索（最近加载的消息）
         const localMatches = messagesCache.filter(m => (m.content||'').toLowerCase().includes(term.toLowerCase()));
         localMatches.forEach(m => results.push({ source: 'local', id: m.id, sender: m.sender, content: m.content, created_at: m.created_at }));
 
-        // 服务器搜索（补充）
         try {
             const { data, error } = await supabaseClient.from('messages').select('*').ilike('content', `%${term}%`).eq('room_code', currentRoomCode).order('created_at', { ascending: false }).limit(100);
             if (!error && data && data.length) {
                 data.forEach(m => {
-                    // avoid duplicates
                     if (!results.find(r => String(r.id) === String(m.id))) {
                         results.push({ source: 'server', id: m.id, sender: m.sender, content: m.content, created_at: m.created_at });
                     }
@@ -1760,15 +1967,11 @@
             }
         } catch (e) { console.warn('server search failed', e); }
 
-        openSearchModal(results, term);
-    }
-    window.searchMessages = searchMessages;
+        renderSearchResults(results, term);
+    };
 
-    // 打开搜索结果 modal
-    function openSearchModal(results, term) {
-        let modal = document.getElementById('search-modal');
-        if (!modal) return alert('搜索 modal 未找到');
-        const list = modal.querySelector('.search-list');
+    function renderSearchResults(results, term) {
+        const list = document.querySelector('#search-modal .search-list');
         list.innerHTML = '';
         if (!results || results.length === 0) {
             list.innerHTML = `<div style="padding:12px; color:#666;">未找到与 "${term}" 匹配的消息</div>`;
@@ -1782,8 +1985,17 @@
                 list.appendChild(item);
             });
         }
-        modal.style.display = 'flex';
     }
+
+    async function searchMessages() {
+        const modal = document.getElementById('search-modal');
+        const input = document.getElementById('search-modal-input');
+        if (!modal) return showToast('搜索功能暂时不可用', 'error');
+        modal.style.display = 'flex';
+        if (input) { input.value = ''; setTimeout(() => input.focus(), 100); }
+        document.querySelector('#search-modal .search-list').innerHTML = '';
+    }
+    window.searchMessages = searchMessages;
 
     function closeSearchModal() {
         const modal = document.getElementById('search-modal');
@@ -1792,7 +2004,7 @@
 
     // 跳转到指定消息，若未加载尝试上拉加载直到找到或达到上限
     async function goToMessage(messageId, maxAttempts = 12) {
-        if (!messageId) return alert('消息 ID 无效');
+        if (!messageId) return showToast('消息 ID 无效', 'error');
         // 如果元素已在 DOM 中，直接滚动
         let el = document.querySelector(`[data-msg-id="${messageId}"]`);
         if (el) {
@@ -1816,7 +2028,7 @@
             // small delay to allow DOM to update and avoid tight loop
             await new Promise(r => setTimeout(r, 250));
         }
-        alert('未能在历史记录中找到该消息；请继续上滑以加载更多历史');
+        showToast('未能在历史记录中找到该消息，请继续上滑以加载更多历史', 'info');
         return false;
     }
 
@@ -1864,29 +2076,49 @@
         oldestLoadedAt = null;
         noMoreHistory = false;
         localStorage.removeItem('chat_bg_url');
-        alert('本地聊天记录和缓存已清除。');
+        showToast('本地聊天记录和缓存已清除。', 'success');
     };
 
     window.handleBgUpload = async function(event) {
         const file = event.target.files[0];
         if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            showToast('请选择图片文件作为背景。', 'error');
+            event.target.value = '';
+            return;
+        }
         try {
             const reader = new FileReader();
+            reader.onerror = () => showToast('背景图片读取失败。', 'error');
             reader.onloadend = async () => {
-                localStorage.setItem(`chat_bg_url:${currentRoomCode}`, reader.result);
-                localStorage.setItem('chat_bg_url', reader.result);
-                document.getElementById('chat-bg').style.backgroundImage = `url(${reader.result})`;
+                const bgUrl = reader.result;
+                localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bgUrl);
+                localStorage.setItem('chat_bg_url', bgUrl);
+                document.getElementById('chat-bg').style.backgroundImage = `url(${bgUrl})`;
+                try {
+                    await supabaseClient.from('rooms').update({ background_url: bgUrl, updated_at: new Date().toISOString() }).eq('room_code', currentRoomCode);
+                    if (roomSubscription) {
+                        roomSubscription.send({ type: 'broadcast', event: 'bg_update', payload: { room: currentRoomCode, bgUrl } });
+                    }
+                } catch (e) { console.warn('背景同步到服务器失败:', e); }
             };
             reader.readAsDataURL(file);
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error(e); showToast('背景图片上传失败。', 'error'); }
+        event.target.value = '';
     };
 
     window.handleAvatarUpload = function(event) {
         const file = event.target.files[0];
-        if (!file || !file.type.startsWith('image/')) return;
+        if (!file || !file.type.startsWith('image/')) {
+            showToast('请选择图片文件作为头像。', 'error');
+            event.target.value = '';
+            return;
+        }
         const reader = new FileReader();
-        reader.onload = () => {
-            localStorage.setItem(avatarStorageKey(mySender), reader.result);
+        reader.onerror = () => showToast('头像图片读取失败。', 'error');
+        reader.onload = async () => {
+            const avatarUrl = reader.result;
+            localStorage.setItem(avatarStorageKey(mySender), avatarUrl);
             refreshProfileAvatar();
             document.querySelectorAll('.msg-wrapper').forEach((wrapper) => {
                 if (wrapper.dataset.sender !== mySender) return;
@@ -1896,6 +2128,18 @@
                 }
             });
             refreshMessageAvatars();
+            try {
+                await supabaseClient.from('user_profiles').upsert({
+                    user_name: mySender,
+                    room_code: currentRoomCode,
+                    avatar_url: avatarUrl,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_name,room_code' });
+                if (roomSubscription) {
+                    roomSubscription.send({ type: 'broadcast', event: 'avatar_update', payload: { user: mySender, room: currentRoomCode, avatarUrl } });
+                }
+                showToast('头像已更新！', 'success');
+            } catch (e) { console.warn('头像同步到服务器失败:', e); }
         };
         reader.readAsDataURL(file);
         event.target.value = '';
