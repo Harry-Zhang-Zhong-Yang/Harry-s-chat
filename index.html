@@ -618,6 +618,8 @@
     let presenceActive = false;
     let presenceIdleTimer = null;
     const PRESENCE_IDLE_MS = 2 * 60 * 1000;
+    let realtimePolling = null;
+    let lastKnownMessageId = null;
 
     // 分页相关变量
     let isFetchingHistory = false;
@@ -690,7 +692,10 @@
                     initRealtime();
                     hideRoomLoading();
                     Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
-                        if (results.some((result) => result.status === 'rejected')) console.warn('房间后台同步未完成');
+                        if (results.some((result) => result.status === 'rejected')) {
+                            console.warn('房间后台同步未完成，启动轮询备用');
+                            startPolling();
+                        }
                     });
                 }).catch((error) => {
                     console.error('自动进入房间失败:', error);
@@ -878,7 +883,10 @@
             hideRoomLoading();
             initRealtime();
             Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
-                if (results.some((result) => result.status === 'rejected')) console.warn('房间后台同步未完成');
+                if (results.some((result) => result.status === 'rejected')) {
+                    console.warn('房间后台同步未完成，启动轮询备用');
+                    startPolling();
+                }
             });
         } catch (error) {
             console.error('进入房间失败:', error);
@@ -1060,7 +1068,11 @@
         if (roomSubscription) roomSubscription.unsubscribe();
         presenceActive = false;
         realtimeReady = new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('实时连接超时')), 10000);
+            const timeout = setTimeout(() => {
+                console.warn('Realtime 连接超时（10秒），启动轮询备用');
+                startPolling();
+                reject(new Error('实时连接超时'));
+            }, 10000);
             realtimeReadyResolve = () => {
                 clearTimeout(timeout);
                 resolve();
@@ -1176,26 +1188,72 @@
                     });
                 }
             })
-            .on('broadcast', { event: 'bg_update' }, (payload) => {
-                if (isSpeedMode) return;
-                if (payload.payload && payload.payload.bgUrl) {
-                    document.getElementById('chat-bg').style.backgroundImage = `url(${payload.payload.bgUrl})`;
-                    localStorage.setItem(`chat_bg_url:${currentRoomCode}`, payload.payload.bgUrl);
-                    localStorage.setItem('chat_bg_url', payload.payload.bgUrl);
-                }
-            })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
+                    console.log('Realtime 已连接');
                     showConnectionBar('已连接', 'reconnected');
                     setTimeout(() => hideConnectionBar(), 2000);
                     await setPresenceActive(true, false);
                     resetPresenceIdleTimer();
+                    stopPolling();
                     if (realtimeReadyResolve) realtimeReadyResolve();
                 } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    console.warn('Realtime 连接失败:', status, '，启动轮询备用');
                     showConnectionBar('连接断开，正在重连...', '');
+                    startPolling();
                 }
             });
 
+    }
+
+    function startPolling() {
+        if (realtimePolling) return;
+        console.log('启动轮询备用机制');
+        realtimePolling = setInterval(async () => {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('messages')
+                    .select('*')
+                    .eq('room_code', currentRoomCode)
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+                if (error) return;
+                if (data && data.length > 0) {
+                    for (const msg of data.reverse()) {
+                        if (lastKnownMessageId && String(msg.id) === String(lastKnownMessageId)) continue;
+                        const existing = document.querySelector(`.msg-wrapper[data-msg-id="${msg.id}"]`);
+                        if (existing) continue;
+                        if (msg.sender === mySender) {
+                            const existingTemp = findTempMessage(msg.content, msg.created_at);
+                            if (existingTemp) {
+                                if (existingTemp.dataset.sending === 'true') {
+                                    existingTemp.dataset.msgId = String(msg.id);
+                                    existingTemp.dataset.sending = 'false';
+                                    const statusEl = existingTemp.querySelector('.msg-send-status');
+                                    if (statusEl) {
+                                        statusEl.className = 'msg-send-status sent';
+                                        statusEl.innerText = '已发送';
+                                        statusEl.onclick = null;
+                                        setTimeout(() => { if (statusEl.parentNode) statusEl.style.display = 'none'; }, 3000);
+                                    }
+                                }
+                                continue;
+                            }
+                        }
+                        appendMessageToUI(msg.id, msg.sender, msg.content, true, msg.created_at, msg.media_url, msg.media_type);
+                    }
+                    lastKnownMessageId = data[data.length - 1].id;
+                }
+            } catch (e) { /* ignore polling errors */ }
+        }, 3000);
+    }
+
+    function stopPolling() {
+        if (realtimePolling) {
+            clearInterval(realtimePolling);
+            realtimePolling = null;
+            console.log('Realtime 已恢复，停止轮询');
+        }
     }
 
     function updateOnlineCount() {
@@ -2582,6 +2640,7 @@
         if(confirm("确定要退出当前房间吗？")) {
             isLeavingRoom = true;
             if (roomSubscription) { roomSubscription.unsubscribe(); roomSubscription = null; }
+            stopPolling();
             presenceActive = false;
             if (presenceIdleTimer) { clearTimeout(presenceIdleTimer); presenceIdleTimer = null; }
             localStorage.removeItem('chat_last_room');
