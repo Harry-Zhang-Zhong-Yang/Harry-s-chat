@@ -688,25 +688,11 @@
                 document.getElementById('room-title').innerText = currentRoomCode;
                 applyRoomBackground();
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
-                ensureRoomExists().then(() => {
-                    initRealtime();
-                    hideRoomLoading();
-                    Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
-                        if (results.some((result) => result.status === 'rejected')) {
-                            console.warn('房间后台同步未完成，启动轮询备用');
-                            startPolling();
-                        }
-                    });
-                }).catch((error) => {
-                    console.error('自动进入房间失败:', error);
-                    hideRoomLoading();
-                    document.getElementById('login-area').style.display = 'flex';
-                    document.getElementById('chat-container').style.display = 'none';
-                    if (savedToken) {
-                        document.getElementById('username').value = savedToken;
-                        document.getElementById('room-input').focus();
-                    }
-                });
+                hideRoomLoading();
+                initRealtime();
+                startPolling();
+                ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
+                loadHistory(true).catch(e => console.error('loadHistory failed:', e));
             } else {
                 localStorage.removeItem('chat_last_room');
                 localStorage.removeItem('chat_auth_expiry');
@@ -879,15 +865,11 @@
         setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
         try {
-            await ensureRoomExists();
             hideRoomLoading();
             initRealtime();
-            Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
-                if (results.some((result) => result.status === 'rejected')) {
-                    console.warn('房间后台同步未完成，启动轮询备用');
-                    startPolling();
-                }
-            });
+            startPolling();
+            ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
+            loadHistory(true).catch(e => console.error('loadHistory failed:', e));
         } catch (error) {
             console.error('进入房间失败:', error);
             document.getElementById('login-area').style.display = 'flex';
@@ -1075,10 +1057,9 @@
         presenceActive = false;
         realtimeReady = new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
-                console.warn('Realtime 连接超时（10秒），启动轮询备用');
-                startPolling();
+                console.warn('Realtime 连接超时（20秒），继续使用轮询');
                 reject(new Error('实时连接超时'));
-            }, 10000);
+            }, 20000);
             realtimeReadyResolve = () => {
                 clearTimeout(timeout);
                 resolve();
