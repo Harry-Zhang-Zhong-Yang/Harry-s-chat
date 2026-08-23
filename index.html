@@ -974,6 +974,30 @@
             }, (payload) => {
                 const room = payload.new;
                 document.getElementById('room-title').innerText = room.room_name || currentRoomCode;
+                if (room.background_url && room.background_url !== payload.old.background_url) {
+                    document.getElementById('chat-bg').style.backgroundImage = `url(${room.background_url})`;
+                    localStorage.setItem(`chat_bg_url:${currentRoomCode}`, room.background_url);
+                }
+            })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'user_profiles',
+                filter: `room_code=eq.${currentRoomCode}`
+            }, (payload) => {
+                if (payload.eventType === 'DELETE') return;
+                const profile = payload.new;
+                if (profile && profile.user_name && profile.avatar_url && profile.user_name !== mySender) {
+                    localStorage.setItem(avatarStorageKey(profile.user_name), profile.avatar_url);
+                    const safeUser = profile.user_name.replace(/"/g, '\\"');
+                    document.querySelectorAll(`.message-avatar[data-sender="${safeUser}"]`).forEach(avatar => {
+                        if (avatar.tagName === 'SPAN') {
+                            avatar.outerHTML = `<img class="message-avatar" src="${escapeHtml(profile.avatar_url)}" alt="${escapeHtml(profile.user_name)}的头像" data-sender="${escapeHtml(profile.user_name)}">`;
+                        } else {
+                            avatar.src = profile.avatar_url;
+                        }
+                    });
+                }
             })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -2090,16 +2114,14 @@
         try {
             const reader = new FileReader();
             reader.onerror = () => showToast('背景图片读取失败。', 'error');
-            reader.onloadend = async () => {
+            reader.onload = async () => {
                 const bgUrl = reader.result;
                 localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bgUrl);
                 localStorage.setItem('chat_bg_url', bgUrl);
                 document.getElementById('chat-bg').style.backgroundImage = `url(${bgUrl})`;
                 try {
                     await supabaseClient.from('rooms').update({ background_url: bgUrl, updated_at: new Date().toISOString() }).eq('room_code', currentRoomCode);
-                    if (roomSubscription) {
-                        roomSubscription.send({ type: 'broadcast', event: 'bg_update', payload: { room: currentRoomCode, bgUrl } });
-                    }
+                    showToast('背景已更新！', 'success');
                 } catch (e) { console.warn('背景同步到服务器失败:', e); }
             };
             reader.readAsDataURL(file);
