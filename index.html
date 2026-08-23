@@ -636,7 +636,6 @@
     let isLeavingRoom = false;
     let offlineNoticeElement = null;
     let offlineHadMessages = false;
-    let joinNoticeShown = false;
 
     function showRoomLoading() {
         document.getElementById('login-area').style.display = 'none';
@@ -646,26 +645,6 @@
 
     function hideRoomLoading() {
         document.getElementById('room-loading').classList.add('hidden');
-    }
-
-    function appendJoinNoticeOnce() {
-        if (joinNoticeShown) return;
-        joinNoticeShown = true;
-        appendSystemMessage(`${mySender} 加入了房间`);
-        try {
-            supabaseClient.from('join_logs').insert([{
-                user_name: mySender,
-                room_code: currentRoomCode,
-                joined_at: beijingISOString()
-            }]).then(({ error }) => { if (error) console.warn('加入日志记录失败:', error); });
-        } catch (e) { console.warn('加入日志记录失败:', e); }
-        if (roomSubscription) {
-            realtimeReady.then(() => roomSubscription.send({
-                type: 'broadcast',
-                event: 'presence_notice',
-                payload: { user: mySender, room: currentRoomCode, text: `${mySender} 加入了房间` }
-            })).catch((error) => console.warn('发送加入通知失败:', error));
-        }
     }
 
     window.onload = () => {
@@ -705,7 +684,6 @@
             if (now < parseInt(expiry)) {
                 currentRoomCode = savedRoom;
                 mySender = savedToken; 
-                joinNoticeShown = false;
                 showRoomLoading();
                 document.getElementById('room-title').innerText = currentRoomCode;
                 applyRoomBackground();
@@ -715,7 +693,6 @@
                     hideRoomLoading();
                     Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
                         if (results.some((result) => result.status === 'rejected')) console.warn('房间后台同步未完成');
-                        appendJoinNoticeOnce();
                     });
                 }).catch((error) => {
                     console.error('自动进入房间失败:', error);
@@ -872,7 +849,6 @@
     window.joinRoom = async function() {
         const nameInput = document.getElementById('username').value.trim();
         currentRoomCode = document.getElementById('room-input').value.trim();
-        joinNoticeShown = false;
         const isAutoLogin = document.getElementById('auto-login-check').checked;
         const joinBtn = document.getElementById('join-btn');
         
@@ -905,7 +881,6 @@
             initRealtime();
             Promise.allSettled([realtimeReady, loadHistory(true)]).then((results) => {
                 if (results.some((result) => result.status === 'rejected')) console.warn('房间后台同步未完成');
-                appendJoinNoticeOnce();
             });
         } catch (error) {
             console.error('进入房间失败:', error);
@@ -1259,7 +1234,6 @@
             updateOnlineCount();
             return;
         }
-        const wasActive = presenceActive;
         presenceActive = active;
         if (active) {
             await roomSubscription.track({ user: mySender, room: currentRoomCode });
@@ -1268,26 +1242,20 @@
         }
         updateOnlineCount();
         if (announce) {
-            const text = active
-                ? (wasActive ? `${mySender} 重新在线` : `${mySender} 加入了房间`)
-                : `${mySender} 暂时离线`;
-            await roomSubscription.send({
-                type: 'broadcast',
-                event: 'presence_notice',
-                payload: { user: mySender, room: currentRoomCode, text }
-            });
-            if (active) {
-                if (offlineNoticeElement && offlineHadMessages) appendSystemMessage(text);
-                else if (offlineNoticeElement) {
-                    offlineNoticeElement.remove();
-                    offlineNoticeElement = null;
-                } else {
-                    appendSystemMessage(text);
-                }
-                offlineNoticeElement = null;
+            if (!active) {
+                const text = `${mySender} 暂时离线`;
+                await roomSubscription.send({
+                    type: 'broadcast',
+                    event: 'presence_notice',
+                    payload: { user: mySender, room: currentRoomCode, text }
+                });
+                offlineNoticeElement = appendSystemMessage('你已暂时离线');
                 offlineHadMessages = false;
             } else {
-                offlineNoticeElement = appendSystemMessage('你已暂时离线');
+                if (offlineNoticeElement) {
+                    offlineNoticeElement.remove();
+                    offlineNoticeElement = null;
+                }
                 offlineHadMessages = false;
             }
         }
@@ -2477,6 +2445,14 @@
         isSpeedMode = toggle.checked;
         localStorage.setItem('chat_speed_mode', isSpeedMode ? '1' : '0');
         if (isSpeedMode) {
+            document.getElementById('chat-bg').style.backgroundImage = '';
+            document.querySelectorAll('.message-avatar[data-sender]').forEach(avatar => {
+                const sender = avatar.dataset.sender;
+                if (avatar.tagName === 'IMG') {
+                    avatar.outerHTML = avatarHtml(sender);
+                }
+            });
+            refreshMessageAvatars();
             showToast('极速模式已开启，优先保证消息收发', 'success', 2000);
         } else {
             showToast('已切换为正常模式，将加载头像和背景', 'info', 2000);
