@@ -1105,7 +1105,6 @@
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
                 if (!presenceActive && payload.new.sender !== mySender) offlineHadMessages = true;
-                // Check if message already exists in DOM (avoid duplicates)
                 const existing = document.querySelector(`.msg-wrapper[data-msg-id="${payload.new.id}"]`);
                 if (existing) return;
                 if (payload.new.sender === mySender) {
@@ -1117,7 +1116,6 @@
                         if (idx >= 0) messagesCache[idx].id = payload.new.id;
                         existingTemp.style.opacity = '1';
                         existingTemp.title = '';
-                        // Update the status to "已发送"
                         const statusEl = existingTemp.querySelector('.msg-send-status');
                         if (statusEl) {
                             statusEl.className = 'msg-send-status sent';
@@ -1127,19 +1125,9 @@
                         }
                         return;
                     }
-                    // Also check if we already have a non-temp version of this message
                     if (existingTemp && existingTemp.dataset.sending === 'false') return;
                 }
                 appendMessageToUI(payload.new.id, payload.new.sender, payload.new.content, true, payload.new.created_at, payload.new.media_url, payload.new.media_type);
-            })
-            .on('postgres_changes', {
-                event: 'UPDATE',
-                schema: 'public',
-                table: 'messages',
-                filter: `room_code=eq.${currentRoomCode}`
-            }, (payload) => {
-                // Update message UI when recalled
-                updateMessageInUI(payload.new);
             })
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -1177,7 +1165,7 @@
             })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    console.log('Realtime 已连接（辅助通道）');
+                    console.log('Realtime 已连接');
                     showConnectionBar('已连接', 'reconnected');
                     setTimeout(() => hideConnectionBar(), 2000);
                     await setPresenceActive(true, false);
@@ -1204,9 +1192,18 @@
                 if (error) return;
                 if (data && data.length > 0) {
                     for (const msg of data.reverse()) {
-                        if (lastKnownMessageId && String(msg.id) === String(lastKnownMessageId)) continue;
                         const existing = document.querySelector(`.msg-wrapper[data-msg-id="${msg.id}"]`);
+                        if (existing && (msg.is_recalled || msg.content === '[已撤回]')) {
+                            const contentEl = existing.querySelector('.msg-content');
+                            if (contentEl) {
+                                contentEl.innerHTML = '<span style="opacity:0.5;font-style:italic;">此消息已被撤回</span>';
+                            }
+                            existing.querySelector('.msg-send-status')?.remove();
+                            existing.querySelector('.msg-actions')?.remove();
+                            continue;
+                        }
                         if (existing) continue;
+                        if (lastKnownMessageId && String(msg.id) === String(lastKnownMessageId)) continue;
                         if (msg.sender === mySender) {
                             const existingTemp = findTempMessage(msg.content, msg.created_at);
                             if (existingTemp) {
