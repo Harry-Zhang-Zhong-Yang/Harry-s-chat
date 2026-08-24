@@ -393,6 +393,20 @@
         </div>
     </div>
 
+    <div id="room-name-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:9500; background:rgba(0,0,0,0.35);" onclick="if(event.target===this)window.closeRoomNameModal()">
+        <div style="background:white; width:90%; max-width:400px; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong>修改房间名称</strong>
+                <button onclick="window.closeRoomNameModal()" style="border:none; background:none; font-size:20px; cursor:pointer;">&times;</button>
+            </div>
+            <input id="room-name-modal-input" type="text" placeholder="输入新的房间名称..." style="flex:1; padding:10px 12px; border:1px solid #ddd; border-radius:8px; font-size:14px;" onkeydown="if(event.key==='Enter')window.confirmRoomName()">
+            <div style="display:flex; gap:8px; justify-content:flex-end;">
+                <button onclick="window.closeRoomNameModal()" style="padding:8px 20px; border:1px solid #ddd; border-radius:8px; background:#f5f5f5; cursor:pointer; font-size:14px;">取消</button>
+                <button onclick="window.confirmRoomName()" style="padding:8px 20px; background:#07c475; color:white; border:none; border-radius:8px; cursor:pointer; font-size:14px;">确认</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 搜索结果 Modal -->
     <div id="search-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:9000; background:rgba(0,0,0,0.35);">
         <div style="background:white; width:95%; max-width:720px; max-height:80vh; border-radius:12px; padding:12px; display:flex; flex-direction:column;">
@@ -828,6 +842,11 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                const roomNameModal = document.getElementById('room-name-modal');
+                if (roomNameModal && roomNameModal.style.display === 'flex') {
+                    roomNameModal.style.display = 'none';
+                    return;
+                }
                 const lightbox = document.getElementById('image-lightbox');
                 if (lightbox && lightbox.classList.contains('visible')) {
                     closeImageLightbox();
@@ -862,6 +881,8 @@
         window.openImageLightbox = openImageLightbox;
         window.closeImageLightbox = closeImageLightbox;
 
+        localStorage.removeItem('chat_bg_url');
+
         const savedColor = localStorage.getItem('chat_theme_color');
         if (savedColor) {
             document.documentElement.style.setProperty('--bubble-color', savedColor);
@@ -872,7 +893,7 @@
         const speedToggle = document.getElementById('speed-mode-toggle');
         if (speedToggle) speedToggle.checked = isSpeedMode;
 
-        const savedBg = localStorage.getItem(`chat_bg_url:${savedRoom || ''}`) || localStorage.getItem('chat_bg_url');
+        const savedBg = localStorage.getItem(`chat_bg_url:${savedRoom || ''}`);
         if (savedBg && !isSpeedMode) {
             document.getElementById('chat-bg').style.backgroundImage = `url(${savedBg})`;
         }
@@ -1001,7 +1022,7 @@
         const background = document.getElementById('chat-bg');
         if (!background) return;
         if (isSpeedMode) { background.style.backgroundImage = ''; return; }
-        const savedBg = localStorage.getItem(`chat_bg_url:${currentRoomCode}`) || localStorage.getItem('chat_bg_url');
+        const savedBg = localStorage.getItem(`chat_bg_url:${currentRoomCode}`);
         if (savedBg) background.style.backgroundImage = `url(${savedBg})`;
         try {
             const { data: room } = await supabaseClient.from('rooms').select('background_url').eq('room_code', currentRoomCode).single();
@@ -1177,6 +1198,12 @@
                 if (bg.room === currentRoomCode && bg.bgUrl) {
                     document.getElementById('chat-bg').style.backgroundImage = `url(${bg.bgUrl})`;
                     localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bg.bgUrl);
+                }
+            })
+            .on('broadcast', { event: 'room_name_update' }, (payload) => {
+                const data = payload.payload || {};
+                if (data.room === currentRoomCode && data.roomName) {
+                    document.getElementById('room-title').innerText = data.roomName;
                 }
             })
             .on('broadcast', { event: 'avatar_update' }, (payload) => {
@@ -2594,10 +2621,19 @@
     };
 
     window.updateRoomName = async function() {
-        var newName = prompt('输入新的房间名称：');
-        if (!newName) return;
-        newName = newName.trim();
+        document.getElementById('room-name-modal-input').value = '';
+        document.getElementById('room-name-modal').style.display = 'flex';
+        setTimeout(() => document.getElementById('room-name-modal-input').focus(), 100);
+    };
+
+    window.closeRoomNameModal = function() {
+        document.getElementById('room-name-modal').style.display = 'none';
+    };
+
+    window.confirmRoomName = async function() {
+        var newName = document.getElementById('room-name-modal-input').value.trim();
         if (!newName) return showToast('房间名称不能为空', 'error');
+        document.getElementById('room-name-modal').style.display = 'none';
         try {
             var { error } = await supabaseClient
                 .from('rooms')
@@ -2605,6 +2641,9 @@
                 .eq('room_code', currentRoomCode);
             if (error) throw error;
             document.getElementById('room-title').innerText = newName;
+            if (roomSubscription) {
+                roomSubscription.send({ type: 'broadcast', event: 'room_name_update', payload: { room: currentRoomCode, roomName: newName } });
+            }
             window.toggleSettings();
             showToast('房间名称已更新！', 'success');
         } catch (e) {
@@ -2631,11 +2670,8 @@
         unreadCount = 0;
         const jumpBtn = document.getElementById('jump-btn');
         if (jumpBtn) jumpBtn.style.display = 'none';
-        localStorage.removeItem('chat_bg_url');
-        if (currentRoomCode) {
-            localStorage.removeItem('chat_bg_url:' + currentRoomCode);
-            document.getElementById('chat-bg').style.backgroundImage = '';
-        }
+        localStorage.removeItem('chat_bg_url:' + currentRoomCode);
+        document.getElementById('chat-bg').style.backgroundImage = '';
         showToast('本地聊天记录和缓存已清除。', 'success');
     };
 
@@ -2660,7 +2696,6 @@
             const { data: publicData } = supabaseClient.storage.from('chat_media').getPublicUrl(filePath);
             const bgUrl = publicData.publicUrl;
             localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bgUrl);
-            localStorage.setItem('chat_bg_url', bgUrl);
             if (!isSpeedMode) {
                 document.getElementById('chat-bg').style.backgroundImage = `url(${bgUrl})`;
             }
