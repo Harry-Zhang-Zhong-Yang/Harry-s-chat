@@ -20,7 +20,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
+            background-color: #e8ecf1;
             height: 100vh; height: 100dvh; width: 100vw;
             display: flex; flex-direction: column; overflow: hidden;
         }
@@ -55,6 +55,7 @@
             display: flex; flex-direction: column; max-width: 920px; margin: 0 auto;
             width: 100%; height: 100vh; height: 100dvh; background: #fff; position: relative;
             padding-bottom: env(safe-area-inset-bottom);
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 0 0 40px rgba(0,0,0,0.03);
         }
 
             /* 跳到最新按钮 */
@@ -63,45 +64,56 @@
                     width: auto; min-width: 42px; height: 28px; padding: 0 9px; border-radius: 14px;
                     background: rgba(255,255,255,.96); color: var(--btn-color); border: 1px solid #dbe5ff;
                     box-shadow: 0 4px 12px rgba(32,33,36,0.12); cursor: pointer; display: none; font-size: 11px; font-weight: 600;
+                    transition: transform 0.15s, opacity 0.15s;
             }
+            #jump-btn:active { transform: scale(0.92); }
 
         #chat-bg {
             position: absolute; inset: 0; z-index: 0;
+            background: linear-gradient(180deg, #f0f4f8 0%, #e2e8f0 100%);
             background-size: cover; background-position: center;
             transition: background-image 0.5s ease;
         }
-        #room-loading { position:absolute; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; background:#f7f8fa; color:#69707a; font-size:14px; }
+        #room-loading { position:absolute; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:#f7f8fa; color:#69707a; font-size:14px; }
         #room-loading.hidden { display:none; }
+        #room-loading .spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: var(--btn-color); border-radius: 50%; animation: spin 0.7s linear infinite; }
         .loading-spinner { width:28px; height:28px; border:3px solid #dce3ec; border-top-color:var(--btn-color); border-radius:50%; animation:spin .8s linear infinite; }
-        @keyframes spin { to { transform:rotate(360deg); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         #nav-bar { 
             min-height: clamp(52px, 7vh, 62px); height: calc(clamp(52px, 7vh, 62px) + env(safe-area-inset-top)); background: rgba(255,255,255,0.94); backdrop-filter: blur(10px);
             border-bottom: 1px solid #eee; display: flex; align-items: center; 
             padding: env(safe-area-inset-top) clamp(12px, 2vw, 18px) 0; justify-content: space-between; z-index: 10; flex: 0 0 auto;
         }
-        #back-btn { font-size: clamp(21px, 2.4vw, 24px); cursor: pointer; padding: 5px; }
+        #back-btn { font-size: clamp(21px, 2.4vw, 24px); cursor: pointer; padding: 5px; transition: transform 0.12s; user-select: none; }
+        #back-btn:active { transform: scale(0.88); }
         #room-title { position:absolute; left:50%; transform:translateX(-50%); max-width:45%; font-weight: 600; font-size: clamp(14px, 1.6vw, 16px); color: var(--text-main); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .nav-icon { width: 34px; height: 34px; padding: 0; margin: 0; background: transparent; color: #69707a; border: 0; border-radius: 50%; font-size: 24px; font-weight: 400; line-height: 1; }
+        .nav-icon { width: 34px; height: 34px; padding: 0; margin: 0; background: transparent; color: #69707a; border: 0; border-radius: 50%; font-size: 24px; font-weight: 400; line-height: 1; cursor: pointer; transition: background 0.12s, color 0.12s, transform 0.12s; }
         .nav-icon:hover { background: #f2f4f7; color: #202124; }
+        .nav-icon:active { transform: scale(0.92); background: #e8eaed; }
         .online-count { width: auto; padding: 0 4px; margin: 0; background: transparent; color: #8a9099; border: 0; font-size: 12px; font-weight: 400; white-space: nowrap; }
 
         /* --- 聊天框内容层 --- */
         #chat-box { 
-            flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 22px 20px; display: flex;
+            flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 22px 20px 28px; display: flex;
             flex-direction: column; gap: 10px;
             background-color: transparent; 
             z-index: 1;
-            padding-bottom: 20px;
             touch-action: pan-y;
             position: relative;
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: #d0d5dd transparent;
         }
+        #chat-box::-webkit-scrollbar { width: 5px; }
+        #chat-box::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 10px; }
         #chat-box > *:last-child { margin-bottom: 0; }
-        #jump-bottom { position: fixed; bottom: 90px; right: 20px; z-index: 30; width: 40px; height: 40px; border-radius: 50%; background: var(--bubble-color); color: white; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: transform 0.2s, opacity 0.2s; }
+        #jump-bottom { position: fixed; bottom: 90px; right: 20px; z-index: 30; width: 40px; height: 40px; border-radius: 50%; background: var(--bubble-color); color: white; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: transform 0.2s, opacity 0.2s, background 0.2s; }
+        #jump-bottom:hover { background: #1d4ed8; }
         #jump-bottom:active { transform: scale(0.9); }
         #jump-bottom .badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 9px; background: #ef4444; color: white; font-size: 11px; display: flex; align-items: center; justify-content: center; padding: 0 4px; line-height: 1; }
 
-        .msg-wrapper { max-width: min(75%, 620px); position: relative; animation: msgIn 0.2s ease-out; }
+        .msg-wrapper { max-width: min(75%, 620px); position: relative; animation: msgIn 0.2s ease-out; will-change: transform, opacity; }
         .message-row { display:flex; align-items:flex-start; gap:8px; }
         .right .message-row { flex-direction:row-reverse; }
         .message-avatar { width:30px; height:30px; flex:0 0 30px; border-radius:50%; object-fit:cover; background:#dbe5f5; color:#52709d; display:grid; place-items:center; font-size:12px; font-weight:600; overflow:hidden; }
@@ -117,21 +129,22 @@
         .right { align-self: flex-end; text-align: right; }
 
         .msg-content { 
-            width:fit-content; max-width:100%; padding: clamp(8px, 1.1vw, 10px) clamp(10px, 1.4vw, 13px); border-radius: 14px; font-size: clamp(14px, 1.45vw, 15px); line-height: 1.55;
+            width:fit-content; max-width:100%; padding: clamp(8px, 1.1vw, 10px) clamp(10px, 1.4vw, 13px) 18px; border-radius: 14px; font-size: clamp(14px, 1.45vw, 15px); line-height: 1.55;
             position: relative; box-shadow: none;
             display: flex; flex-direction: column; gap: 6px;
-            background: #fff; transition: background 0.12s ease;
+            background: #fff; transition: background 0.12s ease, box-shadow 0.12s ease;
         }
+        .msg-wrapper:hover .msg-content { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
         .left:hover .msg-content { background: #f8fafc; }
-        .right:hover .msg-content { background: var(--bubble-color); }
+        .right:hover .msg-content { background: #cfe2ff; }
 
-        .msg-send-status { font-size: 10px; opacity: 0.65; text-align: right; margin-top: 1px; line-height: 1; display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+        .msg-send-status { font-size: 10px; opacity: 0.65; text-align: right; margin-top: 2px; line-height: 1; height: 14px; display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
         .msg-send-status.sending { animation: pulse 1.2s ease-in-out infinite; }
         .msg-send-status.failed { color: #dc3545; opacity: 1; cursor: pointer; }
         .msg-send-status.failed:hover { text-decoration: underline; }
-        .msg-meta { font-size: 10px; opacity: 0; transition: opacity 0.2s; text-align: right; margin-top: 2px; color: inherit; }
+        .msg-meta { position: absolute; bottom: 2px; right: 10px; font-size: 10px; opacity: 0; transition: opacity 0.2s; color: inherit; white-space: nowrap; }
         .msg-content:hover .msg-meta { opacity: 0.6; }
-        .left .msg-meta { text-align: left; }
+        .left .msg-meta { right: auto; left: 10px; }
 
         .msg-img-placeholder { width: 100%; max-width: 320px; height: 180px; border-radius: 8px; background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%); background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite; margin-top: 5px; display: block; }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
@@ -140,8 +153,8 @@
         .right .msg-img-placeholder { margin-left: auto; }
         .left .msg-img-placeholder { margin-right: auto; }
 
-        #connection-bar { position: absolute; top: calc(clamp(52px, 7vh, 62px) + env(safe-area-inset-top)); left: 0; right: 0; z-index: 50; height: 0; overflow: hidden; background: #fff3cd; color: #856404; font-size: 12px; text-align: center; line-height: 28px; transition: height 0.3s ease; }
-        #connection-bar.visible { height: 28px; }
+        #connection-bar { position: absolute; top: calc(clamp(52px, 7vh, 62px) + env(safe-area-inset-top)); left: 0; right: 0; z-index: 50; height: 0; overflow: hidden; background: #fff3cd; color: #856404; font-size: 12px; text-align: center; line-height: 28px; transition: height 0.25s ease; opacity: 0; }
+        #connection-bar.visible { height: 28px; opacity: 1; }
         #connection-bar.reconnected { background: #d4edda; color: #155724; }
 
         #offline-overlay { position:absolute; top:calc(62px + env(safe-area-inset-top)); right:0; bottom:72px; left:0; z-index:4; display:none; align-items:center; justify-content:center; color:rgba(32,33,36,0.72); font-size:13px; background:rgba(255,255,255,0.28); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); pointer-events:auto; cursor: pointer; }
@@ -158,17 +171,20 @@
         .msg-wrapper.media-only .reply-quote { margin-bottom: 4px; }
 
         @media (max-width: 600px) {
+            #chat-box { padding: 16px 12px 20px; }
+            .msg-wrapper { max-width: 88%; }
             #nav-bar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+            #input-area { padding-left: 10px; padding-right: 10px; }
             #back-btn { flex: 0 0 40px; min-width: 40px; font-size: 27px; line-height: 1; }
             #room-title { max-width:42%; padding: 0 4px; }
             #nav-bar > div { flex: 0 0 auto; gap: 4px !important; }
             .online-count { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
-            #chat-box { padding-left: 10px; padding-right: 10px; }
-            #input-area { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+            .context-menu { min-width: 200px; right: 8px !important; left: auto !important; }
+            .context-menu button { font-size:16px; padding:12px 14px; }
         }
 
         .sender-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; display: block; opacity: 0.72; }
-        .message-time-divider { align-self: center; color: #9aa0a8; font-size: 11px; line-height: 1; padding: 5px 9px; margin: 7px 0 3px; }
+        .message-time-divider { align-self: center; color: #9aa0a8; font-size: 11px; line-height: 1; padding: 5px 12px; margin: 8px 0 4px; background: rgba(255,255,255,0.7); border-radius: 10px; backdrop-filter: blur(4px); }
 
         #reply-preview {
             height: auto; min-height: 40px; display: flex; align-items: center; justify-content: space-between;
@@ -179,7 +195,8 @@
 
         #input-area { position:relative; padding: clamp(7px, 1.4vw, 11px) clamp(10px, 2vw, 16px) calc(clamp(7px, 1.4vw, 11px) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; flex: 0 0 auto; }
         .input-wrapper { display: flex; align-items: center; gap: clamp(5px, 1vw, 8px); width: 100%; }
-        #message-input { flex: 1; padding: clamp(9px, 1.3vw, 11px) clamp(11px, 1.8vw, 15px); border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: clamp(14px, 1.6vw, 16px); resize: none; overflow-y:auto; max-height: 150px; background: #fafbfc; }
+        #message-input { flex: 1; padding: clamp(9px, 1.3vw, 11px) clamp(11px, 1.8vw, 15px); border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: clamp(14px, 1.6vw, 16px); resize: none; overflow-y:auto; max-height: 150px; background: #fafbfc; transition: border-color 0.2s, box-shadow 0.2s; }
+        #message-input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
         #message-input::-webkit-scrollbar { width:0; height:0; }
         #message-input { scrollbar-width:none; }
         
@@ -189,6 +206,7 @@
             font-size: clamp(18px, 2.2vw, 22px); cursor: pointer; transition: all 0.2s; border: none; margin-top: 0;
             flex-shrink: 0;
         }
+        .action-btn:hover { background: #e4e6eb; }
         .action-btn:active { transform: scale(0.9); background: #ddd; }
         #voice-btn { user-select:none; touch-action:none; }
         #voice-btn.recording { background:#fee2e2; color:#dc2626; }
@@ -237,11 +255,12 @@
 
         /* --- 设置弹窗 --- */
         #settings-modal {
-            position: fixed; inset: 0; background: rgba(20,25,35,0.42); display: none;
+            position: fixed; inset: 0; background: rgba(20,25,35,0.5); display: none;
             align-items: flex-start; justify-content: center; z-index: 8000; backdrop-filter: blur(3px);
             padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
-            overflow-y: auto;
+            overflow-y: auto; animation: fadeIn 0.2s ease;
         }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .modal-content { 
             background: white; padding: 18px 20px; border-radius: 16px; width: min(100%, 450px);
             max-height: calc(100dvh - 24px); overflow-y: auto; position: relative; box-shadow: 0 16px 45px rgba(20,25,35,0.16);
@@ -287,17 +306,6 @@
         .context-menu button:hover, .context-menu button:focus-visible { background:#f5f7fb; color:#111827; outline:none; }
         .context-menu .hint { font-size:12px; color:#888; padding:6px 10px; }
 
-        /* Mobile adjustments */
-        @media (max-width: 600px) {
-            .context-menu { min-width: 200px; right: 8px !important; left: auto !important; }
-            .context-menu button { font-size:16px; padding:12px 14px; }
-            #chat-box { padding: 16px 12px 20px; }
-            .msg-wrapper { max-width: 88%; }
-            #nav-bar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
-            #input-area { padding-left: 10px; padding-right: 10px; }
-            .msg-wrapper { max-width:92%; }
-        }
-
         /* Toast 通知 */
         #toast-container {
             position: fixed; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
@@ -307,11 +315,12 @@
             padding: 10px 18px; border-radius: 10px; font-size: 14px; color: #fff; pointer-events: auto;
             box-shadow: 0 6px 20px rgba(0,0,0,0.18); animation: toastIn 0.3s ease-out;
             text-align: center; white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis;
+            font-weight: 500; letter-spacing: 0.01em;
         }
         .toast.info { background: rgba(30,34,42,0.88); }
-        .toast.success { background: #20c997; }
-        .toast.error { background: #dc3545; }
-        .toast.out { animation: toastOut 0.3s ease-in forwards; }
+        .toast.success { background: #16a34a; }
+        .toast.error { background: #dc2626; }
+        .toast.out { animation: toastOut 0.25s ease-in forwards; }
         @keyframes toastIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); } }
 
@@ -494,10 +503,15 @@
             container.id = 'toast-container';
             document.body.appendChild(container);
         }
+        if (container.children.length >= 3) return;
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         toast.innerText = message;
         container.appendChild(toast);
+        if (duration === 0) {
+            setTimeout(() => toast.remove(), 5000);
+            return;
+        }
         setTimeout(() => {
             toast.classList.add('out');
             toast.addEventListener('animationend', () => toast.remove());
@@ -513,7 +527,15 @@
     }
 
     async function registerPushWorker() {
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('当前浏览器不支持后台通知');
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            const ua = navigator.userAgent || '';
+            const isIOS = /iPhone|iPad|iPod/.test(ua);
+            const isSafari = /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua);
+            if (isIOS && isSafari) {
+                throw new Error('iOS Safari 需要将网站添加到主屏幕（PWA模式）才能使用后台通知，或使用最新 iOS 16.4+ 系统');
+            }
+            throw new Error('当前浏览器不支持后台通知，请使用最新版 Chrome 或 Edge');
+        }
         const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
         await registration.update();
         if (!registration.active) {
@@ -553,24 +575,35 @@
         }
         try {
             if (!('Notification' in window)) {
+                const ua = navigator.userAgent || '';
+                const isIOS = /iPhone|iPad|iPod/.test(ua);
+                const isSafari = /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua);
+                if (isIOS && isSafari) {
+                    throw new Error('iOS Safari 需将网站添加到主屏幕（PWA）才能使用后台通知');
+                }
                 throw new Error('当前浏览器不支持网页通知，请使用最新版 Chrome 或 Edge，并通过 HTTPS 访问');
             }
             const permission = await window.Notification.requestPermission();
-            if (permission !== 'granted') throw new Error('通知权限未允许');
+            if (permission !== 'granted') throw new Error('通知权限未允许，请在浏览器设置中开启');
             const registration = await registerPushWorker();
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
                 applicationServerKey: urlBase64ToUint8Array(PUSH_PUBLIC_KEY)
             });
+            const subJson = subscription.toJSON();
             const { error } = await supabaseClient.from('push_subscriptions').upsert([{
                 room_code: currentRoomCode,
                 user_name: mySender,
                 endpoint: subscription.endpoint,
-                subscription: subscription.toJSON(),
+                subscription: subJson,
+                browser: navigator.userAgent.slice(0, 200),
                 updated_at: beijingISOString()
             }], { onConflict: 'endpoint' });
             if (error) throw error;
-            setPushStatus('后台通知已开启', true);
+            localStorage.setItem('push_sub_endpoint', subscription.endpoint);
+            setPushStatus('后台通知已开启 ✓', true);
+            setTimeout(() => setPushStatus('', false), 3000);
+            listenForSubscriptionChange();
         } catch (error) {
             console.error('开启后台通知失败:', error);
             setPushStatus(error.message || '开启失败，请检查浏览器权限', true);
@@ -578,6 +611,29 @@
             if (toggle) toggle.checked = false;
         }
     };
+
+    function listenForSubscriptionChange() {
+        if (!('serviceWorker' in navigator)) return;
+        navigator.serviceWorker.addEventListener('message', async (event) => {
+            if (event.data && event.data.type === 'PUSH_SUBSCRIPTION_CHANGE') {
+                console.log('[push] 订阅已变更，尝试重新订阅');
+                const registration = await navigator.serviceWorker.ready;
+                const sub = await registration.pushManager.getSubscription();
+                if (sub) {
+                    const subJson = sub.toJSON();
+                    await supabaseClient.from('push_subscriptions').upsert([{
+                        room_code: currentRoomCode || '',
+                        user_name: mySender || '',
+                        endpoint: sub.endpoint,
+                        subscription: subJson,
+                        browser: navigator.userAgent.slice(0, 200),
+                        updated_at: beijingISOString()
+                    }], { onConflict: 'endpoint' });
+                    localStorage.setItem('push_sub_endpoint', sub.endpoint);
+                }
+            }
+        });
+    }
 
     window.togglePushNotifications = async function(toggle) {
         if (toggle.checked) {
@@ -591,10 +647,11 @@
                 await supabaseClient.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
                 await subscription.unsubscribe();
             }
+            localStorage.removeItem('push_sub_endpoint');
             setPushStatus('', false);
         } catch (error) {
             toggle.checked = true;
-            setPushStatus('关闭通知失败', true);
+            setPushStatus('关闭通知失败: ' + (error.message || '未知错误'), true);
         }
     };
 
@@ -635,7 +692,6 @@
     let unreadCount = 0;
     let isLeavingRoom = false;
     let offlineNoticeElement = null;
-    let offlineHadMessages = false;
 
     function showRoomLoading() {
         document.getElementById('login-area').style.display = 'none';
@@ -647,7 +703,48 @@
         document.getElementById('room-loading').classList.add('hidden');
     }
 
+    function generateNotificationIcon(size) {
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#2563eb';
+            const r = size * 0.22;
+            ctx.beginPath();
+            ctx.moveTo(r, 0);
+            ctx.lineTo(size - r, 0);
+            ctx.quadraticCurveTo(size, 0, size, r);
+            ctx.lineTo(size, size - r);
+            ctx.quadraticCurveTo(size, size, size - r, size);
+            ctx.lineTo(r, size);
+            ctx.quadraticCurveTo(0, size, 0, size - r);
+            ctx.lineTo(0, r);
+            ctx.quadraticCurveTo(0, 0, r, 0);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${size * 0.48}px -apple-system, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('💬', size / 2, size / 2);
+            return canvas.toDataURL('image/png');
+        } catch (e) {
+            return null;
+        }
+    }
+
+    const NOTIFICATION_ICON = generateNotificationIcon(192);
+
     window.onload = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomFromUrl = urlParams.get('room');
+        if (roomFromUrl) {
+            document.getElementById('room-input').value = roomFromUrl;
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState({}, '', window.location.pathname);
+            }
+        }
+
         const voiceButton = document.getElementById('voice-btn');
         const messageInput = document.getElementById('message-input');
         const isMobile = () => window.matchMedia('(max-width: 600px), (pointer: coarse)').matches;
@@ -904,18 +1001,15 @@
         const background = document.getElementById('chat-bg');
         if (!background) return;
         if (isSpeedMode) { background.style.backgroundImage = ''; return; }
+        const savedBg = localStorage.getItem(`chat_bg_url:${currentRoomCode}`) || localStorage.getItem('chat_bg_url');
+        if (savedBg) background.style.backgroundImage = `url(${savedBg})`;
         try {
             const { data: room } = await supabaseClient.from('rooms').select('background_url').eq('room_code', currentRoomCode).single();
             if (room && room.background_url) {
                 background.style.backgroundImage = `url(${room.background_url})`;
                 localStorage.setItem(`chat_bg_url:${currentRoomCode}`, room.background_url);
-                return;
             }
-        } catch (e) { /* ignore, fallback to cache */ }
-        const savedBg = localStorage.getItem(`chat_bg_url:${currentRoomCode}`) || localStorage.getItem('chat_bg_url');
-        if (savedBg) {
-            background.style.backgroundImage = `url(${savedBg})`;
-        }
+        } catch (e) { /* ignore */ }
     }
 
     /**
@@ -949,8 +1043,10 @@
                 }
 
                 if (!recentData || recentData.length === 0) {
-                    console.warn('[chat] 未查询到任何消息，房间:', currentRoomCode, '可能原因: RLS未配置或表中无数据');
-                    chatBox.innerHTML = '<div style="padding:18px;text-align:center;color:#8a929c;font-size:13px;">暂无消息，开始聊天吧</div>';
+                    console.warn('[chat] 未查询到任何消息，房间:', currentRoomCode);
+                    if (!chatBox.children.length) {
+                        chatBox.innerHTML = '<div style="padding:18px;text-align:center;color:#8a929c;font-size:13px;">暂无消息，开始聊天吧</div>';
+                    }
                     noMoreHistory = true;
                     isFetchingHistory = false;
                     return;
@@ -1104,7 +1200,6 @@
                 table: 'messages',
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
-                if (!presenceActive && payload.new.sender !== mySender) offlineHadMessages = true;
                 const existing = document.querySelector(`.msg-wrapper[data-msg-id="${payload.new.id}"]`);
                 if (existing) return;
                 if (payload.new.sender === mySender) {
@@ -1287,13 +1382,11 @@
                     payload: { user: mySender, room: currentRoomCode, text }
                 });
                 offlineNoticeElement = appendSystemMessage('你已暂时离线');
-                offlineHadMessages = false;
             } else {
                 if (offlineNoticeElement) {
                     offlineNoticeElement.remove();
                     offlineNoticeElement = null;
                 }
-                offlineHadMessages = false;
             }
         }
         document.getElementById('offline-overlay').classList.toggle('visible', !active);
@@ -1629,12 +1722,8 @@
             tempEl.appendChild(statusEl);
         }
 
-        const forceScroll = () => {
-            const chatBox = document.getElementById('chat-box');
-            if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-        };
-        requestAnimationFrame(forceScroll);
-        [50, 150, 300].forEach((delay) => setTimeout(forceScroll, delay));
+        requestAnimationFrame(scrollToBottomInstant);
+        [50, 150, 300].forEach((delay) => setTimeout(scrollToBottomInstant, delay));
 
         try {
             const { data, error } = await supabaseClient
@@ -2119,6 +2208,12 @@
         unreadCount = 0;
         const btn = document.getElementById('jump-btn');
         if (btn) btn.style.display = 'none';
+    }
+
+    function scrollToBottomInstant() {
+        const chatBox = document.getElementById('chat-box');
+        if (!chatBox) return;
+        chatBox.scrollTop = chatBox.scrollHeight;
     }
 
 
@@ -2618,36 +2713,34 @@
     };
 
     window.leaveRoom = function() {
-        if(confirm("确定要退出当前房间吗？")) {
-            isLeavingRoom = true;
-            if (roomSubscription) { roomSubscription.unsubscribe(); roomSubscription = null; }
-            stopPolling();
-            presenceActive = false;
-            if (presenceIdleTimer) { clearTimeout(presenceIdleTimer); presenceIdleTimer = null; }
-            localStorage.removeItem('chat_last_room');
-            localStorage.removeItem('chat_auth_expiry');
-            currentRoomCode = "";
-            mySender = "";
-            messagesCache = [];
-            unreadCount = 0;
-            oldestLoadedAt = null;
-            noMoreHistory = false;
-            hideConnectionBar();
-            const jumpBtn = document.getElementById('jump-btn');
-            if (jumpBtn) jumpBtn.style.display = 'none';
-            document.getElementById('chat-box').innerHTML = '';
-            document.getElementById('room-title').innerText = '正在加载...';
-            document.getElementById('online-count').innerText = '在线 0 人';
-            document.getElementById('chat-bg').style.backgroundImage = '';
-            document.getElementById('login-area').style.display = 'flex';
-            document.getElementById('chat-container').style.display = 'none';
-            var savedName = localStorage.getItem('chat_auth_token');
-            if (savedName) {
-                document.getElementById('username').value = savedName;
-            }
-            document.getElementById('room-input').value = '';
-            document.getElementById('room-input').focus();
-        }
+        if(!confirm("确定要退出当前房间吗？")) return;
+        isLeavingRoom = true;
+        if (roomSubscription) { roomSubscription.unsubscribe(); roomSubscription = null; }
+        stopPolling();
+        presenceActive = false;
+        if (presenceIdleTimer) { clearTimeout(presenceIdleTimer); presenceIdleTimer = null; }
+        localStorage.removeItem('chat_last_room');
+        localStorage.removeItem('chat_auth_expiry');
+        currentRoomCode = "";
+        mySender = "";
+        messagesCache = [];
+        unreadCount = 0;
+        oldestLoadedAt = null;
+        noMoreHistory = false;
+        lastKnownMessageId = null;
+        hideConnectionBar();
+        const jumpBtn = document.getElementById('jump-btn');
+        if (jumpBtn) jumpBtn.style.display = 'none';
+        document.getElementById('chat-box').innerHTML = '';
+        document.getElementById('room-title').innerText = '正在加载...';
+        document.getElementById('online-count').innerText = '在线 0 人';
+        document.getElementById('chat-bg').style.backgroundImage = '';
+        document.getElementById('login-area').style.display = 'flex';
+        document.getElementById('chat-container').style.display = 'none';
+        var savedName = localStorage.getItem('chat_auth_token');
+        if (savedName) document.getElementById('username').value = savedName;
+        document.getElementById('room-input').value = '';
+        document.getElementById('room-input').focus();
     };
 
     window.closeUpdateModal = function() {
@@ -2697,6 +2790,36 @@
             });
         }
     } catch (e) { /* best-effort */ }
+
+    // 键盘快捷键：Escape 关闭弹窗/菜单
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const ctxMenu = document.getElementById('context-menu');
+        if (ctxMenu && ctxMenu.style.display === 'block') {
+            ctxMenu.style.display = 'none';
+            return;
+        }
+        const emoji = document.getElementById('emoji-panel');
+        if (emoji && emoji.classList.contains('visible')) {
+            emoji.classList.remove('visible');
+            return;
+        }
+        const settings = document.getElementById('settings-modal');
+        if (settings && settings.style.display === 'flex') {
+            settings.style.display = 'none';
+            return;
+        }
+        const lightbox = document.getElementById('image-lightbox');
+        if (lightbox && lightbox.style.display === 'flex') {
+            lightbox.style.display = 'none';
+            return;
+        }
+        const update = document.getElementById('update-modal');
+        if (update && update.style.display === 'flex') {
+            update.style.display = 'none';
+            return;
+        }
+    });
 
 </script>
 </body>
