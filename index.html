@@ -1252,16 +1252,11 @@
             delBtn.style.display = 'none';
             checkBtn.style.display = 'block';
             qrImg.style.display = 'block';
-            status.textContent = '正在生成二维码...';
             const extra = currentRoomCode + ':' + mySender;
-            const qrUrl = await createWxPusherQrCode(extra);
-            if (qrUrl) {
-                qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
-                status.textContent = '';
-            } else {
-                status.textContent = '二维码生成失败，请重试';
-                status.style.color = '#dc3545';
-            }
+            const followUrl = 'https://wxpusher.zjiecode.com/wxuser/?type=1&id=AT_lx7t01tEWGI9yb9Z5b2ZJRzVwZpQBiHd&extra=' + encodeURIComponent(extra) + '#/follow';
+            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(followUrl);
+            status.textContent = '扫码后关注公众号，点"检查绑定状态"完成绑定';
+            status.style.color = '#8a9099';
         }
         modal.classList.add('show');
         document.getElementById('settings-modal').style.display = 'none';
