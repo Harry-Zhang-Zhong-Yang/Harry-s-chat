@@ -72,16 +72,7 @@
         }
 
             /* 跳到最新按钮 */
-            #jump-btn {
-                    position: fixed; right: 12px; bottom: 88px; z-index: 60;
-                    width: auto; min-width: 42px; height: 28px; padding: 0 9px; border-radius: 14px;
-                    background: rgba(255,255,255,.96); color: var(--btn-color); border: 1px solid #dbe5ff;
-                    box-shadow: 0 4px 12px rgba(32,33,36,0.12); cursor: pointer; display: none; font-size: 11px; font-weight: 600;
-                    transition: transform 0.15s, opacity 0.15s;
-            }
-            #jump-btn:active { transform: scale(0.92); }
-
-        #chat-bg {
+            #chat-bg {
             position: absolute; inset: 0; z-index: 0;
             background: linear-gradient(180deg, #f0f4f8 0%, #e2e8f0 100%);
             background-size: cover; background-position: center;
@@ -121,11 +112,6 @@
         #chat-box::-webkit-scrollbar { width: 5px; }
         #chat-box::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 10px; }
         #chat-box > *:last-child { margin-bottom: 0; }
-        #jump-bottom { position: fixed; bottom: 90px; right: 20px; z-index: 30; width: 40px; height: 40px; border-radius: 50%; background: var(--bubble-color); color: white; border: none; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.2); transition: transform 0.2s, opacity 0.2s, background 0.2s; }
-        #jump-bottom:hover { background: #1d4ed8; }
-        #jump-bottom:active { transform: scale(0.9); }
-        #jump-bottom .badge { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; border-radius: 9px; background: #ef4444; color: white; font-size: 11px; display: flex; align-items: center; justify-content: center; padding: 0 4px; line-height: 1; }
-
         .msg-wrapper { max-width: min(75%, 620px); position: relative; animation: msgIn 0.2s ease-out; will-change: transform, opacity; }
         .message-row { display:flex; align-items:flex-start; gap:8px; }
         .right .message-row { flex-direction:row-reverse; }
@@ -202,7 +188,6 @@
             .message-avatar { width: 28px; height: 28px; flex: 0 0 28px; font-size: 11px; }
             .sender-name { font-size: 11px; }
             .msg-content { font-size: 15px; }
-            #jump-bottom { bottom: 80px; right: 12px; width: 36px; height: 36px; font-size: 16px; }
             #install-popup > div { width: 94% !important; padding: 16px !important; }
         }
 
@@ -446,7 +431,6 @@
 
 
     <div id="chat-box"></div>
-    <button id="jump-bottom" title="跳到底部">↓<span class="badge" style="display:none"></span></button>
     <div id="connection-bar"></div>
     <div id="offline-overlay">已离线 · 点击重新连接</div>
     <div id="voice-recording-overlay" class="voice-recording-overlay">
@@ -498,9 +482,6 @@
         <!-- 隐藏的文件选择器 -->
         <input type="file" id="file-input" accept="image/*,audio/*" style="display:none;" onchange="window.handleFileSelect(event)">
          
-        <!-- 跳到最新按钮 -->
-        <button id="jump-btn" onclick="scrollToBottom()">未读 (0)</button>
-
         <!-- 设置弹窗 -->
         <div id="settings-modal" onclick="window.toggleSettings(event)">
             <div class="modal-content" onclick="event.stopPropagation()">
@@ -764,10 +745,8 @@
     // 是否已经没有更多历史可加载
     let noMoreHistory = false;
 
-    // 本地消息缓存（用于导出与未读计数）
+    // 本地消息缓存（用于导出）
     let messagesCache = [];
-    // 未读消息计数与滚动状态
-    let unreadCount = 0;
     let isLeavingRoom = false;
     let offlineNoticeElement = null;
 
@@ -813,7 +792,7 @@
 
     const NOTIFICATION_ICON = generateNotificationIcon(192);
 
-    window.onload = () => {
+    window.onload = async () => {
         showInstallBanner();
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
@@ -865,10 +844,14 @@
                 applyRoomBackground();
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 hideRoomLoading();
-                initRealtime();
                 startPolling();
                 ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
-                loadHistory(true).catch(e => console.error('loadHistory failed:', e));
+                await loadHistory(true);
+                scrollToBottomInstant();
+                initRealtime();
+                setTimeout(scrollToBottomInstant, 200);
+                setTimeout(scrollToBottomInstant, 500);
+                setTimeout(scrollToBottomInstant, 1000);
             } else {
                 localStorage.removeItem('chat_last_room');
                 localStorage.removeItem('chat_auth_expiry');
@@ -987,40 +970,6 @@
         document.getElementById('offline-overlay').addEventListener('click', () => {
             if (roomSubscription && !presenceActive) setPresenceActive(true, true);
         });
-
-        const jumpBtn = document.getElementById('jump-bottom');
-        const jumpBadge = jumpBtn.querySelector('.badge');
-        const chatBoxEl = document.getElementById('chat-box');
-
-        function isNearBottom(el) {
-            return el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-        }
-
-        jumpBtn.addEventListener('click', () => {
-            chatBoxEl.scrollTop = chatBoxEl.scrollHeight;
-            jumpBtn.style.display = 'none';
-            unreadCount = 0;
-            if (jumpBadge) jumpBadge.style.display = 'none';
-        });
-
-        const obs = new MutationObserver(() => {
-            if (!isNearBottom(chatBoxEl)) {
-                unreadCount++;
-                if (jumpBadge) {
-                    jumpBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
-                    jumpBadge.style.display = 'flex';
-                }
-                jumpBtn.style.display = 'flex';
-            }
-        });
-        obs.observe(chatBoxEl, { childList: true, subtree: false });
-        chatBoxEl.addEventListener('scroll', () => {
-            if (isNearBottom(chatBoxEl)) {
-                jumpBtn.style.display = 'none';
-                unreadCount = 0;
-                if (jumpBadge) jumpBadge.style.display = 'none';
-            }
-        });
     };
 
     window.joinRoom = async function() {
@@ -1054,10 +1003,14 @@
 
         try {
             hideRoomLoading();
-            initRealtime();
             startPolling();
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
-            loadHistory(true).catch(e => console.error('loadHistory failed:', e));
+            await loadHistory(true);
+            scrollToBottomInstant();
+            initRealtime();
+            setTimeout(scrollToBottomInstant, 200);
+            setTimeout(scrollToBottomInstant, 500);
+            setTimeout(scrollToBottomInstant, 1000);
         } catch (error) {
             console.error('进入房间失败:', error);
             document.getElementById('login-area').style.display = 'flex';
@@ -1116,10 +1069,7 @@
             if (isInitial) {
                 oldestLoadedAt = null;
                 noMoreHistory = false;
-                unreadCount = 0;
                 messagesCache = [];
-                const unreadButton = document.getElementById('jump-btn');
-                if (unreadButton) unreadButton.style.display = 'none';
 
                 let { data: recentData, error } = await supabaseClient
                     .from('messages')
@@ -2249,7 +2199,7 @@
             }
         }
         if (!skipAvatarRefresh) refreshMessageAvatars();
-        // 存入本地缓存（用于导出和未读计数）
+        // 存入本地缓存（用于导出）
         try {
             const msgObj = { id: id || null, sender, content, created_at: timestamp_str || beijingISOString(), media_url: mediaUrl || null, media_type: mediaType || null };
             if (insertAtTop) {
@@ -2260,21 +2210,9 @@
 
         } catch (e) { console.error('cache error', e); }
 
-        // 判断是否在底部以决定是否自动滚动或增加未读计数
         const atBottom = (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight) < 60;
-        if (isNew) {
-            if (sender === mySender) {
-                if (atBottom) chatBox.scrollTop = chatBox.scrollHeight;
-            } else if (atBottom) {
-                chatBox.scrollTop = chatBox.scrollHeight;
-            } else {
-                // 增加未读计数并显示跳转按钮
-                unreadCount += 1;
-                const btn = document.getElementById('jump-btn');
-                btn.innerText = `↓ ${unreadCount}`;
-                btn.title = `${unreadCount} 条未读消息`;
-                btn.style.display = 'block';
-            }
+        if (isNew && atBottom) {
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
     }
 
@@ -2296,14 +2234,11 @@
     const chatBoxEl = document.getElementById('chat-box');
     let pressTimer;
 
-    // 跳到最新按钮行为
+    // 跳到底部
     function scrollToBottom() {
         const chatBox = document.getElementById('chat-box');
         if (!chatBox) return;
         chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
-        unreadCount = 0;
-        const btn = document.getElementById('jump-btn');
-        if (btn) btn.style.display = 'none';
     }
 
     function scrollToBottomInstant() {
@@ -2311,17 +2246,6 @@
         if (!chatBox) return;
         chatBox.scrollTop = chatBox.scrollHeight;
     }
-
-
-    // 滚动监听：当靠近底部时隐藏跳转按钮并重置未读计数
-    chatBoxEl.addEventListener('scroll', () => {
-        const chatBox = document.getElementById('chat-box');
-        const atBottom = (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight) < 60;
-        if (atBottom) {
-            unreadCount = 0;
-            const btn = document.getElementById('jump-btn'); if (btn) btn.style.display = 'none';
-        }
-    });
 
     function handleLongPress(element) {
         // Deprecated: long press now shows context menu. Keep for compatibility.
@@ -2736,9 +2660,6 @@
         messagesCache = [];
         oldestLoadedAt = null;
         noMoreHistory = false;
-        unreadCount = 0;
-        const jumpBtn = document.getElementById('jump-btn');
-        if (jumpBtn) jumpBtn.style.display = 'none';
         localStorage.removeItem('chat_bg_url:' + currentRoomCode);
         document.getElementById('chat-bg').style.backgroundImage = '';
         showToast('本地聊天记录和缓存已清除。', 'success');
@@ -2828,13 +2749,10 @@
         currentRoomCode = "";
         mySender = "";
         messagesCache = [];
-        unreadCount = 0;
         oldestLoadedAt = null;
         noMoreHistory = false;
         lastKnownMessageId = null;
         hideConnectionBar();
-        const jumpBtn = document.getElementById('jump-btn');
-        if (jumpBtn) jumpBtn.style.display = 'none';
         document.getElementById('chat-box').innerHTML = '';
         document.getElementById('room-title').innerText = '正在加载...';
         document.getElementById('online-count').innerText = '在线 0 人';
