@@ -1,14 +1,45 @@
 const CACHE_NAME = 'harrys-chat-v2';
 const STATIC_ASSETS = [
     '/',
-    '/index.html'
+    '/index.html',
+    '/manifest.json'
 ];
+
+async function generateAndCacheIcon(size) {
+    const canvas = new OffscreenCanvas(size, size);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#2563eb';
+    const r = size * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(r, 0);
+    ctx.lineTo(size - r, 0);
+    ctx.quadraticCurveTo(size, 0, size, r);
+    ctx.lineTo(size, size - r);
+    ctx.quadraticCurveTo(size, size, size - r, size);
+    ctx.lineTo(r, size);
+    ctx.quadraticCurveTo(0, size, 0, size - r);
+    ctx.lineTo(0, r);
+    ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${size * 0.48}px -apple-system, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('💬', size / 2, size / 2);
+    const blob = await canvas.convertToBlob({ type: 'image/png' });
+    const cache = await caches.open(CACHE_NAME);
+    const url = `/icon-${size}.png`;
+    await cache.put(url, new Response(blob, { headers: { 'Content-Type': 'image/png' } }));
+    return url;
+}
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
         (async () => {
             await self.skipWaiting();
             try {
+                await generateAndCacheIcon(192);
+                await generateAndCacheIcon(512);
                 const cache = await caches.open(CACHE_NAME);
                 await cache.addAll(STATIC_ASSETS);
             } catch (e) {
@@ -73,30 +104,7 @@ self.addEventListener('push', (event) => {
         (async () => {
             let iconUrl = payload.icon || '/icon-192.png';
             try {
-                const canvas = new OffscreenCanvas(192, 192);
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = '#2563eb';
-                const r = 42;
-                ctx.beginPath();
-                ctx.moveTo(r, 0);
-                ctx.lineTo(192 - r, 0);
-                ctx.quadraticCurveTo(192, 0, 192, r);
-                ctx.lineTo(192, 192 - r);
-                ctx.quadraticCurveTo(192, 192, 192 - r, 192);
-                ctx.lineTo(r, 192);
-                ctx.quadraticCurveTo(0, 192, 0, 192 - r);
-                ctx.lineTo(0, r);
-                ctx.quadraticCurveTo(0, 0, r, 0);
-                ctx.fill();
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 92px -apple-system, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('💬', 96, 96);
-                const blob = await canvas.convertToBlob({ type: 'image/png' });
-                iconUrl = self.registration.scope + 'icon-192.png';
-                const cache = await caches.open(CACHE_NAME);
-                await cache.put(iconUrl, new Response(blob, { headers: { 'Content-Type': 'image/png' } }));
+                iconUrl = await generateAndCacheIcon(192);
             } catch (e) {
                 iconUrl = payload.icon || '/icon-192.png';
             }
