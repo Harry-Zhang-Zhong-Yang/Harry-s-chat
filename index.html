@@ -353,6 +353,10 @@
         .switch input:checked + .switch-track { background:#20c997; }
         .switch input:checked + .switch-track::after { transform:translateX(20px); }
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
+
+        .wx-notify-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 5000; }
+        .wx-notify-modal.show { display: flex; }
+        .wx-notify-content { background: #fff; padding: 24px; border-radius: 16px; width: 90%; max-width: 400px; max-height: 85vh; overflow-y: auto; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
         .settings-search-button { margin:0 0 22px; background:#f5f7f9; color:#30343b; border:1px solid var(--line); text-align:left; font-weight:500; }
         .settings-search-button:hover { background:#eef2f6; }
@@ -516,17 +520,11 @@
         }
 
         @media (hover: hover) and (pointer: fine) {
-            .msg-wrapper:hover .msg-content { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-            .left:hover .msg-content { background: #f8fafc; }
-            .right:hover .msg-content { background: #cfe2ff; }
             .action-btn:hover { background: #e4e6eb; }
             .game-cell:hover { background: rgba(0,0,0,0.06); }
         }
 
         @media (hover: none) and (pointer: coarse) {
-            .msg-wrapper:hover .msg-content { box-shadow: none; }
-            .left:hover .msg-content { background: #fff; }
-            .right:hover .msg-content { background: var(--bubble-color); }
             .game-cell:hover { background: transparent; }
         }
 
@@ -1065,8 +1063,8 @@
                     <div class="settings-row-item"><button class="settings-row-button" onclick="window.updateRoomName()">修改房间名称</button></div>
                     <div class="settings-row-item"><button class="settings-row-button" onclick="window.searchMessages()">查找聊天内容</button></div>
                     <div class="settings-row-item">
-                        <label>后台消息通知</label>
-                        <label class="switch" aria-label="开启后台通知"><input id="push-notification-toggle" type="checkbox" onchange="window.togglePushNotifications(this)"><span class="switch-track"></span></label>
+                        <label>微信通知</label>
+                        <button class="settings-row-button" id="wx-notify-btn" onclick="window.showWxNotifySetup()">配置微信通知</button>
                     </div>
                     <div class="settings-row-item"><label>气泡颜色</label><input type="color" id="color-selector" value="#0084ff"></div>
                     <div class="settings-row-item"><button class="settings-row-button" onclick="document.getElementById('bg-upload-input').click()">设置当前聊天背景</button></div>
@@ -1089,9 +1087,34 @@
                 </div>
                 <input type="file" id="bg-upload-input" accept="image/*" style="display:none;" onchange="window.handleBgUpload(event)">
                 <input type="file" id="avatar-upload-input" accept="image/*" style="display:none;" onchange="window.handleAvatarUpload(event)">
-                <div id="push-notification-status" style="display:none;padding-top:10px;text-align:center;font-size:12px;color:#8a9099;"></div>
             </div>
         </div>
+    </div>
+</div>
+
+<div id="wx-notify-modal" class="wx-notify-modal" onclick="window.closeWxNotifySetup(event)">
+    <div class="wx-notify-content" onclick="event.stopPropagation()">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <h3 style="margin:0;">📱 微信通知设置</h3>
+            <button onclick="window.closeWxNotifySetup(null)" style="width:auto;margin:0;padding:4px 10px;background:transparent;color:#999;font-size:20px;border:none;cursor:pointer;">✕</button>
+        </div>
+        <p style="font-size:13px;color:#666;margin:8px 0 16px;line-height:1.6;">
+            有新消息时，通过微信收到通知提醒。
+        </p>
+        <div style="background:#f0f7ff;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#555;line-height:1.8;">
+            <b>如何获取 Token：</b><br>
+            ① 打开 <a href="http://www.pushplus.plus/" target="_blank" style="color:#2563eb;">pushplus.plus</a><br>
+            ② 点击右上角"登录"，用微信扫码<br>
+            ③ 登录后点击左侧"发送消息"<br>
+            ④ 复制页面上的 <b>Token</b>（32位字符串）<br>
+            ⑤ 粘贴到下方输入框，点击保存
+        </div>
+        <input type="text" id="wx-token-input" placeholder="粘贴你的 PushPlus Token" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:12px;">
+        <div style="display:flex;gap:8px;">
+            <button id="wx-save-btn" onclick="window.saveWxToken()" style="flex:1;margin:0;">保存</button>
+            <button id="wx-delete-btn" onclick="window.deleteWxToken()" style="flex:1;margin:0;background:#dc3545;">取消通知</button>
+        </div>
+        <p id="wx-notify-status" style="text-align:center;font-size:12px;margin-top:10px;color:#8a9099;"></p>
     </div>
 </div>
 
@@ -1147,146 +1170,15 @@
         }, duration);
     }
 
-    const PUSH_PUBLIC_KEY = 'BO9iBsWlhRp3O3mw2bRhHyn05b9BRGBZr_dU69iElwScNQEjINVChx8vkBjtzGzKQlbL-tvLy2a3qP8ao_FcSB0';
-
-    function urlBase64ToUint8Array(value) {
-        const padding = '='.repeat((4 - value.length % 4) % 4);
-        const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
-        return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
-    }
-
-    async function registerPushWorker() {
-        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-            if (isIOS() && !isStandalone()) {
-                throw new Error('请先将网站添加到主屏幕，然后重新开启通知');
-            }
-            throw new Error('当前浏览器不支持后台通知，请使用最新版 Chrome 或 Edge');
-        }
-        const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-        await registration.update();
-        if (!registration.active) {
-            await new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => reject(new Error('Service Worker 激活超时，请刷新页面后重试')), 10000);
-                const onStateChange = () => {
-                    if (registration.active) {
-                        clearTimeout(timeout);
-                        resolve();
-                    }
-                };
-                if (registration.installing) {
-                    registration.installing.addEventListener('statechange', onStateChange);
-                } else if (registration.waiting) {
-                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                    navigator.serviceWorker.addEventListener('controllerchange', onStateChange, { once: true });
-                } else {
-                    clearTimeout(timeout);
-                    reject(new Error('Service Worker 未能激活，请刷新页面后重试'));
-                }
-            });
-        }
-        return registration;
-    }
-
-    function setPushStatus(text, visible = true) {
-        const status = document.getElementById('push-notification-status');
-        if (!status) return;
-        status.innerText = text;
-        status.style.display = visible ? 'block' : 'none';
-    }
-
-    window.enablePushNotifications = async function() {
-        if (PUSH_PUBLIC_KEY.startsWith('REPLACE_')) {
-            setPushStatus('请先配置通知服务', true);
-            return;
-        }
-        if (isIOS() && !isStandalone()) {
-            showInstallBanner();
-            setPushStatus('请先将网站添加到主屏幕，然后才能开启通知<br><a href="#" onclick="window.showInstallPopup();return false" style="color:#07c475;text-decoration:underline;">查看安装教程 →</a>', true);
-            return;
-        }
-        try {
-            if (!('Notification' in window)) {
-                throw new Error('当前浏览器不支持网页通知，请使用最新版 Chrome 或 Edge，并通过 HTTPS 访问');
-            }
-            const permission = await window.Notification.requestPermission();
-            if (permission !== 'granted') throw new Error('通知权限未允许，请在浏览器设置中开启');
-            const registration = await registerPushWorker();
-            const subscription = await registration.pushManager.subscribe({
-                userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(PUSH_PUBLIC_KEY)
-            });
-            const subJson = subscription.toJSON();
-            const { error } = await supabaseClient.from('push_subscriptions').upsert([{
-                room_code: currentRoomCode,
-                user_name: mySender,
-                endpoint: subscription.endpoint,
-                subscription: subJson,
-                browser: navigator.userAgent.slice(0, 200),
-                updated_at: beijingISOString()
-            }], { onConflict: 'endpoint' });
-            if (error) throw error;
-            localStorage.setItem('push_sub_endpoint', subscription.endpoint);
-            setPushStatus('后台通知已开启 ✓', true);
-            if (isAndroid() && !isStandalone() && deferredPrompt) {
-                setTimeout(() => {
-                    setPushStatus('后台通知已开启 ✓  💡 <a href="#" onclick="window.doInstallPWA();return false" style="color:#07c475;text-decoration:underline;">一键安装到桌面</a>，体验更好', true);
-                }, 3000);
-            }
-            setTimeout(() => setPushStatus('', false), 8000);
-            listenForSubscriptionChange();
-        } catch (error) {
-            console.error('开启后台通知失败:', error);
-            setPushStatus(error.message || '开启失败，请检查浏览器权限', true);
-            const toggle = document.getElementById('push-notification-toggle');
-            if (toggle) toggle.checked = false;
-        }
-    };
-
-    function listenForSubscriptionChange() {
-        if (!('serviceWorker' in navigator)) return;
-        navigator.serviceWorker.addEventListener('message', async (event) => {
-            if (event.data && event.data.type === 'PUSH_SUBSCRIPTION_CHANGE') {
-                console.log('[push] 订阅已变更，尝试重新订阅');
-                const registration = await navigator.serviceWorker.ready;
-                const sub = await registration.pushManager.getSubscription();
-                if (sub) {
-                    const subJson = sub.toJSON();
-                    await supabaseClient.from('push_subscriptions').upsert([{
-                        room_code: currentRoomCode || '',
-                        user_name: mySender || '',
-                        endpoint: sub.endpoint,
-                        subscription: subJson,
-                        browser: navigator.userAgent.slice(0, 200),
-                        updated_at: beijingISOString()
-                    }], { onConflict: 'endpoint' });
-                    localStorage.setItem('push_sub_endpoint', sub.endpoint);
-                }
-            }
-        });
-    }
-
-    window.togglePushNotifications = async function(toggle) {
-        if (toggle.checked) {
-            await window.enablePushNotifications();
-            return;
-        }
-        try {
-            const registration = await navigator.serviceWorker.ready;
-            const subscription = await registration.pushManager.getSubscription();
-            if (subscription) {
-                await supabaseClient.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint);
-                await subscription.unsubscribe();
-            }
-            localStorage.removeItem('push_sub_endpoint');
-            setPushStatus('', false);
-        } catch (error) {
-            toggle.checked = true;
-            setPushStatus('关闭通知失败: ' + (error.message || '未知错误'), true);
-        }
-    };
-
     let currentRoomCode = "";
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
+
+    function updateWxNotifyButton() {
+        const btn = document.getElementById('wx-notify-btn');
+        if (!btn || !currentRoomCode) return;
+        const saved = localStorage.getItem('wx_pushplus_token_' + currentRoomCode);
+        btn.textContent = saved ? '微信通知 ✓' : '配置微信通知';
+    }
     let replyData = null;
     let roomSubscription = null;
     let realtimeReady = Promise.resolve();
@@ -1331,37 +1223,71 @@
         document.getElementById('room-loading').classList.add('hidden');
     }
 
-    function generateNotificationIcon(size) {
-        try {
-            const canvas = document.createElement('canvas');
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#2563eb';
-            const r = size * 0.22;
-            ctx.beginPath();
-            ctx.moveTo(r, 0);
-            ctx.lineTo(size - r, 0);
-            ctx.quadraticCurveTo(size, 0, size, r);
-            ctx.lineTo(size, size - r);
-            ctx.quadraticCurveTo(size, size, size - r, size);
-            ctx.lineTo(r, size);
-            ctx.quadraticCurveTo(0, size, 0, size - r);
-            ctx.lineTo(0, r);
-            ctx.quadraticCurveTo(0, 0, r, 0);
-            ctx.fill();
-            ctx.fillStyle = '#ffffff';
-            ctx.font = `bold ${size * 0.48}px -apple-system, sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('💬', size / 2, size / 2);
-            return canvas.toDataURL('image/png');
-        } catch (e) {
-            return null;
+    window.showWxNotifySetup = function() {
+        const modal = document.getElementById('wx-notify-modal');
+        const input = document.getElementById('wx-token-input');
+        const status = document.getElementById('wx-notify-status');
+        const delBtn = document.getElementById('wx-delete-btn');
+        status.textContent = '';
+        const saved = localStorage.getItem('wx_pushplus_token_' + currentRoomCode);
+        if (saved) {
+            input.value = saved;
+            delBtn.style.display = 'block';
+        } else {
+            input.value = '';
+            delBtn.style.display = 'none';
         }
-    }
+        modal.classList.add('show');
+        document.getElementById('settings-modal').style.display = 'none';
+    };
 
-    const NOTIFICATION_ICON = generateNotificationIcon(192);
+    window.closeWxNotifySetup = function(event) {
+        if (event && event.target !== document.getElementById('wx-notify-modal')) return;
+        document.getElementById('wx-notify-modal').classList.remove('show');
+        document.getElementById('settings-modal').style.display = 'flex';
+    };
+
+    window.saveWxToken = async function() {
+        const token = document.getElementById('wx-token-input').value.trim();
+        const status = document.getElementById('wx-notify-status');
+        if (!token) { status.textContent = '请输入 Token'; return; }
+        if (token.length < 30) { status.textContent = 'Token 格式不正确'; return; }
+        try {
+            const { error } = await supabaseClient.from('pushplus_tokens').upsert({
+                room_code: currentRoomCode,
+                user_name: mySender,
+                token: token
+            }, { onConflict: 'room_code,user_name' });
+            if (error) throw error;
+            localStorage.setItem('wx_pushplus_token_' + currentRoomCode, token);
+            status.textContent = '✅ 微信通知已开启！';
+            status.style.color = '#20c997';
+            document.getElementById('wx-delete-btn').style.display = 'block';
+            document.getElementById('wx-notify-btn').textContent = '微信通知 ✓';
+            setTimeout(() => window.closeWxNotifySetup(null), 1500);
+        } catch (e) {
+            console.error('保存 Token 失败:', e);
+            status.textContent = '保存失败，请重试';
+            status.style.color = '#dc3545';
+        }
+    };
+
+    window.deleteWxToken = async function() {
+        const status = document.getElementById('wx-notify-status');
+        try {
+            await supabaseClient.from('pushplus_tokens').delete().eq('room_code', currentRoomCode).eq('user_name', mySender);
+            localStorage.removeItem('wx_pushplus_token_' + currentRoomCode);
+            document.getElementById('wx-token-input').value = '';
+            document.getElementById('wx-delete-btn').style.display = 'none';
+            document.getElementById('wx-notify-btn').textContent = '配置微信通知';
+            status.textContent = '已取消微信通知';
+            status.style.color = '#8a9099';
+        } catch (e) {
+            console.error('删除 Token 失败:', e);
+            status.textContent = '取消失败，请重试';
+            status.style.color = '#dc3545';
+        }
+    };
 
     window.onload = async () => {
         showInstallBanner();
@@ -1427,6 +1353,7 @@
                 applyRoomBackground();
                 await loadHistory(true);
                 hideRoomLoading();
+                updateWxNotifyButton();
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
                 initRealtime();
@@ -1576,6 +1503,7 @@
         try {
             await loadHistory(true);
             hideRoomLoading();
+            updateWxNotifyButton();
             setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
             initRealtime();
@@ -3461,22 +3389,7 @@
         deferredPrompt = null;
         localStorage.setItem('pwa_installed', '1');
         document.getElementById('install-popup').style.display = 'none';
-        if (isAndroid()) {
-            setPushStatus('已安装到桌面！现在可以开启通知了', true);
-            setTimeout(function() { setPushStatus('', false); }, 4000);
-        }
     });
-
-    function checkPWAStatus() {
-        var statusEl = document.getElementById('push-notification-status');
-        if (!statusEl) return;
-        if (isIOS() && !isStandalone()) {
-            statusEl.innerHTML = '💡 <a href="#" onclick="window.showInstallPopup();return false" style="color:#07c475;text-decoration:underline;">点击查看如何安装到桌面</a>，安装后即可开启通知';
-            statusEl.style.display = 'block';
-            return true;
-        }
-        return false;
-    }
 
     // 输入事件：发送 typing 通知 并发送消息
     let typingTimeout = null;
