@@ -2,15 +2,24 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no">
     <title>Harry的聊天室</title>
-
-    <meta name="theme-color" content="#07c475">
+    <meta name="description" content="Harry的聊天室 - 一个支持文字、图片、语音消息和游戏对弈的实时聊天室">
+    <meta name="theme-color" content="#07c475" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1a1a2e" media="(prefers-color-scheme: dark)">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="聊天室">
+    <meta name="format-detection" content="telephone=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Harry的聊天室">
+    <meta name="msapplication-TileColor" content="#07c475">
+    <meta name="msapplication-starturl" content="/">
     <link rel="apple-touch-startup-image" href="/icon-512.png">
-    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png">
     <link rel="manifest" href="/manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -27,11 +36,27 @@
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         button, a, input, textarea, .action-btn, .nav-icon, .clickable { touch-action: manipulation; }
+        html, body { 
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: auto;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation;
+        }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
             background-color: #e8ecf1;
             height: 100vh; height: 100dvh; width: 100vw;
             display: flex; flex-direction: column; overflow: hidden;
+            position: fixed;
+            inset: 0;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        input, textarea, [contenteditable] {
+            -webkit-user-select: text;
+            user-select: text;
         }
 
         /* --- 更新公告弹窗 --- */
@@ -108,6 +133,13 @@
             overflow-anchor: none;
             scrollbar-width: thin;
             scrollbar-color: #d0d5dd transparent;
+            overscroll-behavior-y: contain;
+            -webkit-overflow-scrolling: touch;
+            will-change: scroll-position;
+            scroll-behavior: auto;
+        }
+        @supports (overscroll-behavior: contain) {
+            #chat-box { overscroll-behavior-y: contain; }
         }
         #chat-box::-webkit-scrollbar { width: 5px; }
         #chat-box::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 10px; }
@@ -133,9 +165,6 @@
             display: flex; flex-direction: column; gap: 6px;
             background: #fff; transition: background 0.12s ease, box-shadow 0.12s ease;
         }
-        .msg-wrapper:hover .msg-content { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-        .left:hover .msg-content { background: #f8fafc; }
-        .right:hover .msg-content { background: #cfe2ff; }
 
         .msg-send-status { font-size: 10px; opacity: 0.65; text-align: right; margin-top: 2px; line-height: 1; height: 14px; display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
         .msg-send-status.sending { animation: pulse 1.2s ease-in-out infinite; }
@@ -161,7 +190,7 @@
             #chat-box { padding: 16px 12px 20px; }
             .msg-wrapper { max-width: 88%; }
             #nav-bar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
-            #input-area { padding-left: 10px; padding-right: 10px; }
+            #input-area { padding-left: 10px; padding-right: 10px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
             #back-btn { flex: 0 0 40px; min-width: 40px; font-size: 27px; line-height: 1; }
             #room-title { max-width:42%; padding: 0 4px; }
             #nav-bar > div { flex: 0 0 auto; gap: 4px !important; }
@@ -177,12 +206,13 @@
             .settings-header h3 { font-size: 16px; }
             .settings-row-item { padding: 12px 10px; font-size: 14px; }
             .settings-row-item label { font-size: 14px; }
-            #emoji-panel { right: 10px; width: calc(100vw - 40px); grid-template-columns: repeat(8, 1fr); }
+            #emoji-panel { right: 10px; width: calc(100vw - 40px); grid-template-columns: repeat(7, 1fr); }
             .modal-content { width: 94%; max-width: 94%; max-height: 85vh; border-radius: 12px; padding: 16px; }
             .message-avatar { width: 28px; height: 28px; flex: 0 0 28px; font-size: 11px; }
             .sender-name { font-size: 11px; }
             .msg-content { font-size: 15px; }
             #install-popup > div { width: 94% !important; padding: 16px !important; }
+            body { position: fixed; }
         }
 
         @media (min-width: 601px) and (max-width: 1024px) {
@@ -237,6 +267,13 @@
         #emoji-btn { font-size:clamp(20px, 2.4vw, 24px); }
         #emoji-panel { position:absolute; right:clamp(39px, calc(4.2vw + 5px), 50px); bottom:calc(100% - 1px); width:min(460px, calc(100vw - 80px)); max-height:min(360px, 52vh); overflow-y:auto; display:none; grid-template-columns:repeat(8, 1fr); gap:clamp(5px, 1vw, 9px); padding:clamp(12px, 1.8vw, 18px); border:1px solid var(--line); border-radius:16px 16px 5px 16px; background:#fff; box-shadow:0 10px 30px rgba(20,25,35,.16); z-index:110; }
         #emoji-panel.visible { display:grid; }
+        #attach-panel { display:none; padding: clamp(8px, 1.5vw, 12px); gap: clamp(8px, 1.5vw, 12px); border-top: 1px solid var(--line); background: #f8f9fa; flex-wrap: wrap; }
+        #attach-panel.visible { display:flex; }
+        .attach-item { display:flex; flex-direction:column; align-items:center; gap:6px; width:clamp(60px, 16vw, 72px); padding:clamp(6px, 1vw, 10px); border-radius:10px; cursor:pointer; transition: background 0.15s; }
+        .attach-item:hover { background:#e8eaed; }
+        .attach-item:active { background:#dde0e4; }
+        .attach-icon { width:clamp(42px, 10vw, 52px); height:clamp(42px, 10vw, 52px); border-radius:12px; background:#fff; display:flex; align-items:center; justify-content:center; font-size:clamp(22px, 5vw, 28px); box-shadow:0 1px 3px rgba(0,0,0,0.08); }
+        .attach-label { font-size:11px; color:#606770; white-space:nowrap; }
         .emoji-item { width:100%; aspect-ratio:1; border:0; margin:0; padding:0; background:transparent; border-radius:8px; font-size:clamp(21px, 3vw, 27px); cursor:pointer; }
         .emoji-item:hover { background:#f1f3f5; }
         .voice-recording-icon { font-size:34px; margin-bottom:10px; }
@@ -349,10 +386,514 @@
         .update-close-btn { position: absolute; top: 8px; right: 12px; width: 32px; height: 32px; padding: 0; margin: 0; background: transparent; border: 0; font-size: 22px; color: #8a9099; cursor: pointer; border-radius: 50%; line-height: 1; }
         .update-close-btn:hover { background: #f3f5f7; color: #202124; }
 
+        /* ========== 游戏选择弹窗 ========== */
+        .game-select-overlay {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9000;
+            background: rgba(0,0,0,0.35);
+            padding: env(safe-area-inset-top, 16px) env(safe-area-inset-right, 16px) env(safe-area-inset-bottom, 16px) env(safe-area-inset-left, 16px);
+        }
+        .game-select-inner {
+            background: #fff;
+            width: 92%;
+            max-width: 380px;
+            max-height: 85vh;
+            max-height: 85dvh;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            border-radius: clamp(12px, 2.5vw, 16px);
+            padding: clamp(14px, 3vw, 24px);
+            text-align: center;
+        }
+        .game-select-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: clamp(12px, 2.5vw, 16px);
+        }
+        .game-select-title {
+            font-size: clamp(16px, 3.5vw, 18px);
+            line-height: 1;
+        }
+        .game-select-close {
+            border: none;
+            background: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #8a9099;
+            padding: 0;
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            line-height: 1;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        .game-select-close:active { background: #e0e0e0; }
+        .game-select-list {
+            display: flex;
+            flex-direction: column;
+            gap: clamp(8px, 1.5vw, 10px);
+        }
+        .game-option {
+            display: flex;
+            align-items: center;
+            gap: clamp(10px, 2vw, 12px);
+            padding: clamp(12px, 2.5vw, 14px);
+            border-radius: clamp(10px, 2vw, 12px);
+            background: #f8f9fa;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: background 0.15s;
+            min-height: 48px;
+        }
+        .game-option:hover { background: #e8eaed; }
+        .game-option:active { background: #dde0e4; }
+        @media (hover: none) {
+            .game-option:hover { background: #f8f9fa; }
+        }
+        .game-option-icon {
+            width: clamp(40px, 9vw, 48px);
+            height: clamp(40px, 9vw, 48px);
+            border-radius: clamp(10px, 2vw, 12px);
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(22px, 5vw, 26px);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            flex-shrink: 0;
+        }
+        .game-option-info { text-align: left; }
+        .game-option-name {
+            font-weight: 600;
+            font-size: clamp(14px, 3vw, 15px);
+            color: #202124;
+        }
+        .game-option-desc {
+            font-size: clamp(11px, 2vw, 12px);
+            color: #8a9099;
+        }
+
         /* PWA 独立窗口安全区域适配 */
         @media (display-mode: standalone) {
             #chat-container { padding-top: env(safe-area-inset-top, 0px); }
             #input-area { padding-bottom: env(safe-area-inset-bottom, 0px); }
+            #nav-bar { padding-top: env(safe-area-inset-top, 0px); }
+        }
+        @supports (padding: max(0px)) {
+            #chat-container { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+            #nav-bar { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+        }
+
+        @media (min-width: 768px) and (max-width: 1024px) {
+            #chat-container { max-width: 100%; }
+            .msg-wrapper { max-width: 70%; }
+            #chat-box { padding: 20px 28px 24px; }
+            .action-btn { width: 44px; height: 44px; }
+            #message-input { min-height: 46px; }
+        }
+
+        @media (min-width: 1025px) {
+            #chat-box { padding: 24px 40px 28px; }
+            .msg-wrapper { max-width: 60%; }
+            #message-input { min-height: 48px; }
+            #back-btn { font-size: 30px; }
+            #chat-container { border-radius: 0; }
+            .action-btn { width: 42px; height: 42px; font-size: 20px; }
+            .context-menu { min-width: 180px; }
+        }
+
+        @media (hover: hover) and (pointer: fine) {
+            .msg-wrapper:hover .msg-content { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+            .left:hover .msg-content { background: #f8fafc; }
+            .right:hover .msg-content { background: #cfe2ff; }
+            .action-btn:hover { background: #e4e6eb; }
+            .game-cell:hover { background: rgba(0,0,0,0.06); }
+        }
+
+        @media (hover: none) and (pointer: coarse) {
+            .msg-wrapper:hover .msg-content { box-shadow: none; }
+            .left:hover .msg-content { background: #fff; }
+            .right:hover .msg-content { background: var(--bubble-color); }
+            .game-cell:hover { background: transparent; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            .msg-wrapper { animation: none; }
+            .msg-img-placeholder { animation: none; }
+        }
+
+        /* ========== 游戏消息卡片 ========== */
+        .game-message .msg-content { background:transparent !important; border:none !important; padding:0 !important; box-shadow:none !important; }
+        .game-message:hover .msg-content { background:transparent !important; box-shadow:none !important; }
+
+        .game-invite-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            border-radius: clamp(10px, 2vw, 14px);
+            padding: clamp(10px, 2vw, 14px) clamp(12px, 2.5vw, 16px);
+            min-width: clamp(180px, 40vw, 220px);
+            max-width: clamp(240px, 55vw, 300px);
+        }
+        .game-invite-header {
+            display: flex;
+            align-items: center;
+            gap: clamp(8px, 1.5vw, 10px);
+            margin-bottom: clamp(6px, 1vw, 8px);
+        }
+        .game-invite-icon {
+            width: clamp(36px, 8vw, 44px);
+            height: clamp(36px, 8vw, 44px);
+            border-radius: clamp(8px, 1.5vw, 10px);
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(20px, 4.5vw, 24px);
+            flex-shrink: 0;
+        }
+        .game-invite-name {
+            font-weight: 700;
+            font-size: clamp(14px, 3vw, 16px);
+        }
+        .game-invite-sender {
+            font-size: clamp(10px, 2vw, 11px);
+            opacity: 0.8;
+        }
+        .game-invite-waiting {
+            font-size: clamp(11px, 2vw, 12px);
+            opacity: 0.7;
+            text-align: center;
+            padding: clamp(4px, 1vw, 6px) 0;
+        }
+        .game-accept-btn {
+            width: 100%;
+            padding: clamp(10px, 2vw, 12px);
+            background: #fff;
+            color: #764ba2;
+            border: none;
+            border-radius: clamp(8px, 1.5vw, 10px);
+            font-size: clamp(13px, 2.5vw, 15px);
+            font-weight: 700;
+            cursor: pointer;
+            margin: 4px 0 0;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: transform 0.15s;
+            min-height: 44px;
+        }
+        .game-accept-btn:active { transform: scale(0.96); }
+        @media (hover: hover) {
+            .game-accept-btn:hover { transform: scale(1.02); }
+        }
+        .game-cancel-btn {
+            width: 100%;
+            padding: clamp(10px, 2vw, 12px);
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: clamp(8px, 1.5vw, 10px);
+            font-size: clamp(13px, 2.5vw, 15px);
+            font-weight: 600;
+            cursor: pointer;
+            margin: 8px 0 0;
+            min-height: 44px;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: background 0.15s;
+        }
+        .game-cancel-btn:active { background: rgba(255,255,255,0.3); }
+        @media (hover: hover) {
+            .game-cancel-btn:hover { background: rgba(255,255,255,0.35); }
+        }
+
+        /* ========== 游戏结果卡片 ========== */
+        .game-result-card {
+            color: #fff;
+            border-radius: clamp(10px, 2vw, 14px);
+            padding: clamp(10px, 2vw, 14px) clamp(12px, 2.5vw, 16px);
+            min-width: clamp(160px, 35vw, 200px);
+            max-width: clamp(220px, 50vw, 280px);
+            text-align: center;
+        }
+        .game-result-card.win { background: linear-gradient(135deg, #10b981, #059669); }
+        .game-result-card.lose { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .game-result-card.draw { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .game-result-emoji {
+            font-size: clamp(24px, 5vw, 32px);
+            margin-bottom: 4px;
+        }
+        .game-result-text {
+            font-weight: 700;
+            font-size: clamp(14px, 3vw, 16px);
+        }
+        .game-result-game {
+            font-size: clamp(10px, 2vw, 11px);
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+
+        /* ========== 游戏棋盘全屏 ========== */
+        .game-fs {
+            position: fixed;
+            inset: 0;
+            z-index: 9500;
+            background: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            color: #1e293b;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            -webkit-overflow-scrolling: touch;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+
+        .game-fs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: clamp(10px, 2vw, 14px) clamp(12px, 2.5vw, 20px);
+            border-bottom: 1px solid #dde4ed;
+            background: #fff;
+            flex-shrink: 0;
+        }
+        .game-fs-title {
+            font-size: clamp(16px, 3.5vw, 20px);
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .game-fs-close {
+            border: none;
+            background: #e8ecf1;
+            color: #64748b;
+            font-size: clamp(18px, 4vw, 22px);
+            cursor: pointer;
+            padding: 0;
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: background 0.15s;
+            line-height: 1;
+        }
+        .game-fs-close:active { background: #d0d5dd; }
+        @media (hover: hover) {
+            .game-fs-close:hover { background: #dde0e4; }
+        }
+
+        .game-fs-players {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: clamp(10px, 2vw, 20px);
+            padding: clamp(8px, 1.5vw, 12px) clamp(12px, 2.5vw, 16px);
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+        .player-tag-game {
+            padding: clamp(5px, 1vw, 7px) clamp(12px, 2.5vw, 16px);
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: clamp(13px, 2.5vw, 15px);
+        }
+        .player-tag-game.black { background: #1e293b; color: #fff; }
+        .player-tag-game.white { background: #e2e8f0; color: #475569; }
+        .player-tag-game.waiting { background: #fef3c7; color: #b45309; }
+        .vs-text-game {
+            font-size: clamp(11px, 2vw, 13px);
+            color: #94a3b8;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .game-fs-turn {
+            text-align: center;
+            padding: clamp(6px, 1vw, 10px) clamp(12px, 2.5vw, 16px);
+            font-size: clamp(13px, 2.5vw, 15px);
+            font-weight: 600;
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
+        .game-fs-turn.my-turn { color: #2563eb; }
+        .game-fs-turn.waiting { color: #d97706; }
+        .game-fs-turn.win { color: #059669; }
+        .game-fs-turn.lose { color: #dc2626; }
+        .game-fs-turn.draw { color: #d97706; }
+
+        .game-fs-board-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            min-height: 0;
+            touch-action: pan-x pan-y pinch-zoom;
+        }
+
+        .game-fs-too-small {
+            text-align: center;
+            padding: 32px 16px;
+            color: #94a3b8;
+        }
+        .game-fs-too-small-icon {
+            font-size: clamp(36px, 8vw, 48px);
+            margin-bottom: 12px;
+        }
+        .game-fs-too-small-text {
+            font-size: clamp(14px, 3vw, 16px);
+            line-height: 1.5;
+            max-width: 280px;
+        }
+
+        .game-loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #e2e8f0;
+            border-top-color: #2563eb;
+            border-radius: 50%;
+            animation: game-spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes game-spin {
+            to { transform: rotate(360deg); }
+        }
+        .game-loading-text {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .game-board {
+            display: grid;
+            gap: 0;
+            background: #dcb35c;
+            padding: 0;
+            border: 5px solid;
+            border-color: #d4a853 #8b6914 #8b6914 #d4a853;
+            border-radius: 6px;
+            box-shadow:
+                0 3px 10px rgba(0,0,0,0.15),
+                4px 6px 18px rgba(0,0,0,0.25),
+                inset 0 0 0 1px rgba(0,0,0,0.12);
+            flex-shrink: 0;
+            box-sizing: content-box;
+        }
+        .game-cell {
+            background: transparent;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .game-cell::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #2d2d2d;
+            transform: translateY(-0.5px);
+            z-index: 0;
+            pointer-events: none;
+        }
+        .game-cell::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: #2d2d2d;
+            transform: translateX(-0.5px);
+            z-index: 0;
+            pointer-events: none;
+        }
+        .game-cell:active { background: rgba(0,0,0,0.1); }
+        .game-cell .star-dot {
+            position: absolute;
+            width: 22%;
+            height: 22%;
+            background: #1a1a1a;
+            border-radius: 50%;
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .game-piece {
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 4;
+            position: relative;
+        }
+        .game-piece.black {
+            background: radial-gradient(circle at 35% 35%, #555, #111);
+            box-shadow: 2px 3px 6px rgba(0,0,0,0.5);
+        }
+        .game-piece.white {
+            background: radial-gradient(circle at 35% 35%, #fff, #d5d5d5);
+            box-shadow: 2px 3px 6px rgba(0,0,0,0.3);
+        }
+
+        .game-fs-bottom {
+            padding: clamp(10px, 2vw, 14px) clamp(12px, 2.5vw, 16px);
+            border-top: 1px solid #dde4ed;
+            background: #fff;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
+        .game-fs-btn {
+            padding: clamp(10px, 2vw, 12px) clamp(20px, 4vw, 32px);
+            border: none;
+            border-radius: 10px;
+            font-size: clamp(14px, 2.5vw, 16px);
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 46px;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            transition: background 0.15s, transform 0.1s;
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .game-fs-btn:active { transform: scale(0.96); background: #cbd5e1; }
+        .game-fs-btn.cancel { background: #fee2e2; color: #dc2626; }
+        .game-fs-btn.cancel:active { background: #fecaca; }
+        @media (hover: hover) {
+            .game-fs-btn:hover { background: #cbd5e1; }
+            .game-fs-btn.cancel:hover { background: #fecaca; }
         }
 
     </style>
@@ -383,10 +924,12 @@
         <button class="update-close-btn" onclick="window.closeUpdateModal()" aria-label="关闭更新公告">&times;</button>
         <h2 style="margin-bottom:15px;">✨ Harry的聊天室更新</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
+        • 🎮 新增游戏功能：支持五子棋、井字棋对弈，可在聊天中发起挑战。<br>
         • 新增极速模式：设置中开启，优先保证消息收发。<br>
         • 修复消息加载偶发丢失的问题，优化加载稳定性。<br>
         • 撤回消息显示优化，避免残留媒体内容。<br>
-        • 修复未读计数偶尔不准确的问题。
+        • 修复未读计数偶尔不准确的问题。<br>
+        • 优化房间加入/离开日志，自动登录也有日志记录。
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
@@ -400,8 +943,8 @@
 <div id="login-area">
     <div class="login-box">
         <h2>进入 Harry 的聊天室</h2>
-        <input type="text" id="username" placeholder="输入你的名字" autocomplete="off">
-        <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off">
+        <input type="text" id="username" placeholder="输入你的名字" autocomplete="off" inputmode="text">
+        <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off" inputmode="text">
         <div class="remember-me">
             <input type="checkbox" id="auto-login-check" checked>
             <label for="auto-login-check">10天内免登录（自动进入上次房间）</label>
@@ -461,15 +1004,51 @@
         </div>
     </div>
 
+    <!-- 游戏选择弹窗 -->
+    <div id="game-modal" class="game-select-overlay" style="display:none;" onclick="if(event.target===this)window.closeGamePanel()">
+        <div class="game-select-inner">
+            <div class="game-select-header">
+                <strong class="game-select-title">选择小游戏</strong>
+                <button class="game-select-close" onclick="window.closeGamePanel()" aria-label="关闭">✕</button>
+            </div>
+            <div id="game-list" class="game-select-list">
+                <div class="game-option" onclick="window.startGame('五子棋', '⚫')">
+                    <div class="game-option-icon">⚫</div>
+                    <div class="game-option-info">
+                        <div class="game-option-name">五子棋</div>
+                        <div class="game-option-desc">经典五子棋对弈</div>
+                    </div>
+                </div>
+                <div class="game-option" onclick="window.startGame('井字棋', '⭕')">
+                    <div class="game-option-icon">⭕</div>
+                    <div class="game-option-info">
+                        <div class="game-option-name">井字棋</div>
+                        <div class="game-option-desc">三连棋趣味对战</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="input-area">
         <div id="reply-preview"></div>
         <div class="input-wrapper">
             <button id="voice-btn" class="action-btn" aria-label="语音输入">🎙</button>
-            <textarea id="message-input" rows="1" placeholder="输入消息并按回车..." autocomplete="off"></textarea>
+            <textarea id="message-input" rows="1" placeholder="输入消息并按回车..." autocomplete="off" enterkeyhint="send" inputmode="text"></textarea>
             <button id="emoji-btn" class="action-btn" onclick="window.toggleEmojiPanel(event)" aria-label="发送表情">☺</button>
-            <button id="add-btn" class="action-btn" onclick="window.triggerImageUpload()" aria-label="发送图片或音频">+</button>
+            <button id="add-btn" class="action-btn" onclick="window.toggleAttachPanel()" aria-label="更多功能">+</button>
         </div>
         <div id="emoji-panel" aria-label="表情面板"></div>
+        <div id="attach-panel" aria-label="附件面板">
+            <div class="attach-item" onclick="window.triggerImageUpload(); window.closeAttachPanel();">
+                <div class="attach-icon">🖼</div>
+                <div class="attach-label">图片</div>
+            </div>
+            <div class="attach-item" onclick="window.openGamePanel(); window.closeAttachPanel();">
+                <div class="attach-icon">🎮</div>
+                <div class="attach-label">小游戏</div>
+            </div>
+        </div>
  
         <!-- 隐藏的文件选择器 -->
         <input type="file" id="file-input" accept="image/*,audio/*" style="display:none;" onchange="window.handleFileSelect(event)">
@@ -724,6 +1303,7 @@
     let speechRecognition = null;
     let speechTranscript = '';
     let presenceActive = false;
+    let pendingJoinAnnounce = false;
     let presenceIdleTimer = null;
     const PRESENCE_IDLE_MS = 2 * 60 * 1000;
     let realtimePolling = null;
@@ -794,12 +1374,23 @@
             }
         }
 
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                const chatBox = document.getElementById('chat-box');
+                if (chatBox && chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 100) {
+                    requestAnimationFrame(() => {
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    });
+                }
+            });
+        }
+
         const voiceButton = document.getElementById('voice-btn');
         const messageInput = document.getElementById('message-input');
-        const isMobile = () => window.matchMedia('(max-width: 600px), (pointer: coarse)').matches;
+        const isMobileDevice = () => window.matchMedia('(max-width: 600px), (pointer: coarse)').matches;
         voiceButton.addEventListener('click', (event) => {
             event.preventDefault();
-            if (isMobile()) {
+            if (isMobileDevice()) {
                 mobileVoiceMode = !mobileVoiceMode;
                 voiceButton.classList.toggle('voice-mode', mobileVoiceMode);
                 messageInput.placeholder = mobileVoiceMode ? '长按此处录音，松开发送' : '输入消息并按回车...';
@@ -809,7 +1400,7 @@
             else startVoiceRecording({ pointerId: null, inputSource: 'desktop' });
         });
         messageInput.addEventListener('pointerdown', (event) => {
-            if (!mobileVoiceMode || !isMobile()) return;
+            if (!mobileVoiceMode || !isMobileDevice()) return;
             event.preventDefault();
             startVoiceRecording({ pointerId: event.pointerId, inputSource: 'mobile-input' });
         });
@@ -830,6 +1421,7 @@
             if (now < parseInt(expiry)) {
                 currentRoomCode = savedRoom;
                 mySender = savedToken; 
+                pendingJoinAnnounce = true;
                 showRoomLoading();
                 document.getElementById('room-title').innerText = currentRoomCode;
                 applyRoomBackground();
@@ -969,6 +1561,7 @@
 
         localStorage.setItem('chat_auth_token', nameInput);
         mySender = nameInput; 
+        pendingJoinAnnounce = true; 
 
         if (isAutoLogin) {
             const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000); 
@@ -1282,7 +1875,12 @@
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
                     stopPolling();
-                    await setPresenceActive(true, false);
+                    const announce = pendingJoinAnnounce;
+                    pendingJoinAnnounce = false;
+                    await setPresenceActive(true, announce);
+                    if (announce) {
+                        appendSystemMessage(`${mySender} 加入了房间`);
+                    }
                     resetPresenceIdleTimer();
                     if (realtimeReadyResolve) realtimeReadyResolve();
                 } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -1371,8 +1969,14 @@
         presenceActive = active;
         if (active) {
             await roomSubscription.track({ user: mySender, room: currentRoomCode });
+            if (announce) {
+                roomSubscription.send({ type: 'broadcast', event: 'presence_notice', payload: { user: mySender, room: currentRoomCode, text: `${mySender} 加入了房间` } });
+            }
         } else {
             await roomSubscription.untrack();
+            if (announce) {
+                roomSubscription.send({ type: 'broadcast', event: 'presence_notice', payload: { user: mySender, room: currentRoomCode, text: `${mySender} 离开了房间` } });
+            }
         }
         updateOnlineCount();
     }
@@ -1413,8 +2017,30 @@
         document.addEventListener(eventName, resetPresenceIdleTimer, { passive: true });
     });
 
+    window.toggleAttachPanel = function() {
+        const panel = document.getElementById('attach-panel');
+        const emojiPanel = document.getElementById('emoji-panel');
+        if (emojiPanel) emojiPanel.classList.remove('visible');
+        panel.classList.toggle('visible');
+    };
+
+    window.closeAttachPanel = function() {
+        const panel = document.getElementById('attach-panel');
+        if (panel) panel.classList.remove('visible');
+    };
+
     window.triggerImageUpload = function() {
         document.getElementById('file-input').click();
+    };
+
+    window.openGamePanel = function() {
+        const modal = document.getElementById('game-modal');
+        if (modal) modal.style.display = 'flex';
+    };
+
+    window.closeGamePanel = function() {
+        const modal = document.getElementById('game-modal');
+        if (modal) modal.style.display = 'none';
     };
 
     const CHAT_EMOJIS = ['😀','😃','😄','😁','😆','😅','😂','🤣','😊','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🫡','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','👍','👎','👏','🙌','🙏','💪','❤️','💔','💯','✨','🎉','🔥','✅','❌','⭐','☀️','🌈'];
@@ -1468,12 +2094,16 @@
     window.toggleEmojiPanel = function(event) {
         event?.stopPropagation();
         const panel = document.getElementById('emoji-panel');
+        const attachPanel = document.getElementById('attach-panel');
+        if (attachPanel) attachPanel.classList.remove('visible');
         renderEmojiPanel();
         panel.classList.toggle('visible');
     };
     document.addEventListener('click', (event) => {
         const panel = document.getElementById('emoji-panel');
         if (panel && !panel.contains(event.target) && event.target.id !== 'emoji-btn') panel.classList.remove('visible');
+        const attachPanel = document.getElementById('attach-panel');
+        if (attachPanel && !attachPanel.contains(event.target) && event.target.id !== 'add-btn') attachPanel.classList.remove('visible');
     });
 
     window.handleFileSelect = async function(event) {
@@ -1531,7 +2161,7 @@
     };
 
     function getAudioMimeType() {
-        const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+        const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/ogg;codecs=opus'];
         return candidates.find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || '';
     }
 
@@ -1543,16 +2173,32 @@
         speechRecognition.lang = 'zh-CN';
         speechRecognition.continuous = true;
         speechRecognition.interimResults = true;
+        speechRecognition.maxAlternatives = 1;
         speechRecognition.onresult = (event) => {
             let text = '';
-            for (let i = 0; i < event.results.length; i++) text += event.results[i][0].transcript;
+            for (let i = 0; i < event.results.length; i++) {
+                if (event.results[i].isFinal) {
+                    text += event.results[i][0].transcript;
+                } else {
+                    text += event.results[i][0].transcript;
+                }
+            }
             speechTranscript = text.trim();
         };
         speechRecognition.onerror = (event) => {
-            if (event.error !== 'no-speech' && event.error !== 'aborted') console.warn('speech recognition failed:', event.error);
+            if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                console.warn('语音识别失败:', event.error);
+            }
         };
-        speechRecognition.onend = () => { speechRecognition = null; };
-        try { speechRecognition.start(); } catch (error) { speechRecognition = null; }
+        speechRecognition.onend = () => {
+            speechRecognition = null;
+        };
+        try {
+            speechRecognition.start();
+        } catch (error) {
+            console.warn('语音识别启动失败:', error);
+            speechRecognition = null;
+        }
     }
 
     function stopSpeechRecognition() {
@@ -1619,8 +2265,9 @@
     }
 
     async function uploadRecordedAudio(chunks, mimeType, transcript = '') {
-        const extension = mimeType.includes('mp4') ? 'm4a' : 'webm';
-        const file = new File([new Blob(chunks, { type: mimeType })], `voice_${Date.now()}.${extension}`, { type: mimeType });
+        const extMap = { 'audio/mp4': 'm4a', 'audio/aac': 'aac', 'audio/wav': 'wav', 'audio/ogg': 'ogg' };
+        const extension = extMap[mimeType] || (mimeType.includes('webm') ? 'webm' : 'm4a');
+        const file = new File([new Blob(chunks, { type: mimeType || 'audio/webm' })], `voice_${Date.now()}.${extension}`, { type: mimeType || 'audio/webm' });
         if (file.size > 15 * 1024 * 1024) {
             showToast('语音文件过大，请缩短录音后重试。', 'error');
             return;
@@ -2077,7 +2724,7 @@
             mediaType = null;
         } else if (mediaUrl) {
             if (mediaType === 'image') {
-                mediaHtml = `<div class="msg-img-placeholder"></div><img src="${escapeHtml(mediaUrl)}" class="msg-img loading" alt="图片消息" onload="this.classList.remove('loading');this.classList.add('loaded');this.previousElementSibling.remove();" onerror="this.previousElementSibling.innerText='图片加载失败';this.previousElementSibling.style.cssText='display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;';">`;
+                mediaHtml = `<div class="msg-img-placeholder"></div><img src="${escapeHtml(mediaUrl)}" class="msg-img loading" alt="图片消息" loading="lazy" decoding="async" onload="this.classList.remove('loading');this.classList.add('loaded');this.previousElementSibling.remove();" onerror="this.previousElementSibling.innerText='图片加载失败';this.previousElementSibling.style.cssText='display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;';">`;
                 wrapper.classList.add('media-only');
             } else if (mediaType === 'audio') {
                 mediaHtml = voiceMessageHtml(mediaUrl, displayContent);
@@ -2099,6 +2746,9 @@
         `;
         const messageImage = wrapper.querySelector('.msg-img');
         if (messageImage) messageImage.onclick = () => openImageLightbox(messageImage.src);
+        if (typeof handleGameMessageInUI === 'function') {
+            handleGameMessageInUI(wrapper, sender, content);
+        }
         const replyTarget = wrapper.querySelector('.reply-quote');
         if (replyTarget) {
             if (replyTarget.dataset.replyId) replyTarget.onclick = () => goToMessage(replyTarget.dataset.replyId);
@@ -2695,7 +3345,8 @@
     };
 
     function isIOS() {
-        return /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+        return /iPhone|iPad|iPod/.test(navigator.userAgent || '') ||
+            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     }
 
     function isAndroid() {
@@ -2708,6 +3359,7 @@
 
     function isStandalone() {
         return window.matchMedia('(display-mode: standalone)').matches
+            || window.matchMedia('(display-mode: fullscreen)').matches
             || (navigator.standalone !== undefined && navigator.standalone);
     }
 
@@ -2901,5 +3553,6 @@
     });
 
 </script>
+<script src="game.js" defer></script>
 </body>
 </html>
