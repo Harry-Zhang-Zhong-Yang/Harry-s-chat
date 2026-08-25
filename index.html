@@ -1099,20 +1099,17 @@
             <button onclick="window.closeWxNotifySetup(null)" style="width:auto;margin:0;padding:4px 10px;background:transparent;color:#999;font-size:20px;border:none;cursor:pointer;">✕</button>
         </div>
         <p style="font-size:13px;color:#666;margin:8px 0 16px;line-height:1.6;">
-            有新消息时，通过微信收到通知提醒。
+            扫码关注公众号，有新消息时微信通知你。
         </p>
-        <div style="background:#f0f7ff;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#555;line-height:1.8;">
-            <b>如何获取 Token：</b><br>
-            ① 打开 <a href="http://www.pushplus.plus/" target="_blank" style="color:#2563eb;">pushplus.plus</a><br>
-            ② 点击右上角"登录"，用微信扫码<br>
-            ③ 登录后点击左侧"发送消息"<br>
-            ④ 复制页面上的 <b>Token</b>（32位字符串）<br>
-            ⑤ 粘贴到下方输入框，点击保存
+        <div id="wx-qrcode-area" style="text-align:center;margin:16px 0;">
+            <img id="wx-qrcode-img" src="" alt="微信扫码绑定" style="width:200px;height:200px;border:1px solid #eee;border-radius:8px;">
         </div>
-        <input type="text" id="wx-token-input" placeholder="粘贴你的 PushPlus Token" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:12px;">
-        <div style="display:flex;gap:8px;">
-            <button id="wx-save-btn" onclick="window.saveWxToken()" style="flex:1;margin:0;">保存</button>
-            <button id="wx-delete-btn" onclick="window.deleteWxToken()" style="flex:1;margin:0;background:#dc3545;">取消通知</button>
+        <p style="font-size:12px;color:#888;text-align:center;line-height:1.6;">
+            微信扫一扫 → 关注公众号 → 自动绑定
+        </p>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+            <button id="wx-check-btn" onclick="window.checkWxBind()" style="flex:1;margin:0;">检查绑定状态</button>
+            <button id="wx-delete-btn" onclick="window.deleteWxBind()" style="flex:1;margin:0;background:#dc3545;display:none;">取消通知</button>
         </div>
         <p id="wx-notify-status" style="text-align:center;font-size:12px;margin-top:10px;color:#8a9099;"></p>
     </div>
@@ -1176,9 +1173,22 @@
     function updateWxNotifyButton() {
         const btn = document.getElementById('wx-notify-btn');
         if (!btn || !currentRoomCode) return;
-        const saved = localStorage.getItem('wx_pushplus_token_' + currentRoomCode);
-        btn.textContent = saved ? '微信通知 ✓' : '配置微信通知';
+        checkWxBindStatus().then(bound => {
+            btn.textContent = bound ? '微信通知 ✓' : '配置微信通知';
+        });
     }
+
+    async function checkWxBindStatus() {
+        if (!currentRoomCode || !supabaseClient) return false;
+        const { data } = await supabaseClient
+            .from('wxpusher_uids')
+            .select('uid')
+            .eq('room_code', currentRoomCode)
+            .eq('user_name', mySender)
+            .maybeSingle();
+        return !!data;
+    }
+
     let replyData = null;
     let roomSubscription = null;
     let realtimeReady = Promise.resolve();
@@ -1223,22 +1233,77 @@
         document.getElementById('room-loading').classList.add('hidden');
     }
 
-    window.showWxNotifySetup = function() {
+    window.showWxNotifySetup = async function() {
         const modal = document.getElementById('wx-notify-modal');
-        const input = document.getElementById('wx-token-input');
         const status = document.getElementById('wx-notify-status');
         const delBtn = document.getElementById('wx-delete-btn');
+        const checkBtn = document.getElementById('wx-check-btn');
+        const qrImg = document.getElementById('wx-qrcode-img');
         status.textContent = '';
-        const saved = localStorage.getItem('wx_pushplus_token_' + currentRoomCode);
-        if (saved) {
-            input.value = saved;
+
+        const bound = await checkWxBindStatus();
+        if (bound) {
             delBtn.style.display = 'block';
+            checkBtn.style.display = 'none';
+            qrImg.style.display = 'none';
+            status.textContent = '✅ 已绑定微信通知';
+            status.style.color = '#20c997';
         } else {
-            input.value = '';
             delBtn.style.display = 'none';
+            checkBtn.style.display = 'block';
+            qrImg.style.display = 'block';
+            status.textContent = '正在生成二维码...';
+            const extra = currentRoomCode + ':' + mySender;
+            const qrUrl = await createWxPusherQrCode(extra);
+            if (qrUrl) {
+                qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(qrUrl);
+                status.textContent = '';
+            } else {
+                status.textContent = '二维码生成失败，请重试';
+                status.style.color = '#dc3545';
+            }
         }
         modal.classList.add('show');
         document.getElementById('settings-modal').style.display = 'none';
+    };
+
+    async function createWxPusherQrCode(extra) {
+        try {
+            const res = await fetch('https://wxpusher.zjiecode.com/api/fun/create/qrcode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    appToken: 'AT_lx7t01tEWGI9yb9Z5b2ZJRzVwZpQBiHd',
+                    extra: extra,
+                    validTime: 1800
+                })
+            });
+            const data = await res.json();
+            if (data.code === 1000 && data.data) {
+                return data.data.url || data.data.shortUrl;
+            }
+            return null;
+        } catch (e) {
+            console.error('创建二维码失败:', e);
+            return null;
+        }
+    }
+
+    window.checkWxBind = async function() {
+        const status = document.getElementById('wx-notify-status');
+        const bound = await checkWxBindStatus();
+        if (bound) {
+            status.textContent = '✅ 绑定成功！微信通知已开启';
+            status.style.color = '#20c997';
+            document.getElementById('wx-delete-btn').style.display = 'block';
+            document.getElementById('wx-check-btn').style.display = 'none';
+            document.getElementById('wx-qrcode-img').style.display = 'none';
+            document.getElementById('wx-notify-btn').textContent = '微信通知 ✓';
+            setTimeout(() => window.closeWxNotifySetup(null), 1500);
+        } else {
+            status.textContent = '⚠️ 尚未绑定，请扫码关注公众号后点击检查';
+            status.style.color = '#e67e22';
+        }
     };
 
     window.closeWxNotifySetup = function(event) {
@@ -1247,43 +1312,18 @@
         document.getElementById('settings-modal').style.display = 'flex';
     };
 
-    window.saveWxToken = async function() {
-        const token = document.getElementById('wx-token-input').value.trim();
-        const status = document.getElementById('wx-notify-status');
-        if (!token) { status.textContent = '请输入 Token'; return; }
-        if (token.length < 30) { status.textContent = 'Token 格式不正确'; return; }
-        try {
-            const { error } = await supabaseClient.from('pushplus_tokens').upsert({
-                room_code: currentRoomCode,
-                user_name: mySender,
-                token: token
-            }, { onConflict: 'room_code,user_name' });
-            if (error) throw error;
-            localStorage.setItem('wx_pushplus_token_' + currentRoomCode, token);
-            status.textContent = '✅ 微信通知已开启！';
-            status.style.color = '#20c997';
-            document.getElementById('wx-delete-btn').style.display = 'block';
-            document.getElementById('wx-notify-btn').textContent = '微信通知 ✓';
-            setTimeout(() => window.closeWxNotifySetup(null), 1500);
-        } catch (e) {
-            console.error('保存 Token 失败:', e);
-            status.textContent = '保存失败，请重试';
-            status.style.color = '#dc3545';
-        }
-    };
-
-    window.deleteWxToken = async function() {
+    window.deleteWxBind = async function() {
         const status = document.getElementById('wx-notify-status');
         try {
-            await supabaseClient.from('pushplus_tokens').delete().eq('room_code', currentRoomCode).eq('user_name', mySender);
-            localStorage.removeItem('wx_pushplus_token_' + currentRoomCode);
-            document.getElementById('wx-token-input').value = '';
+            await supabaseClient.from('wxpusher_uids').delete().eq('room_code', currentRoomCode).eq('user_name', mySender);
             document.getElementById('wx-delete-btn').style.display = 'none';
+            document.getElementById('wx-check-btn').style.display = 'block';
+            document.getElementById('wx-qrcode-img').style.display = 'block';
             document.getElementById('wx-notify-btn').textContent = '配置微信通知';
             status.textContent = '已取消微信通知';
             status.style.color = '#8a9099';
         } catch (e) {
-            console.error('删除 Token 失败:', e);
+            console.error('取消绑定失败:', e);
             status.textContent = '取消失败，请重试';
             status.style.color = '#dc3545';
         }
