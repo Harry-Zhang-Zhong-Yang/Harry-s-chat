@@ -844,11 +844,10 @@
                 applyRoomBackground();
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 hideRoomLoading();
-                startPolling();
                 ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
                 await loadHistory(true);
                 initRealtime();
-                scrollToBottomInstant();
+                startPolling();
             } else {
                 localStorage.removeItem('chat_last_room');
                 localStorage.removeItem('chat_auth_expiry');
@@ -1000,11 +999,10 @@
 
         try {
             hideRoomLoading();
-            startPolling();
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
             await loadHistory(true);
             initRealtime();
-            scrollToBottomInstant();
+            startPolling();
         } catch (error) {
             console.error('进入房间失败:', error);
             document.getElementById('login-area').style.display = 'flex';
@@ -1097,7 +1095,9 @@
                     }
                 });
                 console.info(`[chat] 加载了 ${msgs.length} 条历史消息`);
-                chatBox.scrollTop = chatBox.scrollHeight;
+                requestAnimationFrame(() => {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                });
                 oldestLoadedAt = msgs[0].created_at;
                 noMoreHistory = msgs.length < PAGE_SIZE;
                 if (!isSpeedMode) {
@@ -1263,7 +1263,7 @@
                     if (existingTemp && existingTemp.dataset.sending === 'false') return;
                 }
                 appendMessageToUI(payload.new.id, payload.new.sender, payload.new.content, true, payload.new.created_at, payload.new.media_url, payload.new.media_type);
-                scrollToBottomInstant();
+                requestAnimationFrame(() => scrollToBottomInstant());
             })
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -1302,6 +1302,7 @@
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
                     console.log('Realtime 已连接');
+                    stopPolling();
                     showConnectionBar('已连接', 'reconnected');
                     setTimeout(() => hideConnectionBar(), 2000);
                     await setPresenceActive(true, false);
@@ -1360,7 +1361,7 @@
                         appendMessageToUI(msg.id, msg.sender, msg.content, true, msg.created_at, msg.media_url, msg.media_type);
                     }
                     lastKnownMessageId = data[data.length - 1].id;
-                    scrollToBottomInstant();
+                    requestAnimationFrame(() => scrollToBottomInstant());
                 }
             } catch (e) { /* ignore polling errors */ }
         }, 5000);
