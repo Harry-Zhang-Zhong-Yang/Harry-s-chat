@@ -847,11 +847,8 @@
                 startPolling();
                 ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
                 await loadHistory(true);
-                scrollToBottomInstant();
                 initRealtime();
-                setTimeout(scrollToBottomInstant, 200);
-                setTimeout(scrollToBottomInstant, 500);
-                setTimeout(scrollToBottomInstant, 1000);
+                scrollToBottomInstant();
             } else {
                 localStorage.removeItem('chat_last_room');
                 localStorage.removeItem('chat_auth_expiry');
@@ -1006,11 +1003,8 @@
             startPolling();
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
             await loadHistory(true);
-            scrollToBottomInstant();
             initRealtime();
-            setTimeout(scrollToBottomInstant, 200);
-            setTimeout(scrollToBottomInstant, 500);
-            setTimeout(scrollToBottomInstant, 1000);
+            scrollToBottomInstant();
         } catch (error) {
             console.error('进入房间失败:', error);
             document.getElementById('login-area').style.display = 'flex';
@@ -1104,7 +1098,6 @@
                 });
                 console.info(`[chat] 加载了 ${msgs.length} 条历史消息`);
                 chatBox.scrollTop = chatBox.scrollHeight;
-                requestAnimationFrame(() => setTimeout(() => scrollToBottom(), 0));
                 oldestLoadedAt = msgs[0].created_at;
                 noMoreHistory = msgs.length < PAGE_SIZE;
                 if (!isSpeedMode) {
@@ -1270,6 +1263,7 @@
                     if (existingTemp && existingTemp.dataset.sending === 'false') return;
                 }
                 appendMessageToUI(payload.new.id, payload.new.sender, payload.new.content, true, payload.new.created_at, payload.new.media_url, payload.new.media_type);
+                scrollToBottomInstant();
             })
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -1366,6 +1360,7 @@
                         appendMessageToUI(msg.id, msg.sender, msg.content, true, msg.created_at, msg.media_url, msg.media_type);
                     }
                     lastKnownMessageId = data[data.length - 1].id;
+                    scrollToBottomInstant();
                 }
             } catch (e) { /* ignore polling errors */ }
         }, 5000);
@@ -2209,11 +2204,6 @@
             }
 
         } catch (e) { console.error('cache error', e); }
-
-        const atBottom = (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight) < 60;
-        if (isNew && atBottom) {
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
     }
 
     function formatMessageTime(date) {
@@ -2233,13 +2223,6 @@
 
     const chatBoxEl = document.getElementById('chat-box');
     let pressTimer;
-
-    // 跳到底部
-    function scrollToBottom() {
-        const chatBox = document.getElementById('chat-box');
-        if (!chatBox) return;
-        chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
-    }
 
     function scrollToBottomInstant() {
         const chatBox = document.getElementById('chat-box');
