@@ -842,12 +842,12 @@
                 showRoomLoading();
                 document.getElementById('room-title').innerText = currentRoomCode;
                 applyRoomBackground();
-                setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
-                hideRoomLoading();
-                ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
                 await loadHistory(true);
+                hideRoomLoading();
+                setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
+                ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
                 initRealtime();
-                startPolling();
+                realtimeReady.catch(() => startPolling());
             } else {
                 localStorage.removeItem('chat_last_room');
                 localStorage.removeItem('chat_auth_expiry');
@@ -995,14 +995,14 @@
         showRoomLoading();
         document.getElementById('room-title').innerText = currentRoomCode; 
         applyRoomBackground();
-        setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
 
         try {
-            hideRoomLoading();
-            ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
             await loadHistory(true);
+            hideRoomLoading();
+            setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
+            ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
             initRealtime();
-            startPolling();
+            realtimeReady.catch(() => startPolling());
         } catch (error) {
             console.error('进入房间失败:', error);
             document.getElementById('login-area').style.display = 'flex';
