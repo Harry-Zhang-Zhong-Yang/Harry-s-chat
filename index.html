@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Harry的聊天室</title>
+
+    <meta name="theme-color" content="#07c475">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="聊天室">
+    <link rel="apple-touch-startup-image" href="/icon-512.png">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="manifest" href="/manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -18,6 +26,7 @@
         .msg-content > div { text-align: left; }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        button, a, input, textarea, .action-btn, .nav-icon, .clickable { touch-action: manipulation; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
             background-color: #e8ecf1;
@@ -34,6 +43,10 @@
         .update-modal-content {
             background: white; padding: 28px; border-radius: 16px; width: 90%; max-width: 400px; text-align: center;
             animation: modalIn 0.3s ease-out;
+            max-height: 85vh; max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+        }
+        @media (max-width: 600px) {
+            .update-modal-content { padding: 20px 16px !important; width: 92% !important; }
         }
         @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
@@ -41,7 +54,7 @@
         #login-area { position: fixed; inset: 0; background: #f7f8fa; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; transition: opacity 0.25s ease; }
         .login-box { width: 100%; max-width: 380px; padding: 34px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 12px 35px rgba(32,33,36,0.06); }
         .login-box h2 { margin-bottom: 26px; text-align: center; color: var(--text-main); font-size: 22px; letter-spacing: -0.02em; }
-        input { width: 100%; padding: 13px 14px; margin: 8px 0; border: 1px solid #dfe3e8; border-radius: 9px; font-size: 16px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+        input { width: 100%; padding: 13px 14px; margin: 8px 0; border: 1px solid #dfe3e8; border-radius: 9px; font-size: 16px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: #fff; }
         input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
         button { width: 100%; padding: 13px 14px; background: var(--btn-color); color: white; border: none; border-radius: 9px; font-size: 15px; cursor: pointer; margin-top: 15px; font-weight: 600; transition: opacity 0.2s, transform 0.2s; }
         button:active { opacity: 0.8; }
@@ -129,7 +142,7 @@
         .right { align-self: flex-end; text-align: right; }
 
         .msg-content { 
-            width:fit-content; max-width:100%; padding: clamp(8px, 1.1vw, 10px) clamp(10px, 1.4vw, 13px) 18px; border-radius: 14px; font-size: clamp(14px, 1.45vw, 15px); line-height: 1.55;
+            width:fit-content; max-width:100%; padding: clamp(8px, 1.1vw, 10px) clamp(10px, 1.4vw, 13px); border-radius: 14px; font-size: clamp(14px, 1.45vw, 15px); line-height: 1.55;
             position: relative; box-shadow: none;
             display: flex; flex-direction: column; gap: 6px;
             background: #fff; transition: background 0.12s ease, box-shadow 0.12s ease;
@@ -142,9 +155,6 @@
         .msg-send-status.sending { animation: pulse 1.2s ease-in-out infinite; }
         .msg-send-status.failed { color: #dc3545; opacity: 1; cursor: pointer; }
         .msg-send-status.failed:hover { text-decoration: underline; }
-        .msg-meta { position: absolute; bottom: 2px; right: 10px; font-size: 10px; opacity: 0; transition: opacity 0.2s; color: inherit; white-space: nowrap; }
-        .msg-content:hover .msg-meta { opacity: 0.6; }
-        .left .msg-meta { right: auto; left: 10px; }
 
         .msg-img-placeholder { width: 100%; max-width: 320px; height: 180px; border-radius: 8px; background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%); background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite; margin-top: 5px; display: block; }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
@@ -164,9 +174,6 @@
         .right .msg-content { background: var(--bubble-color); color: white; }
         .msg-wrapper.media-only .msg-content { padding:0; border:0; background:transparent; box-shadow:none; }
         .msg-wrapper.media-only .msg-content > div:first-child { line-height: 0; }
-        .msg-wrapper.media-only .msg-meta { position: absolute; bottom: -18px; right: 4px; opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
-        .msg-wrapper.media-only.left .msg-meta { right: auto; left: 4px; }
-        .msg-wrapper.media-only:hover .msg-meta { opacity: 0.7; }
         .msg-wrapper.media-only .msg-content { position: relative; }
         .msg-wrapper.media-only .reply-quote { margin-bottom: 4px; }
 
@@ -181,6 +188,40 @@
             .online-count { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
             .context-menu { min-width: 200px; right: 8px !important; left: auto !important; }
             .context-menu button { font-size:16px; padding:12px 14px; }
+            .action-btn { width: 38px; height: 38px; padding: 6px; font-size: 18px; }
+            #message-input { font-size: 16px; }
+            .login-box { padding: 24px 20px; border-radius: 0; max-width: 100%; }
+            .login-box h2 { font-size: 19px; margin-bottom: 20px; }
+            input { padding: 14px 15px; font-size: 16px; }
+            button { padding: 14px; font-size: 16px; }
+            .settings-header h3 { font-size: 16px; }
+            .settings-row-item { padding: 12px 10px; font-size: 14px; }
+            .settings-row-item label { font-size: 14px; }
+            #emoji-panel { right: 10px; width: calc(100vw - 40px); grid-template-columns: repeat(8, 1fr); }
+            .modal-content { width: 94%; max-width: 94%; max-height: 85vh; border-radius: 12px; padding: 16px; }
+            .message-avatar { width: 28px; height: 28px; flex: 0 0 28px; font-size: 11px; }
+            .sender-name { font-size: 11px; }
+            .msg-content { font-size: 15px; }
+            #jump-bottom { bottom: 80px; right: 12px; width: 36px; height: 36px; font-size: 16px; }
+            #install-popup > div { width: 94% !important; padding: 16px !important; }
+        }
+
+        @media (min-width: 601px) and (max-width: 1024px) {
+            #chat-container { max-width: 100%; }
+            .msg-wrapper { max-width: 75%; }
+            #message-input { min-height: 44px; }
+            #chat-box { padding: 20px 24px 24px; }
+            .action-btn { width: 40px; height: 40px; }
+        }
+
+        @media (min-width: 1025px) {
+            #chat-box { padding: 24px 40px 28px; }
+            .msg-wrapper { max-width: 60%; }
+            #message-input { min-height: 48px; }
+            #back-btn { font-size: 30px; }
+            #chat-container { border-radius: 0; }
+            .action-btn { width: 42px; height: 42px; font-size: 20px; }
+            .context-menu { min-width: 180px; }
         }
 
         .sender-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; display: block; opacity: 0.72; }
@@ -263,7 +304,8 @@
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         .modal-content { 
             background: white; padding: 18px 20px; border-radius: 16px; width: min(100%, 450px);
-            max-height: calc(100dvh - 24px); overflow-y: auto; position: relative; box-shadow: 0 16px 45px rgba(20,25,35,0.16);
+            max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+            position: relative; box-shadow: 0 16px 45px rgba(20,25,35,0.16);
         }
         .settings-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
         .settings-header h3 { font-size:20px; font-weight:600; color:var(--text-main); }
@@ -328,6 +370,12 @@
         .update-close-btn { position: absolute; top: 8px; right: 12px; width: 32px; height: 32px; padding: 0; margin: 0; background: transparent; border: 0; font-size: 22px; color: #8a9099; cursor: pointer; border-radius: 50%; line-height: 1; }
         .update-close-btn:hover { background: #f3f5f7; color: #202124; }
 
+        /* PWA 独立窗口安全区域适配 */
+        @media (display-mode: standalone) {
+            #chat-container { padding-top: env(safe-area-inset-top, 0px); }
+            #input-area { padding-bottom: env(safe-area-inset-bottom, 0px); }
+        }
+
     </style>
 </head>
 <body id="app-body">
@@ -335,9 +383,24 @@
 <!-- Toast 通知容器 -->
 <div id="toast-container"></div>
 
+<!-- 安装到桌面弹窗 -->
+<div id="install-popup" style="display:none; position:fixed; inset:0; z-index:9800; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this)window.dismissInstallPopup()">
+    <div style="background:white; width:92%; max-width:380px; max-height:85vh; max-height:85dvh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; border-radius:16px; padding:clamp(16px,4vw,24px); text-align:center; position:relative;">
+        <button onclick="window.dismissInstallPopup()" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:22px; color:#8a9099; cursor:pointer; width:auto; padding:4px 8px; margin:0; line-height:1;">✕</button>
+        <div style="font-size:40px; margin-bottom:10px; margin-top:8px;" id="install-popup-icon">📱</div>
+        <div style="font-size:18px; font-weight:700; color:#202124; margin-bottom:6px;" id="install-popup-title">安装到桌面，体验更好</div>
+        <div style="font-size:13px; color:#8a9099; margin-bottom:16px; line-height:1.6;" id="install-popup-desc">安装后可使用后台通知、全屏聊天</div>
+        <div style="background:#f5f5f5; border-radius:10px; padding:12px; margin-bottom:14px; text-align:left; font-size:13px; line-height:1.8;" id="install-popup-steps"></div>
+        <div id="install-popup-actions">
+            <button id="install-popup-btn" onclick="window.doInstallPWA()" style="width:100%; padding:12px; background:#07c475; color:white; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer;">查看教程</button>
+        </div>
+        <div id="install-popup-noremind" style="margin-top:12px; font-size:12px; color:#8a9099; cursor:pointer;" onclick="window.dismissInstallPopupForever()">不再提示</div>
+    </div>
+</div>
+
 <!-- 更新公告 -->
-<div id="update-modal" onclick="window.closeUpdateModal()">
-    <div class="update-modal-content" onclick="event.stopPropagation()" style="position:relative;">
+<div id="update-modal" onclick="window.closeUpdateModal()" style="padding:16px;">
+    <div class="update-modal-content" onclick="event.stopPropagation()" style="position:relative; max-height:85vh; max-height:85dvh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; width:92%; max-width:400px;">
         <button class="update-close-btn" onclick="window.closeUpdateModal()" aria-label="关闭更新公告">&times;</button>
         <h2 style="margin-bottom:15px;">✨ Harry的聊天室更新</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:#f9f9f9; padding:15px; border-radius:12px; font-size:14px;">
@@ -393,8 +456,8 @@
         </div>
     </div>
 
-    <div id="room-name-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:9500; background:rgba(0,0,0,0.35);" onclick="if(event.target===this)window.closeRoomNameModal()">
-        <div style="background:white; width:90%; max-width:400px; border-radius:12px; padding:20px; display:flex; flex-direction:column; gap:12px;">
+    <div id="room-name-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:9500; background:rgba(0,0,0,0.35); padding:16px;" onclick="if(event.target===this)window.closeRoomNameModal()">
+        <div style="background:white; width:92%; max-width:400px; max-height:85vh; max-height:85dvh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; border-radius:12px; padding:clamp(16px,4vw,24px); display:flex; flex-direction:column; gap:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <strong>修改房间名称</strong>
                 <button onclick="window.closeRoomNameModal()" style="border:none; background:none; font-size:20px; cursor:pointer;">&times;</button>
@@ -408,8 +471,8 @@
     </div>
 
     <!-- 搜索结果 Modal -->
-    <div id="search-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:9000; background:rgba(0,0,0,0.35);">
-        <div style="background:white; width:95%; max-width:720px; max-height:80vh; border-radius:12px; padding:12px; display:flex; flex-direction:column;">
+    <div id="search-modal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center; z-index:9000; background:rgba(0,0,0,0.35); padding:16px;">
+        <div style="background:white; width:95%; max-width:720px; max-height:85vh; max-height:85dvh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; border-radius:12px; padding:clamp(12px,3vw,20px); display:flex; flex-direction:column;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                 <strong>搜索消息</strong>
                 <button onclick="closeSearchModal()" style="border:none; background:none; font-size:20px; cursor:pointer;">✕</button>
@@ -542,11 +605,8 @@
 
     async function registerPushWorker() {
         if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-            const ua = navigator.userAgent || '';
-            const isIOS = /iPhone|iPad|iPod/.test(ua);
-            const isSafari = /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua);
-            if (isIOS && isSafari) {
-                throw new Error('iOS Safari 需要将网站添加到主屏幕（PWA模式）才能使用后台通知，或使用最新 iOS 16.4+ 系统');
+            if (isIOS() && !isStandalone()) {
+                throw new Error('请先将网站添加到主屏幕，然后重新开启通知');
             }
             throw new Error('当前浏览器不支持后台通知，请使用最新版 Chrome 或 Edge');
         }
@@ -587,14 +647,13 @@
             setPushStatus('请先配置通知服务', true);
             return;
         }
+        if (isIOS() && !isStandalone()) {
+            showInstallBanner();
+            setPushStatus('请先将网站添加到主屏幕，然后才能开启通知<br><a href="#" onclick="window.showInstallPopup();return false" style="color:#07c475;text-decoration:underline;">查看安装教程 →</a>', true);
+            return;
+        }
         try {
             if (!('Notification' in window)) {
-                const ua = navigator.userAgent || '';
-                const isIOS = /iPhone|iPad|iPod/.test(ua);
-                const isSafari = /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua);
-                if (isIOS && isSafari) {
-                    throw new Error('iOS Safari 需将网站添加到主屏幕（PWA）才能使用后台通知');
-                }
                 throw new Error('当前浏览器不支持网页通知，请使用最新版 Chrome 或 Edge，并通过 HTTPS 访问');
             }
             const permission = await window.Notification.requestPermission();
@@ -616,7 +675,12 @@
             if (error) throw error;
             localStorage.setItem('push_sub_endpoint', subscription.endpoint);
             setPushStatus('后台通知已开启 ✓', true);
-            setTimeout(() => setPushStatus('', false), 3000);
+            if (isAndroid() && !isStandalone() && deferredPrompt) {
+                setTimeout(() => {
+                    setPushStatus('后台通知已开启 ✓  💡 <a href="#" onclick="window.doInstallPWA();return false" style="color:#07c475;text-decoration:underline;">一键安装到桌面</a>，体验更好', true);
+                }, 3000);
+            }
+            setTimeout(() => setPushStatus('', false), 8000);
             listenForSubscriptionChange();
         } catch (error) {
             console.error('开启后台通知失败:', error);
@@ -750,6 +814,7 @@
     const NOTIFICATION_ICON = generateNotificationIcon(192);
 
     window.onload = () => {
+        showInstallBanner();
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
         if (roomFromUrl) {
@@ -845,6 +910,11 @@
                 const roomNameModal = document.getElementById('room-name-modal');
                 if (roomNameModal && roomNameModal.style.display === 'flex') {
                     roomNameModal.style.display = 'none';
+                    return;
+                }
+                const installPopup = document.getElementById('install-popup');
+                if (installPopup && installPopup.style.display === 'flex') {
+                    installPopup.style.display = 'none';
                     return;
                 }
                 const lightbox = document.getElementById('image-lightbox');
@@ -2135,7 +2205,6 @@
                     <div class="msg-content">
                     <div style="white-space: pre-wrap; word-break: break-word;">${mediaHtml}${displayContent}</div>
                     ${replyTagHtml}
-                    <span class="msg-meta">${formatMessageTime(messageDate)}</span>
                     </div>
                 </div>
             </div>
@@ -2781,6 +2850,138 @@
     window.closeUpdateModal = function() {
         document.getElementById('update-modal').style.display = 'none';
     };
+
+    function isIOS() {
+        return /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+    }
+
+    function isAndroid() {
+        return /Android/.test(navigator.userAgent || '');
+    }
+
+    function isMobileDevice() {
+        return isIOS() || isAndroid();
+    }
+
+    function isStandalone() {
+        return window.matchMedia('(display-mode: standalone)').matches
+            || (navigator.standalone !== undefined && navigator.standalone);
+    }
+
+    function shouldShowInstallPopup() {
+        if (isStandalone()) return false;
+        if (localStorage.getItem('install_popup_dismissed') === '1') return false;
+        if (isIOS()) return true;
+        if (isAndroid() && deferredPrompt) return true;
+        return false;
+    }
+
+    window.showInstallPopup = function() {
+        var popup = document.getElementById('install-popup');
+        var title = document.getElementById('install-popup-title');
+        var desc = document.getElementById('install-popup-desc');
+        var steps = document.getElementById('install-popup-steps');
+        var btn = document.getElementById('install-popup-btn');
+        var icon = document.getElementById('install-popup-icon');
+        var noremind = document.getElementById('install-popup-noremind');
+
+        if (isAndroid()) {
+            if (icon) icon.textContent = '🤖';
+            if (title) title.textContent = '安装到桌面，体验更好';
+            if (desc) desc.textContent = '安装后可使用后台通知、全屏聊天';
+            if (steps) {
+                steps.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+                    + '<span style="background:#07c475;color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">1</span>'
+                    + '<span style="font-size:13px;">点击 Chrome 右上角 <strong>⋮</strong> 菜单</span></div>'
+                    + '<div style="display:flex;align-items:center;gap:8px;">'
+                    + '<span style="background:#07c475;color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">2</span>'
+                    + '<span style="font-size:13px;">选择 <strong>「添加到主屏幕」</strong></span></div>';
+            }
+            if (btn) {
+                btn.textContent = '一键安装';
+                btn.onclick = function() { window.doInstallPWA(); };
+            }
+            if (noremind) noremind.style.display = 'block';
+        } else {
+            if (icon) icon.textContent = '📱';
+            if (title) title.textContent = '添加到主屏幕';
+            if (desc) desc.textContent = '安装后即可开启后台通知，收到消息时即使关闭浏览器也能收到提醒';
+            if (steps) {
+                steps.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+                    + '<span style="background:#07c475;color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">1</span>'
+                    + '<span style="font-size:13px;">点击 Safari 底部 <strong style="font-size:16px;">↑</strong> 分享按钮</span></div>'
+                    + '<div style="display:flex;align-items:center;gap:8px;">'
+                    + '<span style="background:#07c475;color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">2</span>'
+                    + '<span style="font-size:13px;">滑动找到 <strong>「添加到主屏幕」</strong></span></div>';
+            }
+            if (btn) {
+                btn.textContent = '我知道了';
+                btn.onclick = function() { window.dismissInstallPopup(); };
+            }
+            if (noremind) noremind.style.display = 'block';
+        }
+        if (popup) popup.style.display = 'flex';
+    };
+
+    window.dismissInstallPopup = function() {
+        document.getElementById('install-popup').style.display = 'none';
+    };
+
+    window.dismissInstallPopupForever = function() {
+        localStorage.setItem('install_popup_dismissed', '1');
+        document.getElementById('install-popup').style.display = 'none';
+    };
+
+    window.doInstallPWA = async function() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            var result = await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            if (result.outcome === 'accepted') {
+                localStorage.setItem('pwa_installed', '1');
+                document.getElementById('install-popup').style.display = 'none';
+            }
+        } else if (isIOS()) {
+            window.showInstallPopup();
+        } else {
+            document.getElementById('install-popup').style.display = 'none';
+        }
+    };
+
+    function showInstallBanner() {
+        if (shouldShowInstallPopup()) {
+            window.showInstallPopup();
+        }
+    }
+
+    let deferredPrompt = null;
+
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        showInstallBanner();
+    });
+
+    window.addEventListener('appinstalled', function() {
+        deferredPrompt = null;
+        localStorage.setItem('pwa_installed', '1');
+        document.getElementById('install-popup').style.display = 'none';
+        if (isAndroid()) {
+            setPushStatus('已安装到桌面！现在可以开启通知了', true);
+            setTimeout(function() { setPushStatus('', false); }, 4000);
+        }
+    });
+
+    function checkPWAStatus() {
+        var statusEl = document.getElementById('push-notification-status');
+        if (!statusEl) return;
+        if (isIOS() && !isStandalone()) {
+            statusEl.innerHTML = '💡 <a href="#" onclick="window.showInstallPopup();return false" style="color:#07c475;text-decoration:underline;">点击查看如何安装到桌面</a>，安装后即可开启通知';
+            statusEl.style.display = 'block';
+            return true;
+        }
+        return false;
+    }
 
     // 输入事件：发送 typing 通知 并发送消息
     let typingTimeout = null;
