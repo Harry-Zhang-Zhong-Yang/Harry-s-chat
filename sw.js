@@ -1,8 +1,9 @@
-const CACHE_NAME = 'harrys-chat-v2';
+const CACHE_NAME = 'harrys-chat-v3';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
-    '/manifest.json'
+    '/manifest.json',
+    '/game.js'
 ];
 
 async function generateAndCacheIcon(size) {
@@ -69,17 +70,43 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
-    if (event.request.url.includes('supabase')) return;
+    const url = new URL(event.request.url);
+    if (url.hostname.includes('supabase')) return;
+    if (url.hostname.includes('cdn.jsdelivr.net')) return;
+
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then((response) => {
+                    if (response && response.status === 200) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                    }
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
+        );
+        return;
+    }
+
+    if (STATIC_ASSETS.some(asset => url.pathname.endsWith(asset) || url.pathname === asset)) {
+        event.respondWith(
+            caches.match(event.request).then((cached) => {
+                const fetchPromise = fetch(event.request).then((response) => {
+                    if (response && response.status === 200) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                    }
+                    return response;
+                }).catch(() => cached);
+                return cached || fetchPromise;
+            })
+        );
+        return;
+    }
+
     event.respondWith(
-        caches.match(event.request).then((cached) => {
-            const fetchPromise = fetch(event.request).then((response) => {
-                if (!response || response.status !== 200 || response.type !== 'basic') return response;
-                const clone = response.clone();
-                caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-                return response;
-            }).catch(() => cached);
-            return cached || fetchPromise;
-        })
+        caches.match(event.request).then((cached) => cached || fetch(event.request))
     );
 });
 
