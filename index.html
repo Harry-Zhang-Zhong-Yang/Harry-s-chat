@@ -844,6 +844,7 @@
                 applyRoomBackground();
                 await loadHistory(true);
                 hideRoomLoading();
+                requestAnimationFrame(() => scrollToBottomInstant());
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
                 initRealtime();
@@ -999,6 +1000,7 @@
         try {
             await loadHistory(true);
             hideRoomLoading();
+            requestAnimationFrame(() => scrollToBottomInstant());
             setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
             initRealtime();
@@ -1095,9 +1097,7 @@
                     }
                 });
                 console.info(`[chat] 加载了 ${msgs.length} 条历史消息`);
-                requestAnimationFrame(() => {
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                });
+                chatBox.scrollTop = chatBox.scrollHeight;
                 oldestLoadedAt = msgs[0].created_at;
                 noMoreHistory = msgs.length < PAGE_SIZE;
                 if (!isSpeedMode) {
@@ -1263,7 +1263,7 @@
                     if (existingTemp && existingTemp.dataset.sending === 'false') return;
                 }
                 appendMessageToUI(payload.new.id, payload.new.sender, payload.new.content, true, payload.new.created_at, payload.new.media_url, payload.new.media_type);
-                requestAnimationFrame(() => scrollToBottomInstant());
+                scrollToBottomInstant();
             })
             .on('postgres_changes', {
                 event: 'UPDATE',
@@ -1361,7 +1361,7 @@
                         appendMessageToUI(msg.id, msg.sender, msg.content, true, msg.created_at, msg.media_url, msg.media_type);
                     }
                     lastKnownMessageId = data[data.length - 1].id;
-                    requestAnimationFrame(() => scrollToBottomInstant());
+                    scrollToBottomInstant();
                 }
             } catch (e) { /* ignore polling errors */ }
         }, 5000);
