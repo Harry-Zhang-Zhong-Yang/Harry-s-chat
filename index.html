@@ -2122,17 +2122,7 @@
                 .from('chat_media')
                 .getPublicUrl(filePath);
 
-            let mediaUrl = publicData.publicUrl;
-
-            try {
-                const { data: signedData, error: signedError } = await supabaseClient
-                    .storage
-                    .from('chat_media')
-                    .createSignedUrl(filePath, 31536000);
-                if (!signedError && signedData && signedData.signedUrl) {
-                    mediaUrl = signedData.signedUrl;
-                }
-            } catch (e) { /* signed URL fallback failed, use public URL */ }
+            const mediaUrl = publicData.publicUrl;
 
             const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|webm|m4a|ogg|aac|flac)$/i.test(file.name);
             pendingMedia = {
@@ -2142,8 +2132,16 @@
 
             window.sendMessage();
         } catch (e) {
-            console.error(e);
-            showToast("上传失败，请检查网络或权限。如果问题持续，请在Supabase控制台中为chat_media存储桶添加公开读取策略。", 'error');
+            console.error('文件上传失败:', e);
+            if (e.message && (e.message.includes('Bucket') || e.message.includes('not found'))) {
+                showToast("存储桶不存在，请在Supabase控制台中创建名为 chat_media 的公开存储桶。", 'error');
+            } else if (e.message && e.message.includes('row-level security')) {
+                showToast("存储桶权限不足，请在Supabase控制台 → Storage → chat_media → 添加公开读取策略。", 'error');
+            } else if (e.message && (e.message.includes('quota') || e.message.includes('exceeded'))) {
+                showToast("存储空间已满，请在Supabase控制台中清理 chat_media 存储桶中的文件。", 'error');
+            } else {
+                showToast("上传失败，请检查网络。", 'error');
+            }
         } finally {
             event.target.value = '';
         }
@@ -2266,17 +2264,7 @@
             const { error } = await supabaseClient.storage.from('chat_media').upload(filePath, file);
             if (error) throw error;
             const { data } = supabaseClient.storage.from('chat_media').getPublicUrl(filePath);
-            let mediaUrl = data.publicUrl;
-            try {
-                const { data: signedData, error: signedError } = await supabaseClient
-                    .storage
-                    .from('chat_media')
-                    .createSignedUrl(filePath, 31536000);
-                if (!signedError && signedData && signedData.signedUrl) {
-                    mediaUrl = signedData.signedUrl;
-                }
-            } catch (e) { /* signed URL fallback failed, use public URL */ }
-            pendingMedia = { url: mediaUrl, type: 'audio' };
+            pendingMedia = { url: data.publicUrl, type: 'audio' };
             if (transcript) document.getElementById('message-input').value = transcript;
             await window.sendMessage();
         } catch (error) {
@@ -2308,7 +2296,8 @@
                         ctx.drawImage(img, 0, 0, targetW, targetH);
                         canvas.toBlob((blob) => {
                             if (!blob) return resolve(null);
-                            const newFile = new File([blob], file.name, { type: blob.type });
+                            const nameWithoutExt = file.name.replace(/\.[^.]+$/, '');
+                            const newFile = new File([blob], nameWithoutExt + '.jpg', { type: 'image/jpeg' });
                             resolve(newFile);
                         }, 'image/jpeg', quality);
                     };
@@ -2723,7 +2712,7 @@
             mediaType = null;
         } else if (mediaUrl) {
             if (mediaType === 'image') {
-                mediaHtml = `<div class="msg-img-placeholder"></div><img src="${escapeHtml(mediaUrl)}" class="msg-img loading" alt="图片消息" loading="lazy" decoding="async" onload="this.classList.remove('loading');this.classList.add('loaded');this.previousElementSibling.remove();" onerror="this.previousElementSibling.innerText='图片加载失败';this.previousElementSibling.style.cssText='display:flex;align-items:center;justify-content:center;color:#999;font-size:13px;';">`;
+                mediaHtml = `<div class="msg-img-placeholder"></div><img src="${escapeHtml(mediaUrl)}" class="msg-img loading" alt="图片消息" loading="lazy" decoding="async" onload="this.classList.remove('loading');this.classList.add('loaded');this.previousElementSibling.remove();" onerror="this.previousElementSibling.innerHTML='图片加载失败<br><span style=font-size:11px>请检查Supabase Storage公开读取策略</span>';this.previousElementSibling.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;color:#999;font-size:13px;text-align:center;padding:10px;';">`;
                 wrapper.classList.add('media-only');
             } else if (mediaType === 'audio') {
                 mediaHtml = voiceMessageHtml(mediaUrl, displayContent);
@@ -3273,16 +3262,7 @@
             const { data: uploadData, error: uploadError } = await supabaseClient.storage.from('chat_media').upload(filePath, uploadFile, { upsert: true });
             if (uploadError) throw uploadError;
             const { data: publicData } = supabaseClient.storage.from('chat_media').getPublicUrl(filePath);
-            let bgUrl = publicData.publicUrl;
-            try {
-                const { data: signedData, error: signedError } = await supabaseClient
-                    .storage
-                    .from('chat_media')
-                    .createSignedUrl(filePath, 31536000);
-                if (!signedError && signedData && signedData.signedUrl) {
-                    bgUrl = signedData.signedUrl;
-                }
-            } catch (e) { /* signed URL fallback failed, use public URL */ }
+            const bgUrl = publicData.publicUrl;
             localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bgUrl);
             if (!isSpeedMode) {
                 document.getElementById('chat-bg').style.backgroundImage = `url(${bgUrl})`;
