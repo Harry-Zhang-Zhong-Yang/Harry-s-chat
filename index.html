@@ -1080,6 +1080,11 @@
                         <label class="switch" aria-label="开启极速模式"><input id="speed-mode-toggle" type="checkbox" onchange="window.toggleSpeedMode(this)"><span class="switch-track"></span></label>
                     </div>
                     <div class="settings-row-item" style="font-size:12px;color:#8a9099;padding:8px 0;border-bottom:0;">开启后优先保证消息收发，暂停头像、背景等加载</div>
+                    <div class="settings-row-item">
+                        <label>消息轮询</label>
+                        <label class="switch" aria-label="开启消息轮询"><input id="polling-toggle" type="checkbox" onchange="window.togglePolling(this)"><span class="switch-track"></span></label>
+                    </div>
+                    <div class="settings-row-item" style="font-size:12px;color:#8a9099;padding:8px 0;border-bottom:0;">开启后每5秒主动拉取新消息，适合实时推送不稳定时使用</div>
                 </div>
                 <div class="settings-section">
                     <div class="settings-section-title">其他</div>
@@ -1099,7 +1104,7 @@
             <button onclick="window.closeWxNotifySetup(null)" style="width:auto;margin:0;padding:4px 10px;background:transparent;color:#999;font-size:20px;border:none;cursor:pointer;">✕</button>
         </div>
         <p style="font-size:13px;color:#666;margin:8px 0 16px;line-height:1.6;">
-            扫码关注公众号，有新消息时微信通知你。
+            扫码关注公众号后，请下载 <b>WxPusher App</b> 接收通知（微信公众号已无法直接推送消息）。
         </p>
         <div id="wx-qrcode-area" style="text-align:center;margin:16px 0;">
             <img id="wx-qrcode-img" src="" alt="微信扫码绑定" style="width:200px;height:200px;border:1px solid #eee;border-radius:8px;">
@@ -1195,6 +1200,7 @@
     let realtimeReadyResolve = null;
     let pendingMedia = null;
     let isSpeedMode = false;
+    let isPollingEnabled = false;
     let mediaRecorder = null;
     let recordingChunks = [];
     let recordingStartedAt = 0;
@@ -1393,6 +1399,7 @@
                 ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
                 initRealtime();
                 realtimeReady.catch(() => startPolling());
+                if (isPollingEnabled) startPolling();
             } else {
                 localStorage.removeItem('chat_last_room');
                 localStorage.removeItem('chat_auth_expiry');
@@ -1487,6 +1494,10 @@
         const speedToggle = document.getElementById('speed-mode-toggle');
         if (speedToggle) speedToggle.checked = isSpeedMode;
 
+        isPollingEnabled = localStorage.getItem('chat_polling_enabled') === '1';
+        const pollingToggle = document.getElementById('polling-toggle');
+        if (pollingToggle) pollingToggle.checked = isPollingEnabled;
+
         const savedBg = localStorage.getItem(`chat_bg_url:${savedRoom || ''}`);
         if (savedBg && !isSpeedMode) {
             document.getElementById('chat-bg').style.backgroundImage = `url(${savedBg})`;
@@ -1543,6 +1554,7 @@
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
             initRealtime();
             realtimeReady.catch(() => startPolling());
+            if (isPollingEnabled) startPolling();
         } catch (error) {
             console.error('进入房间失败:', error);
             document.getElementById('login-area').style.display = 'flex';
@@ -1720,13 +1732,14 @@
     });
 
     function initRealtime() {
+        stopPolling();
         if (roomSubscription) roomSubscription.unsubscribe();
         presenceActive = false;
         realtimeReady = new Promise((resolve, reject) => {
             const timeout = setTimeout(() => {
-                console.warn('Realtime 连接超时（20秒），将继续使用轮询');
+                console.warn('Realtime 连接超时（10秒），将继续使用轮询');
                 reject(new Error('实时连接超时'));
-            }, 20000);
+            }, 10000);
             realtimeReadyResolve = () => {
                 clearTimeout(timeout);
                 resolve();
@@ -1902,7 +1915,8 @@
         }, 5000);
     }
 
-    function stopPolling() {
+    function stopPolling(force = false) {
+        if (isPollingEnabled && !force) return;
         if (realtimePolling) {
             clearInterval(realtimePolling);
             realtimePolling = null;
@@ -2108,16 +2122,28 @@
                 .from('chat_media')
                 .getPublicUrl(filePath);
 
+            let mediaUrl = publicData.publicUrl;
+
+            try {
+                const { data: signedData, error: signedError } = await supabaseClient
+                    .storage
+                    .from('chat_media')
+                    .createSignedUrl(filePath, 31536000);
+                if (!signedError && signedData && signedData.signedUrl) {
+                    mediaUrl = signedData.signedUrl;
+                }
+            } catch (e) { /* signed URL fallback failed, use public URL */ }
+
             const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|webm|m4a|ogg|aac|flac)$/i.test(file.name);
             pendingMedia = {
-                url: publicData.publicUrl,
+                url: mediaUrl,
                 type: isAudio ? 'audio' : 'image'
             };
 
             window.sendMessage();
         } catch (e) {
             console.error(e);
-            showToast("上传失败，请检查网络或权限。", 'error');
+            showToast("上传失败，请检查网络或权限。如果问题持续，请在Supabase控制台中为chat_media存储桶添加公开读取策略。", 'error');
         } finally {
             event.target.value = '';
         }
@@ -2240,7 +2266,17 @@
             const { error } = await supabaseClient.storage.from('chat_media').upload(filePath, file);
             if (error) throw error;
             const { data } = supabaseClient.storage.from('chat_media').getPublicUrl(filePath);
-            pendingMedia = { url: data.publicUrl, type: 'audio' };
+            let mediaUrl = data.publicUrl;
+            try {
+                const { data: signedData, error: signedError } = await supabaseClient
+                    .storage
+                    .from('chat_media')
+                    .createSignedUrl(filePath, 31536000);
+                if (!signedError && signedData && signedData.signedUrl) {
+                    mediaUrl = signedData.signedUrl;
+                }
+            } catch (e) { /* signed URL fallback failed, use public URL */ }
+            pendingMedia = { url: mediaUrl, type: 'audio' };
             if (transcript) document.getElementById('message-input').value = transcript;
             await window.sendMessage();
         } catch (error) {
@@ -3127,6 +3163,8 @@
             refreshProfileAvatar();
             const speedToggle = document.getElementById('speed-mode-toggle');
             if (speedToggle) speedToggle.checked = isSpeedMode;
+            const pollingToggle = document.getElementById('polling-toggle');
+            if (pollingToggle) pollingToggle.checked = isPollingEnabled;
         }
     };
 
@@ -3149,6 +3187,18 @@
                 applyRoomBackground();
                 fetchAndApplyUserAvatars(messagesCache.map(m => m.sender));
             }
+        }
+    };
+
+    window.togglePolling = function(toggle) {
+        isPollingEnabled = toggle.checked;
+        localStorage.setItem('chat_polling_enabled', isPollingEnabled ? '1' : '0');
+        if (isPollingEnabled) {
+            startPolling();
+            showToast('消息轮询已开启，每5秒主动拉取新消息', 'success', 2000);
+        } else {
+            stopPolling();
+            showToast('消息轮询已关闭，仅依赖实时推送', 'info', 2000);
         }
     };
 
@@ -3223,7 +3273,16 @@
             const { data: uploadData, error: uploadError } = await supabaseClient.storage.from('chat_media').upload(filePath, uploadFile, { upsert: true });
             if (uploadError) throw uploadError;
             const { data: publicData } = supabaseClient.storage.from('chat_media').getPublicUrl(filePath);
-            const bgUrl = publicData.publicUrl;
+            let bgUrl = publicData.publicUrl;
+            try {
+                const { data: signedData, error: signedError } = await supabaseClient
+                    .storage
+                    .from('chat_media')
+                    .createSignedUrl(filePath, 31536000);
+                if (!signedError && signedData && signedData.signedUrl) {
+                    bgUrl = signedData.signedUrl;
+                }
+            } catch (e) { /* signed URL fallback failed, use public URL */ }
             localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bgUrl);
             if (!isSpeedMode) {
                 document.getElementById('chat-bg').style.backgroundImage = `url(${bgUrl})`;
@@ -3280,7 +3339,7 @@
         if(!confirm("确定要退出当前房间吗？")) return;
         isLeavingRoom = true;
         if (roomSubscription) { roomSubscription.unsubscribe(); roomSubscription = null; }
-        stopPolling();
+        stopPolling(true);
         presenceActive = false;
         if (presenceIdleTimer) { clearTimeout(presenceIdleTimer); presenceIdleTimer = null; }
         localStorage.removeItem('chat_last_room');
