@@ -15,6 +15,18 @@
     <meta name="application-name" content="Harry的聊天室">
     <meta name="msapplication-TileColor" content="#07c475">
     <meta name="msapplication-starturl" content="/">
+    <meta name="apple-touch-fullscreen" content="yes">
+    <meta name="HandheldFriendly" content="true">
+    <meta name="screen-orientation" content="portrait">
+    <meta name="x5-orientation" content="portrait">
+    <meta name="x5-fullscreen" content="true">
+    <meta name="x5-page-mode" content="app">
+    <meta name="browsermode" content="application">
+    <meta name="full-screen" content="yes">
+    <meta name="layoutmode" content="standard">
+    <meta name="imagemode" content="force">
+    <meta name="nightmode" content="disable">
+    <meta name="wap-font-scale" content="no">
     <link rel="apple-touch-startup-image" href="/icon-512.png">
     <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
@@ -43,6 +55,9 @@
             user-select: none;
             -webkit-touch-callout: none;
             touch-action: manipulation;
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+            text-size-adjust: 100%;
         }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
@@ -53,10 +68,23 @@
             inset: 0;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            text-rendering: optimizeLegibility;
+        }
+        body.modal-open {
+            position: fixed;
+            width: 100%;
+            overflow: hidden;
         }
         input, textarea, [contenteditable] {
             -webkit-user-select: text;
             user-select: text;
+        }
+        input[type="text"], input[type="search"], input[type="password"], textarea {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        @supports (-webkit-touch-callout: none) {
+            input, textarea, select { font-size: 16px !important; }
         }
 
         /* --- 更新公告弹窗 --- */
@@ -74,16 +102,15 @@
             .update-modal-content { padding: 20px 16px !important; width: 92% !important; }
         }
         @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-        /* --- 登录区域 --- */
         #login-area { position: fixed; inset: 0; background: #f7f8fa; display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; transition: opacity 0.25s ease; }
         .login-box { width: 100%; max-width: 380px; padding: 34px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 12px 35px rgba(32,33,36,0.06); }
         .login-box h2 { margin-bottom: 26px; text-align: center; color: var(--text-main); font-size: 22px; letter-spacing: -0.02em; }
         input { width: 100%; padding: 13px 14px; margin: 8px 0; border: 1px solid #dfe3e8; border-radius: 9px; font-size: 16px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: #fff; }
         input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-        button { width: 100%; padding: 13px 14px; background: var(--btn-color); color: white; border: none; border-radius: 9px; font-size: 15px; cursor: pointer; margin-top: 15px; font-weight: 600; transition: opacity 0.2s, transform 0.2s; }
-        button:active { opacity: 0.8; }
+        button { width: 100%; padding: 13px 14px; background: var(--btn-color); color: white; border: none; border-radius: 9px; font-size: 15px; cursor: pointer; margin-top: 15px; font-weight: 600; transition: opacity 0.2s, transform 0.2s; min-height: 44px; }
+        button:active { opacity: 0.8; transform: scale(0.98); }
         button:disabled { opacity: 0.55; cursor: not-allowed; }
+        button:focus-visible { outline: 2px solid var(--btn-color); outline-offset: 2px; }
 
         .remember-me { display: flex; align-items: center; gap: 8px; margin-top: -5px; margin-bottom: 15px; font-size: 14px; color: #666; cursor: pointer; }
         .remember-me input { width: auto; margin: 0; }
@@ -92,7 +119,9 @@
         #chat-container { 
             display: flex; flex-direction: column; max-width: 920px; margin: 0 auto;
             width: 100%; height: 100vh; height: 100dvh; background: #fff; position: relative;
-            padding-bottom: env(safe-area-inset-bottom);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            padding-left: env(safe-area-inset-left, 0px);
+            padding-right: env(safe-area-inset-right, 0px);
             box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 0 0 40px rgba(0,0,0,0.03);
         }
 
@@ -110,17 +139,20 @@
         @keyframes spin { to { transform: rotate(360deg); } }
 
         #nav-bar { 
-            min-height: clamp(52px, 7vh, 62px); height: calc(clamp(52px, 7vh, 62px) + env(safe-area-inset-top)); background: rgba(255,255,255,0.94); backdrop-filter: blur(10px);
+            min-height: clamp(52px, 7vh, 62px); height: calc(clamp(52px, 7vh, 62px) + env(safe-area-inset-top, 0px)); background: rgba(255,255,255,0.94); backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border-bottom: 1px solid #eee; display: flex; align-items: center; 
-            padding: env(safe-area-inset-top) clamp(12px, 2vw, 18px) 0; justify-content: space-between; z-index: 10; flex: 0 0 auto;
+            padding: env(safe-area-inset-top, 0px) clamp(12px, 2vw, 18px) 0; justify-content: space-between; z-index: 10; flex: 0 0 auto;
+            padding-left: max(clamp(12px, 2vw, 18px), env(safe-area-inset-left, 0px));
+            padding-right: max(clamp(12px, 2vw, 18px), env(safe-area-inset-right, 0px));
         }
-        #back-btn { font-size: clamp(21px, 2.4vw, 24px); cursor: pointer; padding: 5px; transition: transform 0.12s; user-select: none; }
+        #back-btn { font-size: clamp(21px, 2.4vw, 24px); cursor: pointer; padding: 5px; transition: transform 0.12s; user-select: none; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; }
         #back-btn:active { transform: scale(0.88); }
         #room-title { position:absolute; left:50%; transform:translateX(-50%); max-width:45%; font-weight: 600; font-size: clamp(14px, 1.6vw, 16px); color: var(--text-main); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .nav-icon { width: 34px; height: 34px; padding: 0; margin: 0; background: transparent; color: #69707a; border: 0; border-radius: 50%; font-size: 24px; font-weight: 400; line-height: 1; cursor: pointer; transition: background 0.12s, color 0.12s, transform 0.12s; }
+        .nav-icon { width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 0; margin: 0; background: transparent; color: #69707a; border: 0; border-radius: 50%; font-size: 24px; font-weight: 400; line-height: 1; cursor: pointer; transition: background 0.12s, color 0.12s, transform 0.12s; display: flex; align-items: center; justify-content: center; }
         .nav-icon:hover { background: #f2f4f7; color: #202124; }
         .nav-icon:active { transform: scale(0.92); background: #e8eaed; }
-        .online-count { width: auto; padding: 0 4px; margin: 0; background: transparent; color: #8a9099; border: 0; font-size: 12px; font-weight: 400; white-space: nowrap; }
+        .online-count { width: auto; padding: 0 4px; margin: 0; background: transparent; color: #8a9099; border: 0; font-size: 12px; font-weight: 400; white-space: nowrap; min-height: 36px; display: flex; align-items: center; }
 
         /* --- 聊天框内容层 --- */
         #chat-box { 
@@ -137,6 +169,7 @@
             -webkit-overflow-scrolling: touch;
             will-change: scroll-position;
             scroll-behavior: auto;
+            contain: strict;
         }
         @supports (overscroll-behavior: contain) {
             #chat-box { overscroll-behavior-y: contain; }
@@ -144,7 +177,7 @@
         #chat-box::-webkit-scrollbar { width: 5px; }
         #chat-box::-webkit-scrollbar-thumb { background: #d0d5dd; border-radius: 10px; }
         #chat-box > *:last-child { margin-bottom: 0; }
-        .msg-wrapper { max-width: min(75%, 620px); position: relative; animation: msgIn 0.2s ease-out; will-change: transform, opacity; }
+        .msg-wrapper { max-width: min(75%, 620px); position: relative; animation: msgIn 0.2s ease-out; will-change: transform, opacity; contain: layout style; }
         .message-row { display:flex; align-items:flex-start; gap:8px; }
         .right .message-row { flex-direction:row-reverse; }
         .message-avatar { width:30px; height:30px; flex:0 0 30px; border-radius:50%; object-fit:cover; background:#dbe5f5; color:#52709d; display:grid; place-items:center; font-size:12px; font-weight:600; overflow:hidden; }
@@ -187,30 +220,32 @@
         @media (max-width: 600px) {
             #chat-box { padding: 16px 12px 20px; }
             .msg-wrapper { max-width: 88%; }
-            #nav-bar { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
-            #input-area { padding-left: 10px; padding-right: 10px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
-            #back-btn { flex: 0 0 40px; min-width: 40px; font-size: 27px; line-height: 1; }
-            #room-title { max-width:42%; padding: 0 4px; }
+            #nav-bar { padding-left: max(10px, env(safe-area-inset-left, 0px)); padding-right: max(10px, env(safe-area-inset-right, 0px)); }
+            #input-area { padding-left: 10px; padding-right: 10px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+            #back-btn { flex: 0 0 44px; min-width: 44px; min-height: 44px; font-size: 27px; line-height: 1; }
+            #room-title { max-width:38%; padding: 0 4px; }
             #nav-bar > div { flex: 0 0 auto; gap: 4px !important; }
             .online-count { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
             .context-menu { min-width: 200px; right: 8px !important; left: auto !important; }
-            .context-menu button { font-size:16px; padding:12px 14px; }
-            .action-btn { width: 38px; height: 38px; padding: 6px; font-size: 18px; }
+            .context-menu button { font-size:16px; padding:12px 14px; min-height: 44px; }
+            .action-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; padding: 6px; font-size: 18px; }
             #message-input { font-size: 16px; }
             .login-box { padding: 24px 20px; border-radius: 0; max-width: 100%; }
             .login-box h2 { font-size: 19px; margin-bottom: 20px; }
-            input { padding: 14px 15px; font-size: 16px; }
-            button { padding: 14px; font-size: 16px; }
+            input { padding: 14px 15px; font-size: 16px; min-height: 44px; }
+            button { padding: 14px; font-size: 16px; min-height: 44px; }
             .settings-header h3 { font-size: 16px; }
             .settings-row-item { padding: 12px 10px; font-size: 14px; }
             .settings-row-item label { font-size: 14px; }
             #emoji-panel { right: 10px; width: calc(100vw - 40px); grid-template-columns: repeat(7, 1fr); }
-            .modal-content { width: 94%; max-width: 94%; max-height: 85vh; border-radius: 12px; padding: 16px; }
+            .modal-content { width: 94%; max-width: 94%; max-height: 85vh; max-height: 85dvh; border-radius: 12px; padding: 16px; }
             .message-avatar { width: 28px; height: 28px; flex: 0 0 28px; font-size: 11px; }
             .sender-name { font-size: 11px; }
             .msg-content { font-size: 15px; }
             #install-popup > div { width: 94% !important; padding: 16px !important; }
             body { position: fixed; }
+            .nav-icon { width: 40px; height: 40px; min-width: 40px; min-height: 40px; font-size: 22px; }
+            .update-modal-content { padding: 20px 16px !important; width: 92% !important; }
         }
 
         @media (min-width: 601px) and (max-width: 1024px) {
@@ -218,16 +253,17 @@
             .msg-wrapper { max-width: 75%; }
             #message-input { min-height: 44px; }
             #chat-box { padding: 20px 24px 24px; }
-            .action-btn { width: 40px; height: 40px; }
+            .action-btn { width: 42px; height: 42px; min-width: 42px; min-height: 42px; }
+            #back-btn { min-width: 44px; min-height: 44px; }
         }
 
         @media (min-width: 1025px) {
             #chat-box { padding: 24px 40px 28px; }
             .msg-wrapper { max-width: 60%; }
             #message-input { min-height: 48px; }
-            #back-btn { font-size: 30px; }
+            #back-btn { font-size: 30px; min-width: 44px; min-height: 44px; }
             #chat-container { border-radius: 0; }
-            .action-btn { width: 42px; height: 42px; font-size: 20px; }
+            .action-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 20px; }
             .context-menu { min-width: 180px; }
         }
 
@@ -241,21 +277,23 @@
             overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
         }
 
-        #input-area { position:relative; padding: clamp(7px, 1.4vw, 11px) clamp(10px, 2vw, 16px) calc(clamp(7px, 1.4vw, 11px) + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; flex: 0 0 auto; }
+        #input-area { position:relative; padding: clamp(7px, 1.4vw, 11px) clamp(10px, 2vw, 16px) calc(clamp(7px, 1.4vw, 11px) + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: rgba(255,255,255,0.97); z-index: 100; flex: 0 0 auto; }
         .input-wrapper { display: flex; align-items: center; gap: clamp(5px, 1vw, 8px); width: 100%; }
-        #message-input { flex: 1; padding: clamp(9px, 1.3vw, 11px) clamp(11px, 1.8vw, 15px); border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: clamp(14px, 1.6vw, 16px); resize: none; overflow-y:auto; max-height: 150px; background: #fafbfc; transition: border-color 0.2s, box-shadow 0.2s; }
+        #message-input { flex: 1; padding: clamp(9px, 1.3vw, 11px) clamp(11px, 1.8vw, 15px); border: 1px solid #dfe3e8; border-radius: 20px; outline: none; font-size: clamp(14px, 1.6vw, 16px); resize: none; overflow-y:auto; max-height: 150px; background: #fafbfc; transition: border-color 0.2s, box-shadow 0.2s; min-height: 44px; line-height: 1.5; }
         #message-input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
         #message-input::-webkit-scrollbar { width:0; height:0; }
         #message-input { scrollbar-width:none; }
+        #message-input::placeholder { color: #9aa0a8; opacity: 1; }
         
         .action-btn { 
-            width: clamp(34px, 4.2vw, 42px); height: clamp(34px, 4.2vw, 42px); border-radius: 50%; background: #f0f2f5; color: #606770;
+            width: clamp(38px, 4.5vw, 44px); height: clamp(38px, 4.5vw, 44px); min-width: 38px; min-height: 38px; border-radius: 50%; background: #f0f2f5; color: #606770;
             display: flex; align-items: center; justify-content: center; 
             font-size: clamp(18px, 2.2vw, 22px); cursor: pointer; transition: all 0.2s; border: none; margin-top: 0;
             flex-shrink: 0;
         }
         .action-btn:hover { background: #e4e6eb; }
         .action-btn:active { transform: scale(0.9); background: #ddd; }
+        .action-btn:focus-visible { outline: 2px solid var(--btn-color); outline-offset: 2px; }
         #voice-btn { user-select:none; touch-action:none; }
         #voice-btn.recording { background:#fee2e2; color:#dc2626; }
         #voice-btn.voice-mode { background:#dbeafe; color:#2563eb; }
@@ -303,10 +341,10 @@
         .msg-img { width: auto; max-width: min(100%, 320px); max-height: 360px; object-fit: contain; border-radius: 8px; margin-top: 5px; display: block; cursor: zoom-in; }
         .right .msg-img { margin-left: auto; }
         .reply-media-preview { cursor: zoom-in; }
-        #image-lightbox { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.82); }
+        #image-lightbox { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 20px); background: rgba(0,0,0,.82); }
         #image-lightbox.visible { display: flex; }
-        #image-lightbox img { max-width: 96vw; max-height: 90vh; object-fit: contain; border-radius: 8px; }
-        #image-lightbox button { position: absolute; top: max(14px, env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); width: 38px; height: 38px; padding: 0; margin: 0; border-radius: 50%; background: rgba(255,255,255,.18); font-size: 24px; }
+        #image-lightbox img { max-width: 96vw; max-height: 90vh; max-height: 90dvh; object-fit: contain; border-radius: 8px; -webkit-user-select: none; user-select: none; }
+        #image-lightbox button { position: absolute; top: max(14px, env(safe-area-inset-top, 14px)); right: max(14px, env(safe-area-inset-right, 14px)); width: 44px; height: 44px; padding: 0; margin: 0; border-radius: 50%; background: rgba(255,255,255,.18); font-size: 24px; border: none; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
 
         /* --- 设置弹窗 --- */
         #settings-modal {
@@ -352,18 +390,19 @@
         .switch input:checked + .switch-track::after { transform:translateX(20px); }
         .setting-item label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
 
-        .wx-notify-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 5000; }
+        .wx-notify-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 5000; padding: env(safe-area-inset-top, 16px) env(safe-area-inset-right, 16px) env(safe-area-inset-bottom, 16px) env(safe-area-inset-left, 16px); }
         .wx-notify-modal.show { display: flex; }
-        .wx-notify-content { background: #fff; padding: 24px; border-radius: 16px; width: 90%; max-width: 400px; max-height: 85vh; overflow-y: auto; }
+        .wx-notify-content { background: #fff; padding: 24px; border-radius: 16px; width: 90%; max-width: 400px; max-height: 85vh; max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
         .settings-search-button { margin:0 0 22px; background:#f5f7f9; color:#30343b; border:1px solid var(--line); text-align:left; font-weight:500; }
         .settings-search-button:hover { background:#eef2f6; }
 
 
         /* 上下文菜单 */
-        .context-menu { position:fixed; z-index:6000; background:#fff; color:#1f2937; box-shadow:0 12px 30px rgba(20,25,35,0.18); border:1px solid #e5e7eb; border-radius:10px; padding:5px; display:none; min-width:160px; }
-        .context-menu button { display:block; width:100%; text-align:left; padding:10px 12px; border:none; background:transparent; color:#1f2937; cursor:pointer; font:inherit; font-size:15px; line-height:1.4; border-radius:6px; margin:0; }
+        .context-menu { position:fixed; z-index:6000; background:#fff; color:#1f2937; box-shadow:0 12px 30px rgba(20,25,35,0.18); border:1px solid #e5e7eb; border-radius:10px; padding:5px; display:none; min-width:160px; max-width: calc(100vw - 16px); }
+        .context-menu button { display:block; width:100%; text-align:left; padding:10px 12px; border:none; background:transparent; color:#1f2937; cursor:pointer; font:inherit; font-size:15px; line-height:1.4; border-radius:6px; margin:0; min-height: 40px; }
         .context-menu button:hover, .context-menu button:focus-visible { background:#f5f7fb; color:#111827; outline:none; }
+        .context-menu button:active { background:#e8eaed; }
         .context-menu .hint { font-size:12px; color:#888; padding:6px 10px; }
 
         /* Toast 通知 */
@@ -682,10 +721,10 @@
             font-size: clamp(18px, 4vw, 22px);
             cursor: pointer;
             padding: 0;
-            width: 40px;
-            height: 40px;
-            min-width: 40px;
-            min-height: 40px;
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            min-height: 44px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -694,6 +733,7 @@
             touch-action: manipulation;
             transition: background 0.15s;
             line-height: 1;
+            margin: 0;
         }
         .game-fs-close:active { background: #d0d5dd; }
         @media (hover: hover) {
@@ -878,6 +918,7 @@
             font-weight: 600;
             cursor: pointer;
             min-height: 46px;
+            margin: 0;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
             transition: background 0.15s, transform 0.1s;
@@ -1257,30 +1298,20 @@
         document.getElementById('room-loading').classList.add('hidden');
     }
 
-    window.showWxNotifySetup = async function() {
+    window.showWxNotifySetup = function() {
         const modal = document.getElementById('wx-notify-modal');
         const status = document.getElementById('wx-notify-status');
         const delBtn = document.getElementById('wx-delete-btn');
         const checkBtn = document.getElementById('wx-check-btn');
         const qrImg = document.getElementById('wx-qrcode-img');
-        status.textContent = '';
-
-        const bound = await checkWxBindStatus();
-        if (bound) {
-            delBtn.style.display = 'block';
-            checkBtn.style.display = 'none';
-            qrImg.style.display = 'none';
-            status.textContent = '✅ 已绑定微信通知';
-            status.style.color = '#20c997';
-        } else {
-            delBtn.style.display = 'none';
-            checkBtn.style.display = 'block';
-            qrImg.style.display = 'block';
-            const extra = currentRoomCode + ':' + mySender;
-            const followUrl = 'https://wxpusher.zjiecode.com/wxuser/?type=1&id=AT_lx7t01tEWGI9yb9Z5b2ZJRzVwZpQBiHd&extra=' + encodeURIComponent(extra) + '#/follow';
-            qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(followUrl);
-            status.textContent = '扫码后关注公众号，点"检查绑定状态"完成绑定';
-            status.style.color = '#8a9099';
+        const qrcodeArea = document.getElementById('wx-qrcode-area');
+        if (qrImg) qrImg.style.display = 'none';
+        if (qrcodeArea) qrcodeArea.innerHTML = '<div style="text-align:center;padding:40px 20px;font-size:48px;">🚧</div>';
+        if (delBtn) delBtn.style.display = 'none';
+        if (checkBtn) checkBtn.style.display = 'none';
+        if (status) {
+            status.textContent = '⏳ 微信通知功能正在开发中，敬请期待...';
+            status.style.color = '#f59e0b';
         }
         modal.classList.add('show');
         document.getElementById('settings-modal').style.display = 'none';
@@ -1350,6 +1381,20 @@
 
     window.onload = async () => {
         showInstallBanner();
+        
+        document.addEventListener('touchstart', function(){}, {passive: true});
+        document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+        document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
+        document.addEventListener('gestureend', function(e) { e.preventDefault(); });
+        
+        const setVH = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+        setVH();
+        window.addEventListener('resize', setVH);
+        window.addEventListener('orientationchange', () => setTimeout(setVH, 100));
+        
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
         if (roomFromUrl) {
@@ -1360,14 +1405,21 @@
         }
 
         if (window.visualViewport) {
-            window.visualViewport.addEventListener('resize', () => {
+            const fixIOSKeyboard = () => {
                 const chatBox = document.getElementById('chat-box');
+                const chatContainer = document.getElementById('chat-container');
+                if (chatContainer) {
+                    const offset = window.innerHeight - window.visualViewport.height;
+                    chatContainer.style.transform = offset > 0 ? `translateY(${-offset}px)` : '';
+                }
                 if (chatBox && chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 100) {
                     requestAnimationFrame(() => {
                         chatBox.scrollTop = chatBox.scrollHeight;
                     });
                 }
-            });
+            };
+            window.visualViewport.addEventListener('resize', fixIOSKeyboard);
+            window.visualViewport.addEventListener('scroll', fixIOSKeyboard);
         }
 
         const voiceButton = document.getElementById('voice-btn');
