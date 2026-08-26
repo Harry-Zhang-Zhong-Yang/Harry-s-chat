@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -340,6 +340,179 @@
 
         .msg-img { width: auto; max-width: min(100%, 320px); max-height: 360px; object-fit: contain; border-radius: 8px; margin-top: 5px; display: block; cursor: zoom-in; }
         .right .msg-img { margin-left: auto; }
+        .file-card { 
+            display: flex; align-items: center; gap: 14px; padding: 14px 16px; 
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); 
+            border: 1px solid #e2e8f0; border-radius: 14px; cursor: pointer; 
+            max-width: 340px; min-width: 220px;
+            transition: all 0.2s ease; 
+            -webkit-tap-highlight-color: transparent; touch-action: manipulation; 
+            user-select: none; -webkit-user-select: none;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .file-card:hover { 
+            background: linear-gradient(135deg, #eef2f7 0%, #e2e8f0 100%); 
+            border-color: #cbd5e1; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            transform: translateY(-1px);
+        }
+        .file-card:active { 
+            background: #e2e8f0; 
+            transform: scale(0.985); 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+        }
+        .file-card-icon-wrap {
+            width: 48px; height: 48px; flex-shrink: 0;
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+            border-radius: 12px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative; overflow: hidden;
+        }
+        .file-card-icon-emoji { font-size: 22px; line-height: 1; }
+        .file-card-ext-label {
+            font-size: 9px; font-weight: 700; color: #4338ca; 
+            text-transform: uppercase; letter-spacing: 0.5px;
+            margin-top: 1px; line-height: 1;
+        }
+        .file-card-body { flex: 1; min-width: 0; }
+        .file-card-name { 
+            font-size: 14px; font-weight: 600; color: #1e293b; 
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+            max-width: 190px; line-height: 1.3;
+        }
+        .file-card-meta {
+            font-size: 12px; color: #94a3b8; margin-top: 3px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .file-card-type-badge {
+            font-size: 10px; font-weight: 600; color: #6366f1;
+            background: #eef2ff; padding: 2px 7px; border-radius: 6px;
+            letter-spacing: 0.3px;
+        }
+        .file-card-download-btn { 
+            flex-shrink: 0;
+            width: 38px; height: 38px; 
+            display: flex; align-items: center; justify-content: center; 
+            border-radius: 10px; 
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: white; font-size: 16px; font-weight: 700;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 6px rgba(99,102,241,0.3);
+        }
+        .file-card:hover .file-card-download-btn { 
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+            box-shadow: 0 4px 12px rgba(99,102,241,0.4);
+            transform: scale(1.05);
+        }
+        .right .file-card { margin-left: auto; }
+        @media (max-width: 600px) {
+            .file-card { padding: 12px 14px; gap: 12px; max-width: 290px; min-width: 200px; }
+            .file-card-icon-wrap { width: 42px; height: 42px; border-radius: 10px; }
+            .file-card-icon-emoji { font-size: 20px; }
+            .file-card-name { font-size: 13px; max-width: 150px; }
+            .file-card-download-btn { width: 34px; height: 34px; border-radius: 8px; font-size: 14px; }
+        }
+        .file-card-upload-spinner {
+            flex-shrink: 0; width: 38px; height: 38px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .upload-spinner-ring {
+            width: 24px; height: 24px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: uploadSpin 0.8s linear infinite;
+        }
+        @keyframes uploadSpin { to { transform: rotate(360deg); } }
+        .file-upload-status {
+            display: flex; align-items: center; gap: 8px; margin-top: 8px;
+            padding: 6px 12px; border-radius: 8px;
+            background: rgba(99,102,241,0.06); font-size: 13px; color: #6366f1;
+            font-weight: 500;
+        }
+        .upload-dot-pulse {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #6366f1; flex-shrink: 0;
+            animation: dotPulse 1.2s ease-in-out infinite;
+        }
+        @keyframes dotPulse {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        .msg-uploading .msg-content {
+            background: #f8fafc !important;
+            border: 1px solid #d0d0d0 !important;
+        }
+        .msg-wrapper.has-file-card .msg-content {
+            padding: 0 !important; border: 0 !important; background: transparent !important;
+            box-shadow: none !important; gap: 0 !important;
+        }
+        .msg-wrapper.has-file-card .msg-content > div:first-child {
+            line-height: 0;
+        }
+        .download-path-overlay {
+            position: fixed; inset: 0; z-index: 10001;
+            background: rgba(15,23,42,0.55); display: flex;
+            align-items: center; justify-content: center;
+            padding: 20px; opacity: 0;
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .download-path-dialog {
+            background: white; border-radius: 18px; padding: 28px 26px 24px;
+            width: min(100%, 420px); box-shadow: 0 20px 60px rgba(15,23,42,0.25);
+            animation: dialogSlideUp 0.25s ease;
+        }
+        @keyframes dialogSlideUp {
+            from { opacity: 0; transform: translateY(20px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .download-path-header {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 10px;
+        }
+        .download-path-icon { font-size: 28px; }
+        .download-path-header h3 { font-size: 18px; font-weight: 700; color: #1e293b; margin: 0; }
+        .download-path-desc { font-size: 14px; color: #64748b; margin: 0 0 18px; line-height: 1.5; }
+        .download-path-input-row {
+            display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;
+        }
+        .download-path-input-row label {
+            font-size: 13px; font-weight: 600; color: #475569;
+        }
+        .download-path-input-row input {
+            padding: 10px 14px; border: 1.5px solid #d0d5dd; border-radius: 10px;
+            font-size: 14px; font-family: 'Consolas', 'SF Mono', 'Menlo', monospace;
+            color: #1e293b; transition: border-color 0.15s, box-shadow 0.15s;
+            background: #f8fafc;
+        }
+        .download-path-input-row input:focus {
+            outline: none; border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
+            background: white;
+        }
+        .download-path-hint {
+            font-size: 12px; color: #94a3b8; margin: 0 0 20px; line-height: 1.5;
+        }
+        .download-path-buttons {
+            display: flex; gap: 10px; justify-content: flex-end;
+        }
+        .download-path-btn {
+            padding: 10px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
+            border: none; cursor: pointer; transition: all 0.15s;
+            min-height: 42px; -webkit-tap-highlight-color: transparent;
+        }
+        .download-path-btn.cancel {
+            background: #f1f5f9; color: #64748b;
+        }
+        .download-path-btn.cancel:hover { background: #e2e8f0; }
+        .download-path-btn.confirm {
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: white; box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+        }
+        .download-path-btn.confirm:hover {
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+            box-shadow: 0 4px 14px rgba(99,102,241,0.4);
+        }
         .reply-media-preview { cursor: zoom-in; }
         #image-lightbox { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 20px); background: rgba(0,0,0,.82); }
         #image-lightbox.visible { display: flex; }
@@ -377,6 +550,11 @@
         .settings-row-item input[type="color"] { width:42px; height:28px; padding:0; border:0; background:transparent; }
         .settings-row-button { border:0; background:transparent; color:#30343b; padding:0; margin:0; text-align:left; font-weight:400; }
         .settings-row-button::after { content:'›'; color:#a5abb2; float:right; font-size:22px; line-height:15px; }
+        #download-path-input { font-family: 'Consolas', 'SF Mono', 'Menlo', monospace; font-size: 13px; transition: border-color 0.15s; }
+        #download-path-input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        @media (max-width: 600px) {
+            #download-path-input { max-width: 160px !important; font-size: 12px !important; }
+        }
         .profile-avatar-preview { width:44px; height:44px; flex:0 0 44px; border-radius:50%; object-fit:cover; background:#dbe5f5; color:#52709d; display:grid; place-items:center; font-size:18px; font-weight:600; overflow:hidden; }
         .profile-avatar-action { display:flex; align-items:center; gap:12px; border:0; background:transparent; color:#30343b; padding:0; margin:0; font-weight:400; }
         .profile-avatar-action::after { content:'›'; color:#a5abb2; font-size:22px; line-height:15px; }
@@ -1081,6 +1259,10 @@
                 <div class="attach-icon">🖼</div>
                 <div class="attach-label">图片</div>
             </div>
+            <div class="attach-item" onclick="window.triggerFileUpload(); window.closeAttachPanel();">
+                <div class="attach-icon">📁</div>
+                <div class="attach-label">文件</div>
+            </div>
             <div class="attach-item" onclick="window.openGamePanel(); window.closeAttachPanel();">
                 <div class="attach-icon">🎮</div>
                 <div class="attach-label">小游戏</div>
@@ -1089,6 +1271,7 @@
  
         <!-- 隐藏的文件选择器 -->
         <input type="file" id="file-input" accept="image/*,audio/*" style="display:none;" onchange="window.handleFileSelect(event)">
+        <input type="file" id="file-input-generic" style="display:none;" onchange="window.handleGenericFileSelect(event)">
          
         <!-- 设置弹窗 -->
         <div id="settings-modal" onclick="window.toggleSettings(event)">
@@ -1128,6 +1311,15 @@
                 <div class="settings-section">
                     <div class="settings-section-title">其他</div>
                     <div class="settings-row-item"><button class="settings-row-button" onclick="window.clearLocalHistory()">清空聊天记录</button></div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">文件下载</div>
+                    <div class="settings-row-item" style="font-size:12px;color:#8a9099;padding:8px 0;border-bottom:0;">💻 文件下载功能仅支持电脑端使用</div>
+                    <div class="settings-row-item">
+                        <label>默认下载路径</label>
+                        <input type="text" id="download-path-input" placeholder="例如: C:\Users\xxx\Downloads" style="flex:1;min-width:0;padding:8px 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:14px;text-align:right;max-width:220px;" onchange="window.saveDownloadPath(this.value)">
+                    </div>
+                    <div class="settings-row-item" style="font-size:12px;color:#8a9099;padding:8px 0;border-bottom:0;">⚠ 实际下载位置由浏览器设置决定，此处仅作记录参考</div>
                 </div>
                 <input type="file" id="bg-upload-input" accept="image/*" style="display:none;" onchange="window.handleBgUpload(event)">
                 <input type="file" id="avatar-upload-input" accept="image/*" style="display:none;" onchange="window.handleAvatarUpload(event)">
@@ -1299,22 +1491,8 @@
     }
 
     window.showWxNotifySetup = function() {
-        const modal = document.getElementById('wx-notify-modal');
-        const status = document.getElementById('wx-notify-status');
-        const delBtn = document.getElementById('wx-delete-btn');
-        const checkBtn = document.getElementById('wx-check-btn');
-        const qrImg = document.getElementById('wx-qrcode-img');
-        const qrcodeArea = document.getElementById('wx-qrcode-area');
-        if (qrImg) qrImg.style.display = 'none';
-        if (qrcodeArea) qrcodeArea.innerHTML = '<div style="text-align:center;padding:40px 20px;font-size:48px;">🚧</div>';
-        if (delBtn) delBtn.style.display = 'none';
-        if (checkBtn) checkBtn.style.display = 'none';
-        if (status) {
-            status.textContent = '⏳ 微信通知功能正在开发中，敬请期待...';
-            status.style.color = '#f59e0b';
-        }
-        modal.classList.add('show');
         document.getElementById('settings-modal').style.display = 'none';
+        showToast('⏳ 微信通知功能正在开发中，敬请期待...', 'info', 3500);
     };
 
     async function createWxPusherQrCode(extra) {
@@ -2082,6 +2260,10 @@
         document.getElementById('file-input').click();
     };
 
+    window.triggerFileUpload = function() {
+        document.getElementById('file-input-generic').click();
+    };
+
     window.openGamePanel = function() {
         const modal = document.getElementById('game-modal');
         if (modal) modal.style.display = 'flex';
@@ -2226,6 +2408,304 @@
             event.target.value = '';
         }
     };
+
+    window.handleGenericFileSelect = async function(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        if (file.size > 50 * 1024 * 1024) {
+            return showToast("文件太大啦！请选择小于50MB的文件。", 'error');
+        }
+
+        const tempId = 'uploading_' + Date.now();
+        const progressEl = appendUploadingPlaceholder(tempId, file.name, file.size);
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const safeName = file.name.replace(/[^a-zA-Z0-9\u4e00-\u9fff._-]/g, '_');
+            const fileName = `file_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${safeName}`;
+            const filePath = `chat_media/${fileName}`;
+
+            const { data, error } = await supabaseClient
+                .storage
+                .from('chat_media')
+                .upload(filePath, file);
+
+            if (error) throw error;
+
+            const { data: publicData } = await supabaseClient
+                .storage
+                .from('chat_media')
+                .getPublicUrl(filePath);
+
+            const mediaUrl = publicData.publicUrl;
+
+            removeUploadingPlaceholder(tempId);
+
+            pendingMedia = {
+                url: mediaUrl,
+                type: 'file',
+                fileName: file.name,
+                fileSize: file.size
+            };
+
+            window.sendMessage();
+        } catch (e) {
+            removeUploadingPlaceholder(tempId);
+            console.error('文件上传失败:', e);
+            if (e.message && (e.message.includes('Bucket') || e.message.includes('not found'))) {
+                showToast("存储桶不存在，请在Supabase控制台中创建名为 chat_media 的公开存储桶。", 'error');
+            } else if (e.message && e.message.includes('row-level security')) {
+                showToast("存储桶权限不足，请在Supabase控制台 → Storage → chat_media → 添加公开读取策略。", 'error');
+            } else if (e.message && (e.message.includes('quota') || e.message.includes('exceeded'))) {
+                showToast("存储空间已满，请在Supabase控制台中清理 chat_media 存储桶中的文件。", 'error');
+            } else {
+                showToast("上传失败，请检查网络。", 'error');
+            }
+        } finally {
+            event.target.value = '';
+        }
+    };
+
+    function appendUploadingPlaceholder(tempId, fileName, fileSize) {
+        const chatBox = document.getElementById('chat-box');
+        if (!chatBox) return null;
+
+        const icon = getFileIcon(fileName);
+        const extLabel = getFileExtLabel(fileName);
+        const sizeStr = fileSize ? formatFileSize(fileSize) : '';
+
+        const div = document.createElement('div');
+        div.className = 'msg-wrapper right msg-uploading';
+        div.id = tempId;
+        div.innerHTML = `
+            <div class="msg-content" style="opacity:0.9;padding:0;border:0;background:transparent;box-shadow:none;gap:4px;">
+                <div class="file-card file-card-uploading" style="cursor:default;pointer-events:none;border:1px solid #d0d0d0;">
+                    <div class="file-card-icon-wrap">
+                        <span class="file-card-icon-emoji">${icon}</span>
+                        <span class="file-card-ext-label">${escapeHtml(extLabel)}</span>
+                    </div>
+                    <div class="file-card-body">
+                        <div class="file-card-name">${escapeHtml(fileName)}</div>
+                        <div class="file-card-meta">
+                            <span class="file-card-type-badge">${escapeHtml(extLabel)} 文件</span>
+                            ${sizeStr ? `<span>${sizeStr}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="file-card-upload-spinner">
+                        <div class="upload-spinner-ring"></div>
+                    </div>
+                </div>
+                <div class="file-upload-status" style="margin-top:0;">
+                    <span class="upload-dot-pulse"></span>
+                    <span>正在上传文件...</span>
+                </div>
+            </div>
+        `;
+        chatBox.appendChild(div);
+        requestAnimationFrame(scrollToBottomInstant);
+        [50, 150].forEach((d) => setTimeout(scrollToBottomInstant, d));
+        return div;
+    }
+
+    function removeUploadingPlaceholder(tempId) {
+        const el = document.getElementById(tempId);
+        if (el) {
+            el.style.transition = 'opacity 0.3s';
+            el.style.opacity = '0';
+            setTimeout(() => { if (el.parentNode) el.remove(); }, 300);
+        }
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function getFileIcon(fileName) {
+        const ext = (fileName || '').split('.').pop().toLowerCase();
+        const iconMap = {
+            zip: '🗜', rar: '🗜', '7z': '🗜', tar: '🗜', gz: '🗜', bz2: '🗜', xz: '🗜',
+            pdf: '📕', doc: '📄', docx: '📄', xls: '📊', xlsx: '📊', ppt: '📽', pptx: '📽',
+            txt: '📝', md: '📝', csv: '📊', json: '📋', xml: '📋', html: '🌐', css: '🎨', js: '📜', py: '📜', java: '📜', cpp: '📜', c: '📜', ts: '📜', go: '📜', rs: '📜',
+            mp3: '🎵', wav: '🎵', flac: '🎵', aac: '🎵', ogg: '🎵',
+            mp4: '🎬', avi: '🎬', mkv: '🎬', mov: '🎬', webm: '🎬',
+            jpg: '🖼', jpeg: '🖼', png: '🖼', gif: '🖼', webp: '🖼', svg: '🖼', bmp: '🖼',
+            exe: '⚙', dmg: '⚙', apk: '📱', ipa: '📱',
+            iso: '💿',
+        };
+        return iconMap[ext] || '📎';
+    }
+
+    function getFileExtLabel(fileName) {
+        const ext = (fileName || '').split('.').pop().toLowerCase();
+        const labelMap = {
+            zip: 'ZIP', rar: 'RAR', '7z': '7Z', tar: 'TAR', gz: 'GZ', bz2: 'BZ2', xz: 'XZ',
+            pdf: 'PDF', doc: 'DOC', docx: 'DOCX', xls: 'XLS', xlsx: 'XLSX', ppt: 'PPT', pptx: 'PPTX',
+            txt: 'TXT', md: 'MD', csv: 'CSV', json: 'JSON', xml: 'XML', html: 'HTML', css: 'CSS',
+            js: 'JS', py: 'PY', java: 'JAVA', cpp: 'CPP', ts: 'TS', go: 'GO', rs: 'RS',
+            mp3: 'MP3', wav: 'WAV', flac: 'FLAC', aac: 'AAC', ogg: 'OGG',
+            mp4: 'MP4', avi: 'AVI', mkv: 'MKV', mov: 'MOV', webm: 'WEBM',
+            jpg: 'JPG', jpeg: 'JPEG', png: 'PNG', gif: 'GIF', webp: 'WEBP', svg: 'SVG', bmp: 'BMP',
+            exe: 'EXE', dmg: 'DMG', apk: 'APK', ipa: 'IPA', iso: 'ISO',
+        };
+        return labelMap[ext] || ext.toUpperCase().slice(0, 4) || 'FILE';
+    }
+
+    function fileMessageHtml(url, fileName, fileSize) {
+        const icon = getFileIcon(fileName);
+        const extLabel = getFileExtLabel(fileName);
+        const sizeStr = fileSize ? formatFileSize(fileSize) : '';
+        const displayName = fileName || '未知文件';
+        const safeUrl = escapeHtml(url);
+        const safeName = escapeHtml(displayName);
+        return `<div class="file-card" onclick="window.downloadFile('${safeUrl}', '${safeName}')" title="点击下载 ${safeName}">
+            <div class="file-card-icon-wrap">
+                <span class="file-card-icon-emoji">${icon}</span>
+                <span class="file-card-ext-label">${escapeHtml(extLabel)}</span>
+            </div>
+            <div class="file-card-body">
+                <div class="file-card-name">${safeName}</div>
+                <div class="file-card-meta">
+                    <span class="file-card-type-badge">${escapeHtml(extLabel)} 文件</span>
+                    ${sizeStr ? `<span>${sizeStr}</span>` : ''}
+                </div>
+            </div>
+            <div class="file-card-download-btn">⬇</div>
+        </div>`;
+    }
+
+    window.isDesktopDevice = function() {
+        if (window.matchMedia('(pointer: coarse)').matches) return false;
+        if (window.matchMedia('(max-width: 768px)').matches) return false;
+        const ua = navigator.userAgent || '';
+        if (/Android|iPhone|iPad|iPod|webOS|BlackBerry|Windows Phone/i.test(ua) && !/Tablet/i.test(ua)) return false;
+        return true;
+    };
+
+    window.saveDownloadPath = function(path) {
+        localStorage.setItem('chat_download_path', path || '');
+        if (path) {
+            showToast('下载路径已保存', 'success');
+        }
+    };
+
+    window.downloadFile = async function(url, fileName) {
+        if (!window.isDesktopDevice()) {
+            showToast('📱 手机端暂不支持下载文件，请使用电脑访问此页面下载', 'error', 4000);
+            return;
+        }
+
+        let downloadPath = localStorage.getItem('chat_download_path') || '';
+        const saveName = fileName || 'download';
+
+        if (!downloadPath) {
+            const path = await promptDownloadPath();
+            if (!path) return;
+            downloadPath = path;
+        }
+
+        showToast('正在准备下载...', 'info');
+
+        try {
+            const response = await fetch(url, { mode: 'cors' });
+            if (!response.ok) throw new Error('下载失败: ' + response.status);
+
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = saveName;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            }, 1000);
+
+            const sizeStr = blob.size ? formatFileSize(blob.size) : '';
+            const pathInfo = downloadPath ? ` → ${downloadPath}` : '';
+            showToast(`✅ 下载已开始${sizeStr ? ' (' + sizeStr + ')' : ''}${pathInfo}`, 'success', 3500);
+        } catch (e) {
+            console.error('文件下载失败:', e);
+            window.open(url, '_blank');
+            showToast('⚠ 直接下载失败，已在新标签页打开文件', 'error', 3500);
+        }
+    };
+
+    function promptDownloadPath() {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'download-path-overlay';
+            overlay.innerHTML = `
+                <div class="download-path-dialog">
+                    <div class="download-path-header">
+                        <span class="download-path-icon">📂</span>
+                        <h3>设置下载路径</h3>
+                    </div>
+                    <p class="download-path-desc">请设置默认下载路径，方便后续下载文件时快速定位。</p>
+                    <div class="download-path-input-row">
+                        <label>下载路径</label>
+                        <input type="text" id="download-path-dialog-input" 
+                               placeholder="例如: C:\\Users\\你的用户名\\Downloads"
+                               value="${localStorage.getItem('chat_download_path') || ''}">
+                    </div>
+                    <p class="download-path-hint">💡 实际保存位置由浏览器设置决定，此处仅作记录参考</p>
+                    <div class="download-path-buttons">
+                        <button class="download-path-btn cancel" id="download-path-cancel">跳过</button>
+                        <button class="download-path-btn confirm" id="download-path-confirm">保存并下载</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const input = overlay.querySelector('#download-path-dialog-input');
+            const confirmBtn = overlay.querySelector('#download-path-confirm');
+            const cancelBtn = overlay.querySelector('#download-path-cancel');
+
+            const cleanup = () => {
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.2s';
+                setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 200);
+            };
+
+            confirmBtn.onclick = () => {
+                const path = input.value.trim();
+                if (path) {
+                    localStorage.setItem('chat_download_path', path);
+                    const settingsInput = document.getElementById('download-path-input');
+                    if (settingsInput) settingsInput.value = path;
+                }
+                cleanup();
+                resolve(path || '');
+            };
+
+            cancelBtn.onclick = () => {
+                cleanup();
+                resolve('');
+            };
+
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    cleanup();
+                    resolve('');
+                }
+            };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') confirmBtn.click();
+            });
+
+            requestAnimationFrame(() => {
+                overlay.style.opacity = '1';
+                input.focus();
+            });
+        });
+    }
 
     function getAudioMimeType() {
         const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/ogg;codecs=opus'];
@@ -2401,6 +2881,10 @@
             const replyMeta = encodeURIComponent(JSON.stringify(replyData));
             finalContent = `${content}\n\n[回复元数据:${replyMeta}]`;
         }
+        if (pendingMedia && pendingMedia.type === 'file') {
+            const fileMeta = encodeURIComponent(JSON.stringify({ fileName: pendingMedia.fileName, fileSize: pendingMedia.fileSize }));
+            finalContent = `${finalContent}\n\n[文件元数据:${fileMeta}]`;
+        }
 
         const now = beijingISOString();
         const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -2411,7 +2895,7 @@
         pendingMedia = null;
         cancelReply();
 
-        appendMessageToUI(tempId, mySender, finalContent, true, now, pendingMediaCopy ? pendingMediaCopy.url : null, pendingMediaCopy ? pendingMediaCopy.type : null);
+        appendMessageToUI(tempId, mySender, finalContent, true, now, pendingMediaCopy ? pendingMediaCopy.url : null, pendingMediaCopy ? pendingMediaCopy.type : null, false, false, pendingMediaCopy ? pendingMediaCopy.fileName : null, pendingMediaCopy ? pendingMediaCopy.fileSize : null);
 
         const tempEl = document.querySelector(`[data-msg-id="${tempId}"]`);
         if (tempEl) {
@@ -2741,7 +3225,7 @@
         }
     };
 
-    function appendMessageToUI(id, sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false, skipAvatarRefresh = false) {
+    function appendMessageToUI(id, sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false, skipAvatarRefresh = false, fileName = null, fileSize = null) {
         const chatBox = document.getElementById('chat-box');
         if (isNew && id && Array.from(chatBox.querySelectorAll('.msg-wrapper[data-msg-id]')).some((item) => item.dataset.msgId === String(id))) return;
         const wrapper = document.createElement('div');
@@ -2784,6 +3268,16 @@
             }
         }
 
+        const fileMetaMatch = displayContent && displayContent.match(/\n\n\[文件元数据:([^\]]+)\]$/);
+        if (fileMetaMatch) {
+            try {
+                const meta = JSON.parse(decodeURIComponent(fileMetaMatch[1]));
+                if (meta.fileName && !fileName) fileName = meta.fileName;
+                if (meta.fileSize && !fileSize) fileSize = meta.fileSize;
+                displayContent = displayContent.slice(0, fileMetaMatch.index);
+            } catch (e) { console.warn('文件元数据解析失败:', e); }
+        }
+
         let mediaHtml = "";
         const isRecalled = content === '[已撤回]';
         if (isRecalled) {
@@ -2797,6 +3291,9 @@
             } else if (mediaType === 'audio') {
                 mediaHtml = voiceMessageHtml(mediaUrl, displayContent);
                 displayContent = '';
+            } else if (mediaType === 'file') {
+                mediaHtml = fileMessageHtml(mediaUrl, fileName, fileSize);
+                wrapper.classList.add('has-file-card');
             }
         }
 
@@ -3061,15 +3558,30 @@
                     wrapper.dataset.originalContent = '[已撤回]';
                     wrapper.dataset.mediaUrl = '';
                     wrapper.dataset.mediaType = '';
-                    wrapper.classList.remove('media-only');
                     const img = wrapper.querySelector('.msg-img');
                     if (img) img.remove();
                     const placeholder = wrapper.querySelector('.msg-img-placeholder');
                     if (placeholder) placeholder.remove();
                     const voiceMsg = wrapper.querySelector('.voice-message-wrap');
                     if (voiceMsg) voiceMsg.remove();
+                    const fileCard = wrapper.querySelector('.file-card');
+                    if (fileCard) fileCard.remove();
+                    wrapper.classList.remove('has-file-card');
+                    wrapper.classList.remove('media-only');
                 } else {
-                    const mediaHtml = newMsg.media_url ? (newMsg.media_type === 'audio' ? voiceMessageHtml(newMsg.media_url, newMsg.content) : `<img src="${escapeHtml(newMsg.media_url)}" class="msg-img" alt="图片消息" />`) : '';
+                    let mediaHtml = '';
+                    if (newMsg.media_url) {
+                        if (newMsg.media_type === 'audio') {
+                            mediaHtml = voiceMessageHtml(newMsg.media_url, newMsg.content);
+                        } else if (newMsg.media_type === 'file') {
+                            const fn = newMsg.fileName || '';
+                            const fs = newMsg.fileSize || null;
+                            mediaHtml = fileMessageHtml(newMsg.media_url, fn, fs);
+                            wrapper.classList.add('has-file-card');
+                        } else {
+                            mediaHtml = `<img src="${escapeHtml(newMsg.media_url)}" class="msg-img" alt="图片消息" />`;
+                        }
+                    }
                     const editedBadge = newMsg.edited_at ? ' <span style="font-size:10px;opacity:0.6;">(已编辑)</span>' : '';
                     contentDiv.innerHTML = `${mediaHtml}${newMsg.media_type === 'audio' ? '' : escapeHtml(newMsg.content || '')}${editedBadge}`;
                     const updatedImage = contentDiv.querySelector('.msg-img');
@@ -3111,7 +3623,7 @@
         try {
             const msg = messagesCache.find(m => String(m.id) === String(messageId));
             if (!msg) return showToast('无法找到消息或已过期', 'error');
-            if (msg.media_type === 'audio' || msg.media_type === 'image') return showToast('暂不支持编辑媒体消息', 'error');
+            if (msg.media_type === 'audio' || msg.media_type === 'image' || msg.media_type === 'file') return showToast('暂不支持编辑媒体消息', 'error');
             const created = new Date(msg.created_at).getTime();
             const now = Date.now();
             const windowMs = 2 * 60 * 1000;
@@ -3234,6 +3746,8 @@
             if (speedToggle) speedToggle.checked = isSpeedMode;
             const pollingToggle = document.getElementById('polling-toggle');
             if (pollingToggle) pollingToggle.checked = isPollingEnabled;
+            const downloadPathInput = document.getElementById('download-path-input');
+            if (downloadPathInput) downloadPathInput.value = localStorage.getItem('chat_download_path') || '';
         }
     };
 
