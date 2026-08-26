@@ -173,8 +173,6 @@
 
         .msg-img-placeholder { width: 100%; max-width: 320px; height: 180px; border-radius: 8px; background: linear-gradient(110deg, #ececec 8%, #f5f5f5 18%, #ececec 33%); background-size: 200% 100%; animation: shimmer 1.5s ease-in-out infinite; margin-top: 5px; display: block; }
         @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-        .msg-img.loading { display: none; }
-        .msg-img.loaded { display: block; }
         .right .msg-img-placeholder { margin-left: auto; }
         .left .msg-img-placeholder { margin-right: auto; }
 
@@ -1225,6 +1223,13 @@
             console.warn('join_logs insert failed:', e);
         }
     }
+
+    window.addEventListener('unhandledrejection', function(e) {
+        if (e.reason && e.reason.message && e.reason.message.includes('message channel closed')) {
+            e.preventDefault();
+        }
+    });
+
     let presenceIdleTimer = null;
     const PRESENCE_IDLE_MS = 2 * 60 * 1000;
     let realtimePolling = null;
@@ -2735,7 +2740,7 @@
             mediaType = null;
         } else if (mediaUrl) {
             if (mediaType === 'image') {
-                mediaHtml = `<div class="msg-img-placeholder"></div><img src="${escapeHtml(mediaUrl)}" class="msg-img loading" alt="图片消息" loading="lazy" decoding="async" onload="this.classList.remove('loading');this.classList.add('loaded');this.previousElementSibling.remove();" onerror="this.previousElementSibling.innerHTML='图片加载失败<br><span style=font-size:11px>请检查Supabase Storage公开读取策略</span>';this.previousElementSibling.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;color:#999;font-size:13px;text-align:center;padding:10px;';">`;
+                mediaHtml = `<div style="display:grid;max-width:320px;"><div class="msg-img-placeholder" style="grid-area:1/1;width:100%;"></div><img src="${escapeHtml(mediaUrl)}" class="msg-img" style="grid-area:1/1;" alt="图片消息" onload="this.previousElementSibling.remove();" onerror="this.previousElementSibling.innerHTML='图片加载失败<br><span style=font-size:11px>请检查网络或图片链接</span>';this.previousElementSibling.style.cssText='display:flex;flex-direction:column;align-items:center;justify-content:center;color:#999;font-size:13px;text-align:center;padding:10px;grid-area:1/1;width:100%;height:180px;border-radius:8px;background:#f0f0f0;margin-top:5px;';"></div>`;
                 wrapper.classList.add('media-only');
             } else if (mediaType === 'audio') {
                 mediaHtml = voiceMessageHtml(mediaUrl, displayContent);
