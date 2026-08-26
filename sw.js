@@ -1,4 +1,4 @@
-const CACHE_NAME = 'harrys-chat-v3';
+const CACHE_NAME = 'harrys-chat-v4';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -72,7 +72,23 @@ self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
     const url = new URL(event.request.url);
     if (url.hostname.includes('supabase')) return;
-    if (url.hostname.includes('cdn.jsdelivr.net')) return;
+    if (url.hostname.includes('api.qrserver.com')) return;
+    if (url.hostname.includes('wxpusher.zjiecode.com')) return;
+    if (url.hostname.includes('cdn.jsdelivr.net')) {
+        event.respondWith(
+            caches.match(event.request).then((cached) => {
+                const fetchPromise = fetch(event.request).then((response) => {
+                    if (response && response.status === 200) {
+                        const clone = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                    }
+                    return response;
+                }).catch(() => cached);
+                return cached || fetchPromise;
+            })
+        );
+        return;
+    }
 
     if (event.request.mode === 'navigate') {
         event.respondWith(
