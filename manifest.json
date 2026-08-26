@@ -5,13 +5,16 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "any",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
   "background_color": "#f0f2f5",
   "theme_color": "#07c475",
   "lang": "zh-CN",
   "categories": ["social", "games", "utilities"],
   "dir": "ltr",
   "prefer_related_applications": false,
+  "iarc_rating_id": "",
+  "related_applications": [],
   "icons": [
     {
       "src": "/icon-192.png",
