@@ -1212,6 +1212,19 @@
     let speechTranscript = '';
     let presenceActive = false;
     let pendingJoinAnnounce = false;
+    async function logJoinRoom(joinType = 'manual') {
+        if (!currentRoomCode || !mySender) return;
+        try {
+            await supabaseClient.from('join_logs').insert([{
+                room_code: currentRoomCode,
+                user_name: mySender,
+                join_type: joinType,
+                user_agent: navigator.userAgent || ''
+            }]);
+        } catch (e) {
+            console.warn('join_logs insert failed:', e);
+        }
+    }
     let presenceIdleTimer = null;
     const PRESENCE_IDLE_MS = 2 * 60 * 1000;
     let realtimePolling = null;
@@ -1395,6 +1408,7 @@
                 await loadHistory(true);
                 hideRoomLoading();
                 updateWxNotifyButton();
+                logJoinRoom('auto');
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
                 initRealtime();
@@ -1550,6 +1564,7 @@
             await loadHistory(true);
             hideRoomLoading();
             updateWxNotifyButton();
+            logJoinRoom('manual');
             setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
             initRealtime();
@@ -2097,7 +2112,9 @@
         if (file.type && file.type.startsWith('image/')) {
             try {
                 const compressed = await compressImageFile(file, 1200, 0.75);
-                if (compressed) file = compressed;
+                if (compressed && compressed.size > 100 && compressed.size < file.size) {
+                    file = compressed;
+                }
             } catch (e) { console.warn('image compression failed', e); }
         }
 
@@ -2123,6 +2140,12 @@
                 .getPublicUrl(filePath);
 
             const mediaUrl = publicData.publicUrl;
+
+            fetch(mediaUrl, { method: 'HEAD', cache: 'no-cache' })
+                .then(r => { if (!r.ok) throw new Error('not ok'); })
+                .catch(() => {
+                    showToast("图片上传成功但无法公开访问！请在Supabase → SQL Editor执行: CREATE POLICY \"public_read\" ON storage.objects FOR SELECT USING (bucket_id='chat_media');", 'error', 6000);
+                });
 
             const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|webm|m4a|ogg|aac|flac)$/i.test(file.name);
             pendingMedia = {
