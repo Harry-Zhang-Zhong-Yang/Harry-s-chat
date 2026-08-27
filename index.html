@@ -1,4 +1,4 @@
-﻿﻿﻿﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -44,8 +44,8 @@
             --text-main: #232741;
             --muted: #6b7192;
             --line: rgba(120,130,180,0.14);
-            --app-bg: linear-gradient(165deg, #eef1ff 0%, #e3ecfd 45%, #f3f0ff 100%);
-            --page-bg: linear-gradient(165deg, #eef1ff 0%, #e3ecfd 45%, #f3f0ff 100%);
+            --app-bg: linear-gradient(165deg, #e8edff 0%, #dde7fd 45%, #efe6ff 100%);
+            --page-bg: linear-gradient(165deg, #e8edff 0%, #dde7fd 45%, #efe6ff 100%);
             --surface: rgba(255,255,255,0.66);
             --surface-solid: #ffffff;
             --surface-border: rgba(120,130,180,0.13);
@@ -76,8 +76,8 @@
             --text-main: #43371f;
             --muted: #a08d72;
             --line: #e7ded0;
-            --app-bg: #f7f2ea;
-            --page-bg: #f7f2ea;
+            --app-bg: linear-gradient(165deg, #fbf4e8 0%, #f5ead7 50%, #fdf2e4 100%);
+            --page-bg: linear-gradient(165deg, #fbf4e8 0%, #f5ead7 50%, #fdf2e4 100%);
             --surface: #fffdf7;
             --surface-solid: #fffdf7;
             --surface-border: #e7ded0;
@@ -249,6 +249,15 @@
             background: var(--page-bg);
             background-size: cover; background-position: center;
             transition: background-image 0.5s ease;
+        }
+        /* 浅色主题给聊天背景加一点柔和高光，避免纯渐变显得平 */
+        :root[data-theme="a"]:not([data-mode="dark"]) #chat-bg::before,
+        :root[data-theme="b"]:not([data-mode="dark"]) #chat-bg::before {
+            content: '';
+            position: absolute; inset: 0;
+            background: radial-gradient(900px 480px at 88% -8%, rgba(255,255,255,0.55), transparent 60%),
+                        radial-gradient(720px 420px at -6% 108%, rgba(255,255,255,0.35), transparent 55%);
+            pointer-events: none;
         }
         #room-loading { position:absolute; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:transparent; color:var(--muted); font-size:14px; }
         #room-loading.hidden { display:none; }
@@ -1589,7 +1598,6 @@
                 <button class="settings-row-button" id="wx-notify-btn" onclick="window.showWxNotifySetup()">配置QQ通知</button>
             </div>
             <div class="settings-row-item"><label>气泡颜色</label><div style="display:flex;align-items:center;gap:8px;"><input type="color" id="color-selector" value="#6366f1" onchange="window.saveSettings()"><button class="settings-row-button" style="padding:6px 12px;font-size:12px;" onclick="window.resetBubbleColor()">恢复默认</button></div></div>
-            <div class="settings-row-item"><button class="settings-row-button" onclick="document.getElementById('bg-upload-input').click()">设置当前聊天背景</button></div>
         </div>
         <div class="settings-section">
             <div class="settings-section-title">我的资料</div>
@@ -1601,7 +1609,7 @@
                 <label>极速模式</label>
                 <label class="switch" aria-label="开启极速模式"><input id="speed-mode-toggle" type="checkbox" onchange="window.toggleSpeedMode(this)"><span class="switch-track"></span></label>
             </div>
-            <div class="settings-row-item" style="font-size:12px;color:var(--muted);padding:8px 0;border-bottom:0;">开启后优先保证消息收发，暂停头像、背景等加载</div>
+            <div class="settings-row-item" style="font-size:12px;color:var(--muted);padding:8px 0;border-bottom:0;">开启后优先保证消息收发，暂停头像等加载</div>
             <div class="settings-row-item">
                 <label>消息轮询</label>
                 <label class="switch" aria-label="开启消息轮询"><input id="polling-toggle" type="checkbox" onchange="window.togglePolling(this)"><span class="switch-track"></span></label>
@@ -1621,7 +1629,6 @@
             </div>
             <div class="settings-row-item" style="font-size:12px;color:var(--muted);padding:8px 0;border-bottom:0;">⚠ 实际下载位置由浏览器设置决定，此处仅作记录参考</div>
         </div>
-        <input type="file" id="bg-upload-input" accept="image/*" style="display:none;" onchange="window.handleBgUpload(event)">
         <input type="file" id="avatar-upload-input" accept="image/*" style="display:none;" onchange="window.handleAvatarUpload(event)">
     </div>
 </div>
@@ -1872,7 +1879,7 @@
             </div>
         </div>
         <div style="display:flex;gap:10px;margin-bottom:10px;">
-            <button onclick="window.testQmsgNotify()" style="flex:1;margin:0;padding:10px 16px;background:var(--panel-soft);color:var(--btn-color);border:1px solid var(--line);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">🧪 测试通知</button>
+            <button onclick="window.testQmsgNotify(this)" style="flex:1;margin:0;padding:10px 16px;background:var(--panel-soft);color:var(--btn-color);border:1px solid var(--line);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">🧪 测试通知</button>
             <a href="https://qmsg.zendee.cn" target="_blank" style="flex:1;text-align:center;padding:10px 16px;background:var(--btn-bg);color:white;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;">🔗 获取Key</a>
         </div>
         <button onclick="window.closeWxNotifySetup(null)" style="width:100%;margin:0;padding:10px 16px;background:var(--panel-soft);color:var(--text-main);border-radius:10px;font-size:14px;font-weight:600;border:1px solid var(--line);cursor:pointer;">关闭</button>
@@ -1891,7 +1898,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.3.0";
+    const CHAT_APP_VERSION = "2.4.0";
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -1939,6 +1946,32 @@
             toast.classList.add('out');
             toast.addEventListener('animationend', () => toast.remove());
         }, duration);
+    }
+
+    /**
+     * 临时把按钮置为 loading 状态（变灰、显示 loading 文字、不可点）。
+     * 返回 restore 回调，调用后恢复原样。
+     * 用法：const restore = setButtonLoading(btn, '加载中…'); ... restore();
+     */
+    function setButtonLoading(btn, loadingText) {
+        if (!btn) return () => {};
+        const original = {
+            text: btn.textContent,
+            disabled: btn.disabled,
+            style: btn.getAttribute('style') || ''
+        };
+        btn.disabled = true;
+        btn.setAttribute('data-loading', '1');
+        btn.textContent = loadingText || '处理中…';
+        btn.style.opacity = '0.7';
+        btn.style.cursor = 'wait';
+        return function restore() {
+            btn.disabled = original.disabled;
+            btn.removeAttribute('data-loading');
+            btn.textContent = original.text;
+            btn.style.opacity = '';
+            btn.style.cursor = '';
+        };
     }
 
     let currentRoomCode = "";
@@ -2122,7 +2155,6 @@
                 pendingJoinAnnounce = true;
                 showRoomLoading();
                 setRoomTitle(currentRoomCode);
-                applyRoomBackground();
                 await loadHistory(true);
                 hideRoomLoading();
                 updateWxNotifyButton();
@@ -2319,7 +2351,13 @@
         window.openImageLightbox = openImageLightbox;
         window.closeImageLightbox = closeImageLightbox;
 
-        localStorage.removeItem('chat_bg_url');
+        // 清理旧版本残留的自定义背景数据
+        try {
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const k = localStorage.key(i);
+                if (k && k.startsWith('chat_bg_url')) localStorage.removeItem(k);
+            }
+        } catch (e) { /* ignore */ }
 
         // ===== 主题初始化：A(雾蓝玻璃,默认) / B(奶油纸感) + 深色模式 =====
         const savedStyle = localStorage.getItem('chat_theme_style');
@@ -2342,11 +2380,6 @@
         isPollingEnabled = localStorage.getItem('chat_polling_enabled') === '1';
         const pollingToggle = document.getElementById('polling-toggle');
         if (pollingToggle) pollingToggle.checked = isPollingEnabled;
-
-        const savedBg = localStorage.getItem(`chat_bg_url:${savedRoom || ''}`);
-        if (savedBg && !isSpeedMode) {
-            document.getElementById('chat-bg').style.backgroundImage = `url(${savedBg})`;
-        }
 
         const lastVersion = localStorage.getItem('app_version');
         if (lastVersion !== CHAT_APP_VERSION) {
@@ -2389,7 +2422,6 @@
 
         showRoomLoading();
         setRoomTitle(currentRoomCode);
-        applyRoomBackground();
 
         try {
             await loadHistory(true);
@@ -2429,21 +2461,6 @@
             setRoomTitle(room.room_name || currentRoomCode);
         }
 
-    }
-
-    async function applyRoomBackground() {
-        const background = document.getElementById('chat-bg');
-        if (!background) return;
-        if (isSpeedMode) { background.style.backgroundImage = ''; return; }
-        const savedBg = localStorage.getItem(`chat_bg_url:${currentRoomCode}`);
-        if (savedBg) background.style.backgroundImage = `url(${savedBg})`;
-        try {
-            const { data: room } = await supabaseClient.from('rooms').select('background_url').eq('room_code', currentRoomCode).single();
-            if (room && room.background_url) {
-                background.style.backgroundImage = `url(${room.background_url})`;
-                localStorage.setItem(`chat_bg_url:${currentRoomCode}`, room.background_url);
-            }
-        } catch (e) { /* ignore */ }
     }
 
     /**
@@ -2612,14 +2629,6 @@
                     appendSystemMessage(notice.text);
                 }
             })
-            .on('broadcast', { event: 'bg_update' }, (payload) => {
-                if (isSpeedMode) return;
-                const bg = payload.payload || {};
-                if (bg.room === currentRoomCode && bg.bgUrl) {
-                    document.getElementById('chat-bg').style.backgroundImage = `url(${bg.bgUrl})`;
-                    localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bg.bgUrl);
-                }
-            })
             .on('broadcast', { event: 'room_name_update' }, (payload) => {
                 const data = payload.payload || {};
                 if (data.room === currentRoomCode && data.roomName) {
@@ -2679,10 +2688,6 @@
             }, (payload) => {
                 const room = payload.new;
                 setRoomTitle(room.room_name || currentRoomCode);
-                if (!isSpeedMode && room.background_url && room.background_url !== payload.old.background_url) {
-                    document.getElementById('chat-bg').style.backgroundImage = `url(${room.background_url})`;
-                    localStorage.setItem(`chat_bg_url:${currentRoomCode}`, room.background_url);
-                }
             })
             .on('postgres_changes', {
                 event: '*',
@@ -4392,7 +4397,6 @@
         isSpeedMode = toggle.checked;
         localStorage.setItem('chat_speed_mode', isSpeedMode ? '1' : '0');
         if (isSpeedMode) {
-            document.getElementById('chat-bg').style.backgroundImage = '';
             document.querySelectorAll('.message-avatar[data-sender]').forEach(avatar => {
                 const sender = avatar.dataset.sender;
                 if (avatar.tagName === 'IMG') {
@@ -4402,9 +4406,8 @@
             refreshMessageAvatars();
             showToast('极速模式已开启，优先保证消息收发', 'success', 2000);
         } else {
-            showToast('已切换为正常模式，将加载头像和背景', 'info', 2000);
+            showToast('已切换为正常模式', 'info', 2000);
             if (currentRoomCode) {
-                applyRoomBackground();
                 fetchAndApplyUserAvatars(messagesCache.map(m => m.sender));
             }
         }
@@ -4450,40 +4453,89 @@
         updateWxNotifyButton();
     };
 
-    window.testQmsgNotify = async function() {
+    window.testQmsgNotify = async function(btn) {
         const key = localStorage.getItem('chat_qmsg_key') || '';
         if (!key) {
             showToast('⚠ 请先填写 Qmsg酱 Key 再测试', 'error', 3000);
             return;
         }
-        showToast('正在发送测试通知...', 'info');
         const qq = localStorage.getItem('chat_qmsg_qq') || '';
         const msg = '✅ Qmsg酱通知测试成功！\n来自：Harry的聊天室\n如果你收到这条消息，说明配置正确。';
-        const success = await sendQmsgRequest(key, qq, msg);
-        if (success) {
-            showToast('✅ 测试通知已发送，请查看QQ消息', 'success', 3000);
+        const restore = setButtonLoading(btn, '发送中…');
+        const code = await sendQmsgRequest(key, qq, msg);
+        restore();
+        if (code === 'success') {
+            showToast('✅ 测试通知已发送，请查看QQ消息', 'success', 3500);
         } else {
-            showToast('❌ 发送失败：请检查Key是否完整、是否已加Qmsg酱为好友', 'error', 3500);
+            showToast(describeQmsgResult(code) || QMSG_ERROR_MSG.unknown, 'error', 4000);
         }
     };
 
+    /**
+     * 通过 Qmsg酱 发送消息
+     * 使用 POST + form-urlencoded（更稳定的 CORS 表现）
+     * API 文档: https://qmsg.zendee.cn
+     * @returns {'success'|'auth'|'network'|'unknown'}  失败时细分原因便于诊断
+     */
     async function sendQmsgRequest(key, qq, msg) {
+        if (!key) return 'auth';
         try {
-            const params = new URLSearchParams();
-            params.append('msg', msg);
-            if (qq) params.append('qq', qq);
-            const url = `https://qmsg.zendee.cn/send/${encodeURIComponent(key)}?${params.toString()}`;
-            const response = await fetch(url, { method: 'GET', mode: 'cors' });
-            if (!response.ok) return false;
+            const body = new URLSearchParams();
+            body.append('msg', msg);
+            if (qq) body.append('qq', qq);
+            const url = `https://qmsg.zendee.cn/send/${encodeURIComponent(key)}`;
+            let response;
+            try {
+                response = await fetch(url, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                    body: body.toString()
+                });
+            } catch (corsErr) {
+                // 部分浏览器/网络环境对 CORS POST 也不友好，回退一次 no-cors（无法读响应，按成功处理）
+                console.warn('[Qmsg] POST CORS 失败，回退 no-cors:', corsErr);
+                try {
+                    await fetch(url, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                        body: body.toString()
+                    });
+                    return 'success';
+                } catch (e2) {
+                    return 'network';
+                }
+            }
+            if (!response.ok) {
+                // 401/403 多半是 Key 错；5xx 是服务端
+                if (response.status === 401 || response.status === 403 || response.status === 404) return 'auth';
+                return 'unknown';
+            }
             const text = await response.text();
             const data = tryParseJSON(text);
-            if (data && data.success) return true;
-            if (text && text.includes('success')) return true;
-            return false;
+            if (data) {
+                if (data.success === true) return 'success';
+                if (data.errno === 0 || data.code === 0) return 'success';
+                // 业务失败（key 错、没加好友等）
+                return 'auth';
+            }
+            if (text && /success/i.test(text)) return 'success';
+            return 'unknown';
         } catch (e) {
-            console.error('Qmsg酱通知发送失败:', e);
-            return false;
+            console.error('[Qmsg] 发送异常:', e);
+            return 'network';
         }
+    }
+
+    const QMSG_ERROR_MSG = {
+        auth: '❌ Key 无效或还没加 Qmsg酱 为好友，请检查后重试',
+        network: '❌ 网络异常，请检查网络后重试',
+        unknown: '❌ 发送失败，请稍后再试或检查 Key'
+    };
+
+    function describeQmsgResult(code) {
+        return code === 'success' ? null : (QMSG_ERROR_MSG[code] || QMSG_ERROR_MSG.unknown);
     }
 
     function tryParseJSON(str) {
@@ -4501,8 +4553,18 @@
         const qq = localStorage.getItem('chat_qmsg_qq') || '';
         const preview = content.length > 80 ? content.slice(0, 80) + '...' : content;
         const msg = `🔔 [Harry的聊天室] 新消息\n来自：${sender}\n内容：${preview}`;
-        sendQmsgRequest(key, qq, msg);
-        localStorage.setItem('chat_qmsg_last_notify', String(now));
+        sendQmsgRequest(key, qq, msg).then(code => {
+            if (code === 'success') {
+                localStorage.setItem('chat_qmsg_last_notify', String(now));
+            } else if (code === 'auth') {
+                // Key 失效时，给用户一次提示，之后每天最多一次
+                const lastAuthWarn = parseInt(localStorage.getItem('chat_qmsg_auth_warn') || '0', 10);
+                if (now - lastAuthWarn > 86400000) {
+                    localStorage.setItem('chat_qmsg_auth_warn', String(now));
+                    showToast('⚠ QQ通知发送失败：Key 可能已失效，请到设置中重新配置', 'error', 4500);
+                }
+            }
+        });
     }
 
     window.updateRoomName = async function() {
@@ -4590,44 +4652,7 @@
         messagesCache = [];
         oldestLoadedAt = null;
         noMoreHistory = false;
-        localStorage.removeItem('chat_bg_url:' + currentRoomCode);
-        document.getElementById('chat-bg').style.backgroundImage = '';
         showToast('本地聊天记录和缓存已清除。', 'success');
-    };
-
-    window.handleBgUpload = async function(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            showToast('请选择图片文件作为背景。', 'error');
-            event.target.value = '';
-            return;
-        }
-        try {
-            let uploadFile = file;
-            try {
-                const compressed = await compressImageFile(file, 1920, 0.7);
-                if (compressed) uploadFile = compressed;
-            } catch (e) { /* use original */ }
-            const fileExt = file.name.split('.').pop();
-            const filePath = `chat_backgrounds/bg_${currentRoomCode}_${Date.now()}.${fileExt}`;
-            const { data: uploadData, error: uploadError } = await supabaseClient.storage.from('chat_media').upload(filePath, uploadFile, { upsert: true });
-            if (uploadError) throw uploadError;
-            const { data: publicData } = supabaseClient.storage.from('chat_media').getPublicUrl(filePath);
-            const bgUrl = publicData.publicUrl;
-            localStorage.setItem(`chat_bg_url:${currentRoomCode}`, bgUrl);
-            if (!isSpeedMode) {
-                document.getElementById('chat-bg').style.backgroundImage = `url(${bgUrl})`;
-            }
-            try {
-                await supabaseClient.from('rooms').update({ background_url: bgUrl, updated_at: beijingISOString() }).eq('room_code', currentRoomCode);
-                if (roomSubscription) {
-                    roomSubscription.send({ type: 'broadcast', event: 'bg_update', payload: { room: currentRoomCode, bgUrl } });
-                }
-                showToast('背景已更新！', 'success');
-            } catch (e) { console.warn('背景同步到服务器失败:', e); }
-        } catch (e) { console.error(e); showToast('背景图片上传失败，请检查网络。', 'error'); }
-        event.target.value = '';
     };
 
     window.handleAvatarUpload = function(event) {
@@ -4685,7 +4710,6 @@
         document.getElementById('chat-box').innerHTML = '';
         setRoomTitle('正在加载...');
         document.getElementById('online-count').innerText = '在线 0 人';
-        document.getElementById('chat-bg').style.backgroundImage = '';
         document.getElementById('login-area').style.display = 'flex';
         document.getElementById('chat-container').style.display = 'none';
         var savedName = localStorage.getItem('chat_auth_token');
