@@ -216,7 +216,8 @@
         #login-area { position: fixed; inset: 0; background: var(--app-bg); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; transition: opacity 0.25s ease, background 0.3s ease; }
         .login-box { width: 100%; max-width: 380px; padding: 34px; background: var(--surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--surface-border); border-radius: 16px; box-shadow: 0 12px 35px rgba(32,33,36,0.08); }
         .login-box h2 { margin-bottom: 26px; text-align: center; color: var(--text-main); font-size: 22px; letter-spacing: -0.02em; font-family: var(--font-display); }
-        input { width: 100%; padding: 13px 14px; margin: 8px 0; border: 1px solid var(--input-border); border-radius: 9px; font-size: 16px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: var(--input-bg); color: var(--text-main); }
+        input:not([type="radio"]):not([type="checkbox"]) { width: 100%; padding: 13px 14px; margin: 8px 0; border: 1px solid var(--input-border); border-radius: 9px; font-size: 16px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: var(--input-bg); color: var(--text-main); }
+        input[type="radio"], input[type="checkbox"] { width: auto; height: auto; min-width: 0; min-height: 0; margin: 0; padding: 0; accent-color: var(--btn-color); cursor: pointer; flex-shrink: 0; }
         input::placeholder { color: var(--muted); opacity: 0.8; }
         input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
         button { width: 100%; padding: 13px 14px; background: var(--btn-bg); color: white; border: none; border-radius: 9px; font-size: 15px; cursor: pointer; margin-top: 15px; font-weight: 600; transition: opacity 0.2s, transform 0.2s; min-height: 44px; }
@@ -338,6 +339,89 @@
         .left .msg-img-placeholder { margin-right: auto; }
 
         .system-message { align-self:center; color:var(--muted); font-size:12px; padding:5px 10px; margin:5px 0; }
+
+        /* ============ 房间加入审批系统 ============ */
+        .join-request-card {
+            align-self: stretch;
+            margin: 8px 12px;
+            padding: 12px 14px;
+            background: linear-gradient(135deg, #fff7e6 0%, #ffe7c2 100%);
+            border: 1px solid #ffd591;
+            border-radius: 14px;
+            box-shadow: 0 2px 10px rgba(255, 167, 38, 0.12);
+            font-size: 13px;
+            line-height: 1.55;
+            color: #5a3d12;
+        }
+        .join-request-card.resolved { opacity: 0.55; background: var(--panel-soft); border-color: var(--line); box-shadow: none; }
+        .join-request-card .jr-head { display:flex; align-items:center; gap:8px; font-weight:700; color:#874800; margin-bottom:6px; font-size:14px; }
+        .join-request-card .jr-head .jr-icon { font-size:18px; }
+        .join-request-card .jr-meta { font-size:12px; color:#9a6a2f; margin-top:4px; }
+        .join-request-card .jr-progress { margin-top:8px; height:6px; background:rgba(255,255,255,0.6); border-radius:3px; overflow:hidden; }
+        .join-request-card .jr-progress-bar { height:100%; background:#ff8c1a; border-radius:3px; transition:width .3s ease; }
+        .join-request-card .jr-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+        .join-request-card .jr-vote-btn {
+            flex: 1; min-width: 90px;
+            padding: 7px 10px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 9px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            margin: 0;
+            transition: all 0.15s;
+        }
+        .join-request-card .jr-vote-btn.jr-approve { background:#22c55e; color:white; border-color:#22c55e; }
+        .join-request-card .jr-vote-btn.jr-approve:hover { background:#16a34a; }
+        .join-request-card .jr-vote-btn.jr-approve.voted { background:#dcfce7; color:#166534; border-color:#86efac; }
+        .join-request-card .jr-vote-btn.jr-reject { background:#ef4444; color:white; border-color:#ef4444; }
+        .join-request-card .jr-vote-btn.jr-reject:hover { background:#dc2626; }
+        .join-request-card .jr-vote-btn.jr-reject.voted { background:#fee2e2; color:#991b1b; border-color:#fca5a5; }
+        .join-request-card .jr-vote-btn:disabled { opacity:0.55; cursor:not-allowed; }
+        .join-request-card .jr-vote-btns-locked { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--muted); margin-top:8px; }
+
+        /* 申请等待页（替代 login-area 显示） */
+        .apply-screen {
+            position: fixed; inset: 0;
+            background: var(--app-bg);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 2000; padding: 20px;
+        }
+        .apply-card {
+            width: 100%; max-width: 420px;
+            padding: 28px 26px;
+            background: var(--surface);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--surface-border);
+            border-radius: 16px;
+            box-shadow: 0 12px 35px rgba(32,33,36,0.08);
+            text-align: center;
+        }
+        .apply-card .apply-icon { font-size: 56px; line-height: 1; margin-bottom: 12px; }
+        .apply-card h3 { margin: 0 0 8px; font-size: 19px; color: var(--text-main); font-family: var(--font-display); }
+        .apply-card p { margin: 0 0 18px; font-size: 14px; color: var(--muted); line-height: 1.6; }
+        .apply-card .apply-progress { background: var(--panel-soft); border-radius: 10px; padding: 14px; margin-bottom: 14px; border:1px solid var(--line); }
+        .apply-card .apply-progress-row { display:flex; justify-content:space-between; align-items:center; font-size:13px; color: var(--text-main); margin-bottom:8px; font-weight:600; }
+        .apply-card .apply-bar { height: 8px; background: var(--line); border-radius: 4px; overflow:hidden; }
+        .apply-card .apply-bar-fill { height:100%; background: linear-gradient(90deg, var(--btn-color) 0%, #22c55e 100%); border-radius:4px; transition: width .4s ease; }
+        .apply-card .apply-detail { font-size:12px; color: var(--muted); margin-top:8px; line-height:1.5; }
+        .apply-card .apply-rejected-icon { color: #ef4444; }
+        .apply-card button.apply-back { width:100%; padding:11px; background: var(--panel-soft); color: var(--text-main); border:1px solid var(--line); border-radius: 9px; font-size:14px; font-weight:600; cursor:pointer; margin-top:8px; }
+        .apply-card button.apply-back:hover { background: var(--surface-solid); }
+        .apply-card button.apply-reapply { width:100%; padding:11px; background: var(--btn-bg); color:white; border:0; border-radius: 9px; font-size:14px; font-weight:600; cursor:pointer; margin-top:8px; }
+
+        /* 登录区提示条：不是房间成员 */
+        .login-notice {
+            margin: -10px 0 18px;
+            padding: 10px 12px;
+            background: #fff7e6;
+            border: 1px solid #ffd591;
+            border-radius: 10px;
+            font-size: 12.5px;
+            color: #874800;
+            line-height: 1.55;
+        }
+        .login-notice b { color: #5a3d12; }
         .left .msg-content { background: var(--msg-others-bg); color: var(--msg-others-text); border: 1px solid var(--msg-others-border); border-radius: var(--radius-other); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
         .right .msg-content { background: var(--bubble-bg); color: var(--bubble-text); border: none; border-radius: var(--radius-self); box-shadow: var(--bubble-shadow); }
         .msg-wrapper.media-only .msg-content { padding:0; border:0; background:transparent; box-shadow:none; }
@@ -781,29 +865,29 @@
         .wx-notify-modal.show { display: flex; }
         .wx-notify-content { background: var(--surface-solid); color: var(--text-main); padding: 24px; border-radius: 16px; width: 90%; max-width: 400px; max-height: 85vh; max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
         /* QQ通知配置图文教程 */
-        .qmsg-guide { background:var(--panel-soft); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:16px; }
-        .qmsg-guide-title { font-size:13px; font-weight:700; color:var(--text-main); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
-        .qmsg-steps { display:flex; flex-direction:column; gap:12px; }
-        .qmsg-step { background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; padding:12px; }
-        .qmsg-step-head { display:flex; align-items:center; gap:9px; margin-bottom:7px; }
-        .qmsg-step-num { flex-shrink:0; width:24px; height:24px; background:var(--btn-bg); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
-        .qmsg-step-title { font-size:13.5px; font-weight:700; color:var(--text-main); line-height:1.35; }
-        .qmsg-step-text { font-size:12.5px; color:var(--muted); line-height:1.7; }
-        .qmsg-step-text b { color:var(--text-main); }
-        .qmsg-step-tips { display:flex; flex-direction:column; gap:2px; margin-top:6px; }
-        .qmsg-tip { font-size:11.5px; color:var(--muted); line-height:1.55; }
-        .qmsg-tip::before { content:'✦ '; color:var(--btn-color); }
-        .qmsg-fig { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--panel-soft); margin-top:9px; }
-        .qmsg-fig svg { display:block; width:100%; height:auto; }
-        .qmsg-fig-cap { font-size:10.5px; color:var(--muted); text-align:center; padding:5px 8px; background:var(--surface-solid); border-top:1px dashed var(--line); }
-        .qmsg-faq { border:1px solid var(--line); border-radius:12px; overflow:hidden; }
-        .qmsg-faq summary { list-style:none; cursor:pointer; padding:11px 14px; font-size:12.5px; font-weight:700; color:var(--text-main); background:var(--panel-soft); display:flex; align-items:center; gap:6px; }
-        .qmsg-faq summary::-webkit-details-marker { display:none; }
-        .qmsg-faq summary::after { content:'▾'; margin-left:auto; color:var(--muted); transition:.2s; }
-        .qmsg-faq[open] summary::after { transform:rotate(180deg); }
-        .qmsg-faq-body { padding:4px 14px 12px; display:flex; flex-direction:column; gap:9px; }
-        .qmsg-faq-item { font-size:12px; color:var(--muted); line-height:1.65; }
-        .qmsg-faq-item b { color:var(--text-main); display:block; margin-bottom:1px; }
+        .push-guide { background:var(--panel-soft); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:16px; }
+        .push-guide-title { font-size:13px; font-weight:700; color:var(--text-main); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+        .push-steps { display:flex; flex-direction:column; gap:12px; }
+        .push-step { background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; padding:12px; }
+        .push-step-head { display:flex; align-items:center; gap:9px; margin-bottom:7px; }
+        .push-step-num { flex-shrink:0; width:24px; height:24px; background:var(--btn-bg); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+        .push-step-title { font-size:13.5px; font-weight:700; color:var(--text-main); line-height:1.35; }
+        .push-step-text { font-size:12.5px; color:var(--muted); line-height:1.7; }
+        .push-step-text b { color:var(--text-main); }
+        .push-step-tips { display:flex; flex-direction:column; gap:2px; margin-top:6px; }
+        .push-tip { font-size:11.5px; color:var(--muted); line-height:1.55; }
+        .push-tip::before { content:'✦ '; color:var(--btn-color); }
+        .push-fig { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--panel-soft); margin-top:9px; }
+        .push-fig svg { display:block; width:100%; height:auto; }
+        .push-fig-cap { font-size:10.5px; color:var(--muted); text-align:center; padding:5px 8px; background:var(--surface-solid); border-top:1px dashed var(--line); }
+        .push-faq { border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+        .push-faq summary { list-style:none; cursor:pointer; padding:11px 14px; font-size:12.5px; font-weight:700; color:var(--text-main); background:var(--panel-soft); display:flex; align-items:center; gap:6px; }
+        .push-faq summary::-webkit-details-marker { display:none; }
+        .push-faq summary::after { content:'▾'; margin-left:auto; color:var(--muted); transition:.2s; }
+        .push-faq[open] summary::after { transform:rotate(180deg); }
+        .push-faq-body { padding:4px 14px 12px; display:flex; flex-direction:column; gap:9px; }
+        .push-faq-item { font-size:12px; color:var(--muted); line-height:1.65; }
+        .push-faq-item b { color:var(--text-main); display:block; margin-bottom:1px; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid var(--input-border); border-radius: 8px; }
         .settings-search-button { margin:0 0 22px; background:var(--chip-bg); color:var(--text-main); border:1px solid var(--line); text-align:left; font-weight:500; }
         .settings-search-button:hover { background:var(--chip-bg); filter:brightness(0.96); }
@@ -1441,11 +1525,19 @@
         <h2>进入 Harry 的聊天室</h2>
         <input type="text" id="username" placeholder="输入你的名字" autocomplete="off" inputmode="text">
         <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off" inputmode="text">
+        <div id="login-membership-notice" class="login-notice" style="display:none;"></div>
         <div class="remember-me">
             <input type="checkbox" id="auto-login-check" checked>
             <label for="auto-login-check">10天内免登录（自动进入上次房间）</label>
         </div>
         <button id="join-btn" onclick="window.joinRoom()">开始聊天</button>
+    </div>
+</div>
+
+<!-- 申请加入/等待审批屏幕（替代 login-area 显示） -->
+<div id="apply-screen" class="apply-screen" style="display:none;">
+    <div class="apply-card" id="apply-card-content">
+        <!-- 由 JS 动态填充 -->
     </div>
 </div>
 
@@ -1594,8 +1686,8 @@
             <div class="settings-row-item"><button class="settings-row-button" onclick="window.updateRoomName()">修改房间名称</button></div>
             <div class="settings-row-item"><button class="settings-row-button" onclick="window.searchMessages()">查找聊天内容</button></div>
             <div class="settings-row-item">
-                <label>QQ通知</label>
-                <button class="settings-row-button" id="wx-notify-btn" onclick="window.showWxNotifySetup()">配置QQ通知</button>
+                <label>消息通知</label>
+                <button class="settings-row-button" id="wx-notify-btn" onclick="window.showWxNotifySetup()">配置微信 / QQ 通知</button>
             </div>
             <div class="settings-row-item"><label>气泡颜色</label><div style="display:flex;align-items:center;gap:8px;"><input type="color" id="color-selector" value="#6366f1" onchange="window.saveSettings()"><button class="settings-row-button" style="padding:6px 12px;font-size:12px;" onclick="window.resetBubbleColor()">恢复默认</button></div></div>
         </div>
@@ -1636,261 +1728,239 @@
 <div id="wx-notify-modal" class="wx-notify-modal" onclick="window.closeWxNotifySetup(event)">
     <div class="wx-notify-content" onclick="event.stopPropagation()" style="padding:24px 18px 20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <h3 style="margin:0;font-size:19px;">🐧 QQ消息通知配置</h3>
+            <h3 style="margin:0;font-size:19px;">📬 微信 / QQ 消息通知</h3>
             <button onclick="window.closeWxNotifySetup(null)" style="width:auto;margin:0;padding:4px 10px;background:transparent;color:var(--muted);font-size:20px;border:none;cursor:pointer;">✕</button>
         </div>
         <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
-            通过 <b>Qmsg酱</b>（免费）把聊天室新消息实时推送到你的 <b>QQ</b>，不在聊天室也不会错过消息。跟着下面 5 步做，约 3 分钟搞定。
+            通过 <a href="https://www.pushplus.plus" target="_blank" style="color:var(--btn-color);font-weight:600;">pushplus（推送加）</a>（免费，每天 200 条额度），把聊天室新消息实时推送到你的 <b>微信</b> 或 <b>QQ</b>。下面 4 步实操，整个流程约 3 分钟。
         </p>
 
-        <div class="qmsg-guide">
-            <div class="qmsg-guide-title">📋 图文配置步骤</div>
-            <div class="qmsg-steps">
+        <div class="push-guide">
+            <div class="push-guide-title">📋 实操步骤（按顺序做完）</div>
+            <div class="push-steps">
 
-                <div class="qmsg-step">
-                    <div class="qmsg-step-head">
-                        <div class="qmsg-step-num">1</div>
-                        <div class="qmsg-step-title">打开 Qmsg酱 官网，用 QQ 登录</div>
+                <div class="push-step">
+                    <div class="push-step-head">
+                        <div class="push-step-num">1</div>
+                        <div class="push-step-title">微信扫码登录 pushplus（推送加）</div>
                     </div>
-                    <div class="qmsg-step-text">
-                        用浏览器打开 <a href="https://qmsg.zendee.cn" target="_blank" style="color:var(--btn-color);font-weight:600;">qmsg.zendee.cn</a>（也可以点本页底部的「🔗 获取Key」按钮），点击首页的「QQ 登录」，用手机 QQ 扫一扫即可。
-                        <div class="qmsg-step-tips">
-                            <div class="qmsg-tip">完全免费，无需注册，登录后自动进入「管理台」</div>
+                    <div class="push-step-text">
+                        浏览器打开 <a href="https://www.pushplus.plus" target="_blank" style="color:var(--btn-color);font-weight:600;">pushplus.plus</a>，点首页的「微信登录」按钮，用手机微信扫码即可登录。首次扫码会自动注册账号，无需手机号。
+                        <div class="push-step-tips">
+                            <div class="push-tip">扫码后会先跳到「个人中心」</div>
+                            <div class="push-tip">立即按提示完成「实名认证」——2024 年 8 月起 pushplus 强制要求实名，否则发送接口会返回错误码 905</div>
                         </div>
                     </div>
-                    <div class="qmsg-fig">
-                        <svg viewBox="0 0 340 206" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：Qmsg酱官网首页，点击QQ登录">
+                    <div class="push-fig">
+                        <svg viewBox="0 0 340 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：pushplus 首页，点击微信登录">
                             <defs>
-                                <marker id="qmsg-arw1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+                                <marker id="pp-arw1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
                                     <path d="M0 0 L10 5 L0 10 z" fill="#ef4444"/>
                                 </marker>
                             </defs>
-                            <rect width="340" height="206" fill="#eef2f7"/>
-                            <rect x="14" y="12" width="312" height="182" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+                            <rect width="340" height="210" fill="#f1f5f9"/>
+                            <rect x="14" y="12" width="312" height="186" rx="10" fill="#0f172a"/>
+                            <text x="170" y="42" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">pushplus</text>
+                            <text x="170" y="58" text-anchor="middle" font-size="8.5" fill="#94a3b8">推送加 · 一个 API 推送所有渠道</text>
+                            <rect x="105" y="83" width="130" height="34" rx="17" fill="#22c55e"/>
+                            <text x="170" y="105" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">💬 微信登录</text>
+                            <text x="170" y="138" text-anchor="middle" font-size="8" fill="#64748b">扫码即注册 · 永久免费</text>
+                            <ellipse cx="170" cy="100" rx="82" ry="28" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
+                            <rect x="240" y="36" width="80" height="20" rx="10" fill="#fef2f2" stroke="#ef4444" stroke-width="1.2"/>
+                            <text x="280" y="50" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444">点这里登录</text>
+                            <path d="M 278 58 Q 282 76 228 86" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#pp-arw1)"/>
+                            <rect x="14" y="170" width="312" height="28" rx="6" fill="#1e293b"/>
+                            <text x="170" y="188" text-anchor="middle" font-size="9" font-weight="700" fill="#facc15">⚠ 登录后立即完成「实名认证」，否则无法发送消息</text>
+                        </svg>
+                        <div class="push-fig-cap">示意图：pushplus 官网首页</div>
+                    </div>
+                </div>
+
+                <div class="push-step">
+                    <div class="push-step-head">
+                        <div class="push-step-num">2</div>
+                        <div class="push-step-title">在 pushplus 后台绑定接收渠道</div>
+                    </div>
+                    <div class="push-step-text">
+                        登录后自动进入个人中心。<b>左侧菜单</b>点「<b>渠道配置</b>」→ 在右侧的渠道卡片里选你要的：微信选「微信公众号」并扫码关注推送加公众号；QQ 选「QQ 机器人」并用自己的 QQ 扫码加好友。
+                        <div class="push-step-tips">
+                            <div class="push-tip">微信公众号：用绑定 pushplus 的同一个微信扫码关注「pushplus 推送加」</div>
+                            <div class="push-tip">QQ 机器人：用你自己的 QQ 扫描页面上的二维码加好友（绑定后机器人会发一条确认消息）</div>
+                            <div class="push-tip">这一步只是「绑定」，绑定后切回本页继续</div>
+                        </div>
+                    </div>
+                    <div class="push-fig">
+                        <svg viewBox="0 0 340 232" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：pushplus 后台，渠道配置">
+                            <rect width="340" height="232" fill="#f1f5f9"/>
+                            <rect x="14" y="12" width="312" height="208" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
                             <path d="M14 22 a10 10 0 0 1 10 -10 h292 a10 10 0 0 1 10 10 v16 h-312 z" fill="#f1f5f9"/>
                             <circle cx="30" cy="25" r="3.5" fill="#f87171"/>
                             <circle cx="42" cy="25" r="3.5" fill="#fbbf24"/>
                             <circle cx="54" cy="25" r="3.5" fill="#34d399"/>
-                            <rect x="96" y="18.5" width="148" height="13" rx="6.5" fill="#ffffff" stroke="#e2e8f0"/>
-                            <text x="170" y="28" text-anchor="middle" font-size="8" fill="#64748b" font-family="monospace">qmsg.zendee.cn</text>
-                            <text x="170" y="72" text-anchor="middle" font-size="17" font-weight="700" fill="#1e293b">Qmsg酱</text>
-                            <text x="170" y="88" text-anchor="middle" font-size="8.5" fill="#94a3b8">消息稳定送达 · 即刻上手</text>
-                            <rect x="105" y="102" width="130" height="32" rx="16" fill="#12b7f5"/>
-                            <text x="170" y="123" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">🐧 QQ 登录</text>
-                            <text x="170" y="156" text-anchor="middle" font-size="8" fill="#94a3b8">手机QQ扫码或快捷登录 · 免费</text>
-                            <ellipse cx="170" cy="118" rx="82" ry="27" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <rect x="236" y="50" width="68" height="20" rx="10" fill="#fef2f2" stroke="#ef4444" stroke-width="1.2"/>
-                            <text x="270" y="64" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444">点这里登录</text>
-                            <path d="M 268 72 Q 272 90 224 102" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#qmsg-arw1)"/>
+                            <rect x="100" y="18.5" width="148" height="13" rx="6.5" fill="#ffffff" stroke="#e2e8f0"/>
+                            <text x="174" y="28" text-anchor="middle" font-size="8" fill="#64748b" font-family="monospace">www.pushplus.plus/ucent.html</text>
+                            <rect x="22" y="46" width="74" height="160" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
+                            <rect x="30" y="55" width="58" height="14" rx="4" fill="#22c55e"/>
+                            <text x="59" y="65" text-anchor="middle" font-size="8.5" font-weight="700" fill="#ffffff">📬 渠道配置</text>
+                            <text x="30" y="86" font-size="8.5" fill="#94a3b8">个人中心</text>
+                            <text x="30" y="103" font-size="8.5" fill="#94a3b8">发送消息</text>
+                            <text x="30" y="120" font-size="8.5" fill="#94a3b8">群组</text>
+                            <text x="30" y="137" font-size="8.5" fill="#94a3b8">好友</text>
+                            <text x="30" y="154" font-size="8.5" fill="#94a3b8">设置</text>
+                            <text x="30" y="188" text-anchor="middle" font-size="7.5" fill="#cbd5e1">————</text>
+                            <text x="30" y="202" text-anchor="middle" font-size="7.5" fill="#94a3b8">登出</text>
+                            <text x="105" y="62" font-size="10.5" font-weight="700" fill="#1e293b">渠道配置</text>
+                            <text x="105" y="75" font-size="8" fill="#94a3b8">选择要接收消息的渠道，每个渠道扫码绑定</text>
+                            <rect x="105" y="82" width="100" height="58" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.3"/>
+                            <circle cx="120" cy="98" r="9" fill="#22c55e"/>
+                            <text x="120" y="101" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">微</text>
+                            <text x="135" y="103" font-size="9" font-weight="700" fill="#166534">微信公众号</text>
+                            <rect x="113" y="112" width="22" height="22" rx="3" fill="#000"/>
+                            <rect x="116" y="115" width="16" height="16" fill="#fff"/>
+                            <text x="124" y="125" text-anchor="middle" font-size="4" fill="#000">QR</text>
+                            <text x="143" y="125" font-size="7.5" fill="#16a34a">✓ 已绑定</text>
+                            <text x="143" y="135" font-size="7" fill="#94a3b8">→ 微信里关注推送加</text>
+                            <rect x="211" y="82" width="100" height="58" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.3"/>
+                            <circle cx="226" cy="98" r="9" fill="#3b82f6"/>
+                            <text x="226" y="101" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">Q</text>
+                            <text x="241" y="103" font-size="9" font-weight="700" fill="#1e40af">QQ 机器人</text>
+                            <rect x="219" y="112" width="22" height="22" rx="3" fill="#000"/>
+                            <rect x="222" y="115" width="16" height="16" fill="#fff"/>
+                            <text x="230" y="125" text-anchor="middle" font-size="4" fill="#000">QR</text>
+                            <text x="249" y="125" font-size="7.5" fill="#2563eb">扫码绑定</text>
+                            <text x="249" y="135" font-size="7" fill="#94a3b8">→ 加 QQ 机器人为好友</text>
+                            <rect x="105" y="148" width="100" height="58" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
+                            <circle cx="120" cy="164" r="9" fill="#94a3b8"/>
+                            <text x="120" y="167" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">微</text>
+                            <text x="135" y="169" font-size="9" fill="#64748b">企业微信应用</text>
+                            <text x="135" y="184" font-size="7.5" fill="#94a3b8">需自建应用</text>
+                            <rect x="211" y="148" width="100" height="58" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
+                            <circle cx="226" cy="164" r="9" fill="#94a3b8"/>
+                            <text x="226" y="167" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">邮</text>
+                            <text x="241" y="169" font-size="9" fill="#64748b">邮件</text>
+                            <text x="241" y="184" font-size="7.5" fill="#94a3b8">需绑定邮箱</text>
+                            <ellipse cx="155" cy="111" rx="58" ry="38" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
+                            <text x="170" y="218" text-anchor="middle" font-size="9" font-weight="700" fill="#ef4444">↑ 选「微信公众号」或「QQ 机器人」并扫码绑定</text>
                         </svg>
-                        <div class="qmsg-fig-cap">示意图：官网首页，点击「QQ 登录」</div>
+                        <div class="push-fig-cap">示意图：pushplus 后台「渠道配置」</div>
                     </div>
                 </div>
 
-                <div class="qmsg-step">
-                    <div class="qmsg-step-head">
-                        <div class="qmsg-step-num">2</div>
-                        <div class="qmsg-step-title">在管理台选一位「Qmsg酱」，加她为QQ好友</div>
+                <div class="push-step">
+                    <div class="push-step-head">
+                        <div class="push-step-num">3</div>
+                        <div class="push-step-title">复制你的 pushplus Token</div>
                     </div>
-                    <div class="qmsg-step-text">
-                        登录后进入管理台，在「Qmsg酱」列表里<b>任选一位</b>，点击她旁边的「添加好友」，会显示她的 QQ 号或二维码——<b>用你自己的 QQ 加她为好友</b>。
-                        <div class="qmsg-step-tips">
-                            <div class="qmsg-tip">她是「给你发消息的人」，不加好友就收不到推送</div>
-                            <div class="qmsg-tip">等她通过好友申请后，再进行下一步</div>
+                    <div class="push-step-text">
+                        渠道绑定后，<b>同一个 pushplus 后台页面</b>里找「<b>Token</b>」一栏（一般在「渠道配置」上方或「发送消息」页），点「复制」按钮得到一串字母数字。整段粘到下方输入框，前后不要带空格。
+                        <div class="push-step-tips">
+                            <div class="push-tip">一个 token 适用所有渠道，只是推送时选不同的渠道（微信/QQ）即可</div>
+                            <div class="push-tip">Token 等同于推送密码，不要发给别人、不要截到群里</div>
                         </div>
                     </div>
-                    <div class="qmsg-fig">
-                        <svg viewBox="0 0 340 236" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：管理台Qmsg酱列表，选择一位并添加好友">
-                            <rect width="340" height="236" fill="#eef2f7"/>
-                            <rect x="14" y="12" width="312" height="212" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+                    <div class="push-fig">
+                        <svg viewBox="0 0 340 188" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：复制pushplus token">
+                            <rect width="340" height="188" fill="#f1f5f9"/>
+                            <rect x="14" y="12" width="312" height="164" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
                             <path d="M14 22 a10 10 0 0 1 10 -10 h292 a10 10 0 0 1 10 10 v16 h-312 z" fill="#f1f5f9"/>
-                            <text x="170" y="27.5" text-anchor="middle" font-size="9" font-weight="700" fill="#475569">Qmsg酱 · 管理台</text>
-                            <rect x="26" y="46" width="62" height="21" rx="10.5" fill="#12b7f5"/>
-                            <text x="57" y="60.5" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">Qmsg酱</text>
-                            <rect x="94" y="46" width="62" height="21" rx="10.5" fill="#ffffff" stroke="#e2e8f0"/>
-                            <text x="125" y="60.5" text-anchor="middle" font-size="10" fill="#64748b">QQ号码</text>
-                            <rect x="162" y="46" width="46" height="21" rx="10.5" fill="#ffffff" stroke="#e2e8f0"/>
-                            <text x="185" y="60.5" text-anchor="middle" font-size="10" fill="#64748b">KEY</text>
-                            <text x="26" y="84" font-size="9" fill="#94a3b8">选择一位Qmsg酱小姐姐，添加她为QQ好友</text>
-                            <rect x="26" y="92" width="288" height="34" rx="8" fill="#e0f2fe" stroke="#bae6fd" stroke-width="1.2"/>
-                            <circle cx="46" cy="109" r="10" fill="#12b7f5"/>
-                            <text x="46" y="112.5" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">酱</text>
-                            <text x="62" y="107" font-size="11" font-weight="700" fill="#0369a1">Qmsg酱 32号</text>
-                            <text x="62" y="119" font-size="8.5" fill="#0284c7">当前选择 ✓</text>
-                            <rect x="244" y="99" width="62" height="20" rx="10" fill="#12b7f5"/>
-                            <text x="275" y="112.5" text-anchor="middle" font-size="9.5" font-weight="700" fill="#ffffff">添加好友</text>
-                            <rect x="26" y="132" width="288" height="34" rx="8" fill="#f8fafc" stroke="#e8edf3"/>
-                            <circle cx="46" cy="149" r="10" fill="#818cf8"/>
-                            <text x="46" y="152.5" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">酱</text>
-                            <text x="62" y="147" font-size="11" font-weight="700" fill="#1e293b">Qmsg酱 57号</text>
-                            <text x="62" y="159" font-size="8.5" fill="#94a3b8">在线</text>
-                            <rect x="244" y="139" width="62" height="20" rx="10" fill="#ffffff" stroke="#93c5fd" stroke-width="1.2"/>
-                            <text x="275" y="152.5" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0ea5e9">添加好友</text>
-                            <rect x="26" y="172" width="288" height="34" rx="8" fill="#f8fafc" stroke="#e8edf3"/>
-                            <circle cx="46" cy="189" r="10" fill="#fb923c"/>
-                            <text x="46" y="192.5" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">酱</text>
-                            <text x="62" y="187" font-size="11" font-weight="700" fill="#1e293b">Qmsg酱 8号</text>
-                            <text x="62" y="199" font-size="8.5" fill="#94a3b8">在线</text>
-                            <rect x="244" y="179" width="62" height="20" rx="10" fill="#ffffff" stroke="#93c5fd" stroke-width="1.2"/>
-                            <text x="275" y="192.5" text-anchor="middle" font-size="9.5" font-weight="700" fill="#0ea5e9">添加好友</text>
-                            <ellipse cx="275" cy="109" rx="50" ry="19" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <rect x="222" y="70" width="92" height="20" rx="10" fill="#fef2f2" stroke="#ef4444" stroke-width="1.2"/>
-                            <text x="268" y="84" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444">点这里加好友</text>
-                            <text x="170" y="218" text-anchor="middle" font-size="9" font-weight="700" fill="#ef4444">⚠ 必须先加她为好友，否则收不到消息</text>
+                            <circle cx="30" cy="25" r="3.5" fill="#f87171"/>
+                            <circle cx="42" cy="25" r="3.5" fill="#fbbf24"/>
+                            <circle cx="54" cy="25" r="3.5" fill="#34d399"/>
+                            <rect x="100" y="18.5" width="148" height="13" rx="6.5" fill="#ffffff" stroke="#e2e8f0"/>
+                            <text x="174" y="28" text-anchor="middle" font-size="8" fill="#64748b" font-family="monospace">个人中心 · 我的 token</text>
+                            <text x="26" y="56" font-size="10.5" font-weight="700" fill="#1e293b">📌 我的 Token</text>
+                            <text x="26" y="70" font-size="8" fill="#94a3b8">这是你的一对一推送令牌，用于调用发送接口</text>
+                            <rect x="26" y="80" width="288" height="28" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
+                            <text x="38" y="98" font-size="10" fill="#1e293b" font-family="monospace" font-weight="700">a91e3f8c7d2b56e9f0c4a8e2d3b7c5f9</text>
+                            <rect x="232" y="86" width="74" height="16" rx="8" fill="#22c55e"/>
+                            <text x="269" y="97" text-anchor="middle" font-size="8.5" font-weight="700" fill="#ffffff">📋 复制</text>
+                            <rect x="26" y="116" width="288" height="44" rx="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1.2"/>
+                            <text x="40" y="134" font-size="9" font-weight="700" fill="#9a3412">⚠ 务必：</text>
+                            <text x="40" y="148" font-size="9" fill="#7c2d12">token 等同于账号密码，不要截图发给别人</text>
+                            <ellipse cx="170" cy="94" rx="170" ry="22" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
+                            <text x="170" y="175" text-anchor="middle" font-size="9" font-weight="700" fill="#ef4444">↑ 完整复制这一整串 token</text>
                         </svg>
-                        <div class="qmsg-fig-cap">示意图：管理台「Qmsg酱」列表</div>
+                        <div class="push-fig-cap">示意图：pushplus「Token」一栏，复制整串</div>
                     </div>
                 </div>
 
-                <div class="qmsg-step">
-                    <div class="qmsg-step-head">
-                        <div class="qmsg-step-num">3</div>
-                        <div class="qmsg-step-title">添加你自己的 QQ 号</div>
+                <div class="push-step">
+                    <div class="push-step-head">
+                        <div class="push-step-num">4</div>
+                        <div class="push-step-title">粘到下方选择渠道，开启 + 测试</div>
                     </div>
-                    <div class="qmsg-step-text">
-                        切换到「QQ号码」页面，在输入框里填<b>你自己用来收消息的 QQ 号</b>，点「＋ 添加QQ号」。
-                        <div class="qmsg-step-tips">
-                            <div class="qmsg-tip">一般就是刚才加好友用的那个 QQ</div>
-                            <div class="qmsg-tip">可以添加多个，消息会推给列表里的 QQ</div>
-                        </div>
+                    <div class="push-step-text">
+                        把 token 粘进下方「Pushplus Token」框，<b>选一个收消息的渠道</b>（微信 / QQ 任意），打开「启用」开关 → 点「🧪 测试通知」。微信或 QQ 收到测试消息就成功了。
                     </div>
-                    <div class="qmsg-fig">
-                        <svg viewBox="0 0 340 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：QQ号码页，添加自己的QQ号">
-                            <rect width="340" height="200" fill="#eef2f7"/>
-                            <rect x="14" y="12" width="312" height="176" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
-                            <path d="M14 22 a10 10 0 0 1 10 -10 h292 a10 10 0 0 1 10 10 v16 h-312 z" fill="#f1f5f9"/>
-                            <text x="170" y="27.5" text-anchor="middle" font-size="9" font-weight="700" fill="#475569">Qmsg酱 · 管理台</text>
-                            <rect x="26" y="46" width="62" height="21" rx="10.5" fill="#ffffff" stroke="#e2e8f0"/>
-                            <text x="57" y="60.5" text-anchor="middle" font-size="10" fill="#64748b">Qmsg酱</text>
-                            <rect x="94" y="46" width="62" height="21" rx="10.5" fill="#12b7f5"/>
-                            <text x="125" y="60.5" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">QQ号码</text>
-                            <rect x="162" y="46" width="46" height="21" rx="10.5" fill="#ffffff" stroke="#e2e8f0"/>
-                            <text x="185" y="60.5" text-anchor="middle" font-size="10" fill="#64748b">KEY</text>
-                            <rect x="26" y="78" width="288" height="88" rx="10" fill="#f8fafc" stroke="#e8edf3"/>
-                            <text x="36" y="96" font-size="10" font-weight="700" fill="#1e293b">我的QQ列表（接收消息的QQ）</text>
-                            <rect x="36" y="103" width="268" height="26" rx="8" fill="#ffffff" stroke="#e8edf3"/>
-                            <circle cx="50" cy="116" r="8" fill="#20c997"/>
-                            <text x="50" y="119" text-anchor="middle" font-size="8" font-weight="700" fill="#ffffff">我</text>
-                            <text x="64" y="120" font-size="9.5" fill="#475569">123456789（我自己的QQ）</text>
-                            <text x="296" y="120" text-anchor="end" font-size="8.5" fill="#16a34a">已添加 ✓</text>
-                            <rect x="36" y="137" width="166" height="24" rx="8" fill="#ffffff" stroke="#d0d5dd"/>
-                            <text x="44" y="153" font-size="9" fill="#94a3b8">输入你的QQ号</text>
-                            <rect x="210" y="137" width="94" height="24" rx="8" fill="#12b7f5"/>
-                            <text x="257" y="153" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">＋ 添加QQ号</text>
-                            <ellipse cx="257" cy="149" rx="57" ry="19" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <text x="170" y="180" text-anchor="middle" font-size="9.5" font-weight="700" fill="#ef4444">↑ 填你自己的QQ号（用它收消息）</text>
-                        </svg>
-                        <div class="qmsg-fig-cap">示意图：「QQ号码」页，添加自己的QQ</div>
-                    </div>
-                </div>
-
-                <div class="qmsg-step">
-                    <div class="qmsg-step-head">
-                        <div class="qmsg-step-num">4</div>
-                        <div class="qmsg-step-title">复制你的 Key</div>
-                    </div>
-                    <div class="qmsg-step-text">
-                        切换到「KEY」页面（部分版本在「接口」页），复制「我的KEY」下面那串<b>字母数字</b>，前后不要带空格。
-                        <div class="qmsg-step-tips">
-                            <div class="qmsg-tip">Key 相当于你的推送密码，不要发给别人</div>
-                        </div>
-                    </div>
-                    <div class="qmsg-fig">
-                        <svg viewBox="0 0 340 204" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：KEY页，复制Key">
-                            <rect width="340" height="204" fill="#eef2f7"/>
-                            <rect x="14" y="12" width="312" height="180" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
-                            <path d="M14 22 a10 10 0 0 1 10 -10 h292 a10 10 0 0 1 10 10 v16 h-312 z" fill="#f1f5f9"/>
-                            <text x="170" y="27.5" text-anchor="middle" font-size="9" font-weight="700" fill="#475569">Qmsg酱 · 管理台</text>
-                            <rect x="26" y="46" width="62" height="21" rx="10.5" fill="#ffffff" stroke="#e2e8f0"/>
-                            <text x="57" y="60.5" text-anchor="middle" font-size="10" fill="#64748b">Qmsg酱</text>
-                            <rect x="94" y="46" width="62" height="21" rx="10.5" fill="#ffffff" stroke="#e2e8f0"/>
-                            <text x="125" y="60.5" text-anchor="middle" font-size="10" fill="#64748b">QQ号码</text>
-                            <rect x="162" y="46" width="46" height="21" rx="10.5" fill="#12b7f5"/>
-                            <text x="185" y="60.5" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">KEY</text>
-                            <rect x="26" y="78" width="288" height="76" rx="10" fill="#f8fafc" stroke="#e8edf3"/>
-                            <text x="36" y="96" font-size="10.5" font-weight="700" fill="#1e293b">我的 KEY</text>
-                            <rect x="36" y="102" width="268" height="24" rx="8" fill="#ffffff" stroke="#d0d5dd"/>
-                            <text x="44" y="118" font-size="10" fill="#1e293b" font-family="monospace">d3e96b6c50adf28cc6d1bba4613</text>
-                            <rect x="36" y="132" width="70" height="16" rx="8" fill="#6366f1"/>
-                            <text x="71" y="143.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="#ffffff">复制 Key</text>
-                            <text x="114" y="143.5" font-size="8.5" fill="#94a3b8">部分版本在「接口」页查看</text>
-                            <ellipse cx="170" cy="114" rx="144" ry="20" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <text x="170" y="178" text-anchor="middle" font-size="9.5" font-weight="700" fill="#ef4444">↑ 完整复制这一串，一个字符都不能少</text>
-                        </svg>
-                        <div class="qmsg-fig-cap">示意图：「KEY」页，完整复制这串字符</div>
-                    </div>
-                </div>
-
-                <div class="qmsg-step">
-                    <div class="qmsg-step-head">
-                        <div class="qmsg-step-num">5</div>
-                        <div class="qmsg-step-title">回到本页，粘贴 Key 并开启通知</div>
-                    </div>
-                    <div class="qmsg-step-text">
-                        把 Key 粘贴到下方输入框；「接收QQ」<b>留空即可</b>（默认推给你添加的第一个 QQ）。打开「启用」开关，再点「🧪 测试通知」——QQ 收到消息就说明配置成功！
-                    </div>
-                    <div class="qmsg-fig">
-                        <svg viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：回到聊天室，粘贴Key、打开开关、点测试通知">
+                    <div class="push-fig">
+                        <svg viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：在本设置页填token、选渠道、测试">
                             <rect width="340" height="220" fill="#eef2f7"/>
                             <rect x="14" y="12" width="312" height="196" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
                             <path d="M14 22 a10 10 0 0 1 10 -10 h292 a10 10 0 0 1 10 10 v16 h-312 z" fill="#f1f5f9"/>
-                            <text x="170" y="27.5" text-anchor="middle" font-size="9" font-weight="700" fill="#475569">Harry 的聊天室 · QQ通知设置</text>
-                            <text x="30" y="87" font-size="10.5" font-weight="700" fill="#475569">Key</text>
-                            <rect x="76" y="71" width="176" height="25" rx="8" fill="#ffffff" stroke="#d0d5dd"/>
-                            <text x="84" y="87.5" font-size="9" fill="#1e293b" font-family="monospace">d3e96b6c50adf28cc…</text>
-                            <text x="30" y="117" font-size="10.5" font-weight="700" fill="#475569">接收QQ</text>
-                            <rect x="76" y="101" width="176" height="25" rx="8" fill="#ffffff" stroke="#d0d5dd"/>
-                            <text x="84" y="117.5" font-size="9" fill="#1e293b" font-family="monospace">123456789</text>
-                            <text x="30" y="147" font-size="10.5" font-weight="700" fill="#475569">启用</text>
-                            <rect x="76" y="129" width="44" height="24" rx="12" fill="#20c997"/>
-                            <circle cx="110" cy="141" r="9.5" fill="#ffffff" stroke="#d1d9e0"/>
-                            <rect x="30" y="164" width="112" height="26" rx="10" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.2"/>
-                            <text x="86" y="181" text-anchor="middle" font-size="10" font-weight="700" fill="#16a34a">🧪 测试通知</text>
-                            <rect x="150" y="164" width="122" height="26" rx="10" fill="#6366f1"/>
-                            <text x="211" y="181" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">🔗 获取Key</text>
-                            <ellipse cx="164" cy="83.5" rx="100" ry="19" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <text x="270" y="87" font-size="9.5" font-weight="700" fill="#ef4444">①粘贴Key</text>
-                            <ellipse cx="98" cy="141" rx="33" ry="17" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <text x="140" y="145" font-size="9.5" font-weight="700" fill="#ef4444">②打开开关</text>
-                            <ellipse cx="86" cy="177" rx="66" ry="18" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <text x="170" y="203" text-anchor="middle" font-size="9.5" font-weight="700" fill="#ef4444">③ 点「测试通知」，QQ收到消息就成功了</text>
+                            <text x="170" y="28" text-anchor="middle" font-size="9" font-weight="700" fill="#475569">Harry 的聊天室 · 通知设置</text>
+                            <text x="30" y="62" font-size="10.5" font-weight="700" fill="#475569">Pushplus Token</text>
+                            <rect x="120" y="48" width="180" height="22" rx="7" fill="#ffffff" stroke="#d0d5dd"/>
+                            <text x="128" y="63" font-size="8.5" fill="#1e293b" font-family="monospace">a91e3f8c7d2b56e9…</text>
+                            <text x="30" y="92" font-size="10.5" font-weight="700" fill="#475569">渠道</text>
+                            <rect x="120" y="78" width="84" height="24" rx="12" fill="#dcfce7" stroke="#22c55e" stroke-width="1.2"/>
+                            <circle cx="135" cy="90" r="5" fill="#22c55e"/>
+                            <text x="148" y="93" font-size="10" font-weight="700" fill="#166534">📬 微信</text>
+                            <rect x="210" y="78" width="84" height="24" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+                            <circle cx="225" cy="90" r="5" fill="#cbd5e1"/>
+                            <text x="238" y="93" font-size="10" fill="#475569">🐧 QQ</text>
+                            <text x="30" y="124" font-size="10.5" font-weight="700" fill="#475569">启用</text>
+                            <rect x="120" y="112" width="42" height="22" rx="11" fill="#22c55e"/>
+                            <circle cx="152" cy="123" r="9" fill="#ffffff"/>
+                            <text x="30" y="170" font-size="10.5" font-weight="600" fill="#15803d">① 粘贴 Token</text>
+                            <text x="30" y="195" font-size="10.5" font-weight="600" fill="#15803d">② 选渠道 + 开开关</text>
+                            <text x="180" y="170" font-size="10.5" font-weight="600" fill="#15803d">③ 点「测试通知」</text>
+                            <rect x="170" y="148" width="130" height="22" rx="8" fill="#22c55e"/>
+                            <text x="235" y="163" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">🧪 测试通知</text>
+                            <ellipse cx="120" cy="118" rx="35" ry="15" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="4 3"/>
                         </svg>
-                        <div class="qmsg-fig-cap">示意图：粘贴 Key → 打开开关 → 测试</div>
+                        <div class="push-fig-cap">示意图：粘贴 Token → 选渠道 → 测试</div>
                     </div>
                 </div>
 
             </div>
         </div>
 
-        <div style="font-size:12px;font-weight:700;color:var(--btn-color);margin:0 0 8px;">⬇️ 在下方填入你的配置</div>
+        <div style="font-size:12px;font-weight:700;color:var(--btn-color);margin:18px 0 8px;">⬇️ 在下方粘贴 Token + 选渠道</div>
         <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
             <div style="display:flex;align-items:center;gap:10px;">
-                <label style="font-size:13px;color:var(--muted);white-space:nowrap;font-weight:600;">Key</label>
-                <input type="text" id="modal-qmsg-key" placeholder="粘贴你的Qmsg酱 Key" style="flex:1;padding:9px 12px;border:1px solid var(--input-border);border-radius:8px;font-size:14px;font-family:monospace;outline:none;background:var(--input-bg);color:var(--text-main);" oninput="window.saveQmsgKey(this.value)">
+                <label style="font-size:13px;color:var(--muted);white-space:nowrap;font-weight:600;">Pushplus Token</label>
+                <input type="text" id="modal-pushplus-token" placeholder="粘贴 pushplus Token（看第 3 步）" style="flex:1;padding:9px 12px;border:1px solid var(--input-border);border-radius:8px;font-size:13px;font-family:monospace;outline:none;background:var(--input-bg);color:var(--text-main);" oninput="window.savePushplusToken(this.value)">
             </div>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <label style="font-size:13px;color:var(--muted);white-space:nowrap;font-weight:600;">接收QQ</label>
-                <input type="text" id="modal-qmsg-qq" placeholder="选填，留空推送给第一个QQ" style="flex:1;padding:9px 12px;border:1px solid var(--input-border);border-radius:8px;font-size:14px;font-family:monospace;outline:none;background:var(--input-bg);color:var(--text-main);" oninput="window.saveQmsgQQ(this.value)">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <label style="font-size:13px;color:var(--muted);white-space:nowrap;font-weight:600;">收消息渠道</label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid var(--input-border);border-radius:10px;background:var(--input-bg);font-size:13px;">
+                    <input type="radio" name="pushplus-channel" value="wechat" onchange="window.savePushplusChannel('wechat');window.refreshPushplusChannelUI()" checked>📬 微信
+                </label>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid var(--input-border);border-radius:10px;background:var(--input-bg);font-size:13px;">
+                    <input type="radio" name="pushplus-channel" value="qq" onchange="window.savePushplusChannel('qq');window.refreshPushplusChannelUI()">🐧 QQ
+                </label>
             </div>
             <div style="display:flex;align-items:center;gap:10px;">
                 <label style="font-size:13px;color:var(--muted);white-space:nowrap;font-weight:600;">启用</label>
-                <label class="switch" aria-label="开启Qmsg酱通知"><input id="modal-qmsg-toggle" type="checkbox" onchange="window.toggleQmsg(this)"><span class="switch-track"></span></label>
-                <span style="font-size:12px;color:var(--muted);">30秒内多条消息合并推送一条</span>
+                <label class="switch" aria-label="开启 pushplus 通知"><input id="modal-pushplus-toggle" type="checkbox" onchange="window.togglePushplus(this)"><span class="switch-track"></span></label>
+                <span style="font-size:12px;color:var(--muted);">30 秒内多条消息合并推送一条</span>
             </div>
         </div>
         <div style="display:flex;gap:10px;margin-bottom:10px;">
-            <button onclick="window.testQmsgNotify(this)" style="flex:1;margin:0;padding:10px 16px;background:var(--panel-soft);color:var(--btn-color);border:1px solid var(--line);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">🧪 测试通知</button>
-            <a href="https://qmsg.zendee.cn" target="_blank" style="flex:1;text-align:center;padding:10px 16px;background:var(--btn-bg);color:white;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;">🔗 获取Key</a>
+            <button onclick="window.testPushplusNotify(this)" style="flex:1;margin:0;padding:10px 16px;background:var(--panel-soft);color:var(--btn-color);border:1px solid var(--line);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">🧪 测试通知</button>
+            <a href="https://www.pushplus.plus" target="_blank" style="flex:1;text-align:center;padding:10px 16px;background:var(--btn-bg);color:white;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;">🔗 打开 pushplus</a>
         </div>
         <button onclick="window.closeWxNotifySetup(null)" style="width:100%;margin:0;padding:10px 16px;background:var(--panel-soft);color:var(--text-main);border-radius:10px;font-size:14px;font-weight:600;border:1px solid var(--line);cursor:pointer;">关闭</button>
 
-        <details class="qmsg-faq" style="margin-top:14px;">
+        <details class="push-faq" style="margin-top:14px;">
             <summary>❓ 收不到消息？点开看常见问题</summary>
-            <div class="qmsg-faq-body">
-                <div class="qmsg-faq-item"><b>测试成功但 QQ 没收到？</b>多半是还没加 Qmsg酱 为好友。回到第 2 步，用你的 QQ 加她为好友，通过后再测试。</div>
-                <div class="qmsg-faq-item"><b>提示发送失败？</b>检查 Key 是否复制完整、前后有没有空格；可以重新进一次管理台再复制。</div>
-                <div class="qmsg-faq-item"><b>会不会太吵？</b>30 秒内多条新消息只合并推送一条；随时关闭「启用」开关即可停用。</div>
-                <div class="qmsg-faq-item"><b>安全吗？</b>Key 只保存在你设备的浏览器本地，不会上传到任何服务器。</div>
+            <div class="push-faq-body">
+                <div class="push-faq-item"><b>测试返回「905 / 需要实名」</b>pushplus 2024 年 8 月起强制实名认证。回「个人中心」完成实名后再试。</div>
+                <div class="push-faq-item"><b>测试返回「Token 无效」</b>检查 token 是否复制完整（看是不是 32 位字母数字混合），前后不要带空格。</div>
+                <div class="push-faq-item"><b>微信收不到？</b>用「扫码登录 pushplus 的那个微信」去扫码关注「pushplus 推送加」公众号。关注后等 10 秒再测试。</div>
+                <div class="push-faq-item"><b>QQ 收不到？</b>必须先在 pushplus 后台的「渠道配置」里用自己的 QQ 扫码加机器人为好友（绑定），机器人会发一条确认。绑定后再测试。</div>
+                <div class="push-faq-item"><b>会不会太吵？</b>30 秒内多条新消息只合并推送一条；随时关闭「启用」开关即可停用。</div>
+                <div class="push-faq-item"><b>安全吗？</b>Token 只保存在你设备的浏览器本地，不会上传到任何服务器。你也可以随时去 pushplus 后台重置 token 让旧 token 失效。</div>
             </div>
         </details>
     </div>
@@ -1898,7 +1968,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.4.0";
+    const CHAT_APP_VERSION = "2.6.0";
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -1978,16 +2048,18 @@
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
 
     async function checkWxBindStatus() {
-        const enabled = localStorage.getItem('chat_qmsg_enabled') === '1';
-        const key = localStorage.getItem('chat_qmsg_key') || '';
-        return !!(enabled && key);
+        const enabled = localStorage.getItem('chat_pushplus_enabled') === '1';
+        const token = localStorage.getItem('chat_pushplus_token') || '';
+        return !!(enabled && token);
     }
 
     function updateWxNotifyButton() {
         const btn = document.getElementById('wx-notify-btn');
         if (!btn) return;
         checkWxBindStatus().then(bound => {
-            btn.textContent = bound ? 'QQ通知 ✓' : '配置QQ通知';
+            const channel = localStorage.getItem('chat_pushplus_channel') || 'wechat';
+            const chanTag = channel === 'qq' ? 'QQ' : '微信';
+            btn.textContent = bound ? '通知已开启（' + chanTag + '）✓' : '配置微信 / QQ 通知';
         });
     }
 
@@ -2058,12 +2130,15 @@
 
     window.showWxNotifySetup = function() {
         document.getElementById('settings-modal').style.display = 'none';
-        const keyInput = document.getElementById('modal-qmsg-key');
-        const qqInput = document.getElementById('modal-qmsg-qq');
-        const toggle = document.getElementById('modal-qmsg-toggle');
-        if (keyInput) keyInput.value = localStorage.getItem('chat_qmsg_key') || '';
-        if (qqInput) qqInput.value = localStorage.getItem('chat_qmsg_qq') || '';
-        if (toggle) toggle.checked = localStorage.getItem('chat_qmsg_enabled') === '1';
+        const tokenInput = document.getElementById('modal-pushplus-token');
+        const toggle = document.getElementById('modal-pushplus-toggle');
+        if (tokenInput) tokenInput.value = localStorage.getItem('chat_pushplus_token') || '';
+        if (toggle) toggle.checked = localStorage.getItem('chat_pushplus_enabled') === '1';
+        // 渠道默认值：首次没有存储就默认 wechat
+        if (!localStorage.getItem('chat_pushplus_channel')) {
+            localStorage.setItem('chat_pushplus_channel', 'wechat');
+        }
+        window.refreshPushplusChannelUI();
         document.getElementById('wx-notify-modal').classList.add('show');
     };
 
@@ -2400,7 +2475,7 @@
         currentRoomCode = document.getElementById('room-input').value.trim();
         const isAutoLogin = document.getElementById('auto-login-check').checked;
         const joinBtn = document.getElementById('join-btn');
-        
+
         if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
             return showToast("房间代码格式不正确，请只使用字母、数字或符号。", 'error');
         }
@@ -2408,40 +2483,149 @@
         if (!nameInput || !currentRoomCode) return showToast("请输入名字和房间代码", 'error');
 
         joinBtn.disabled = true;
+        const oldBtnText = joinBtn.textContent;
         joinBtn.textContent = '正在进入...';
 
         localStorage.setItem('chat_auth_token', nameInput);
-        mySender = nameInput; 
-        pendingJoinAnnounce = true; 
+        mySender = nameInput;
+        pendingJoinAnnounce = true;
 
         if (isAutoLogin) {
-            const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000); 
+            const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000);
             localStorage.setItem('chat_last_room', currentRoomCode);
             localStorage.setItem('chat_auth_expiry', expiryTime.toString());
         }
 
-        showRoomLoading();
-        setRoomTitle(currentRoomCode);
-
         try {
-            await loadHistory(true);
-            hideRoomLoading();
-            updateWxNotifyButton();
-            logJoinRoom('manual');
-            setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
-            ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
-            initRealtime();
-            realtimeReady.catch(() => startPolling());
-            if (isPollingEnabled) startPolling();
-        } catch (error) {
-            console.error('进入房间失败:', error);
-            document.getElementById('login-area').style.display = 'flex';
-            document.getElementById('chat-container').style.display = 'none';
-            document.getElementById('room-loading').classList.add('hidden');
-            showToast('进入房间失败，请检查网络后重试。', 'error');
+            // ====== 成员白名单 + 审批检查 ======
+            const join = await evaluateJoinStatus(currentRoomCode, mySender);
+
+            if (join.status === 'member' || join.status === 'new_room') {
+                // 成员 / 全新房间：直接进入
+                if (join.status === 'new_room') {
+                    // 全新房间，自动加入为第一个成员
+                    await supabaseClient.from('room_members')
+                        .upsert([{ room_code: currentRoomCode, user_name: mySender }],
+                            { onConflict: 'room_code,user_name' });
+                }
+                stopJoinWaitWatcher();
+                hideApplyScreen();
+                document.getElementById('login-area').style.display = 'none';
+                showRoomLoading();
+                setRoomTitle(currentRoomCode);
+                await actuallyEnterRoom();
+            } else if (join.status === 'pending') {
+                // 已有进行中的申请：进入等待页
+                document.getElementById('login-area').style.display = 'none';
+                showApplyScreen();
+                renderWaitingScreen(currentRoomCode, mySender, join.requestId,
+                    join.approveCount || 0, join.totalMembers);
+            } else if (join.status === 'approved') {
+                // 之前已被批准但可能未自动写入成员 → 补一下
+                await supabaseClient.from('room_members')
+                    .upsert([{ room_code: currentRoomCode, user_name: mySender }],
+                        { onConflict: 'room_code,user_name' });
+                document.getElementById('login-area').style.display = 'none';
+                showRoomLoading();
+                setRoomTitle(currentRoomCode);
+                await actuallyEnterRoom();
+            } else if (join.status === 'rejected') {
+                // 之前被拒，提示用户可以重新申请
+                document.getElementById('login-area').style.display = 'flex';
+                const notice = document.getElementById('login-membership-notice');
+                if (notice) {
+                    notice.innerHTML = `你之前的加入申请被拒绝了。可点下方「申请重新加入」再次发起。`;
+                    notice.style.display = 'block';
+                }
+                // 注入「申请重新加入」按钮
+                let reapplyBtn = document.getElementById('reapply-btn');
+                if (!reapplyBtn) {
+                    reapplyBtn = document.createElement('button');
+                    reapplyBtn.id = 'reapply-btn';
+                    reapplyBtn.textContent = '申请重新加入';
+                    reapplyBtn.onclick = window.reapplyJoin;
+                    reapplyBtn.style.cssText = 'width:100%;margin:6px 0 0;padding:10px;background:var(--btn-bg);color:white;border:0;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;';
+                    notice.appendChild(reapplyBtn);
+                }
+            } else {
+                // 'none'：房间存在但用户不是成员，需要申请加入
+                document.getElementById('login-area').style.display = 'flex';
+                const totalMembers = join.totalMembers || 0;
+                const need = votesNeeded(totalMembers);
+                const notice = document.getElementById('login-membership-notice');
+                if (notice) {
+                    notice.innerHTML = `你不是房间「<b>${escapeHtml(currentRoomCode)}</b>」的成员（当前共 <b>${totalMembers}</b> 名成员）。<br>加入需要超过 1/2（即 <b>${need}</b> 票）现有成员同意。点下方按钮发起申请：`;
+                    notice.style.display = 'block';
+                }
+                let applyBtn = document.getElementById('apply-join-btn');
+                if (!applyBtn) {
+                    applyBtn = document.createElement('button');
+                    applyBtn.id = 'apply-join-btn';
+                    applyBtn.textContent = '🙋 申请加入房间';
+                    applyBtn.onclick = window.requestJoinRoom;
+                    applyBtn.style.cssText = 'width:100%;margin:6px 0 0;padding:11px;background:var(--btn-bg);color:white;border:0;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;';
+                    notice.appendChild(applyBtn);
+                }
+            }
+        } catch (e) {
+            console.error('加入房间检查失败:', e);
+            showToast('加入房间检查失败：' + (e.message || ''), 'error');
         } finally {
             joinBtn.disabled = false;
-            joinBtn.textContent = '开始聊天';
+            joinBtn.textContent = oldBtnText;
+        }
+    };
+
+    /**
+     * 在登录页面上「申请加入」按钮：发起申请 → 进入等待页
+     */
+    window.requestJoinRoom = async function() {
+        const name = document.getElementById('username').value.trim();
+        const room = document.getElementById('room-input').value.trim();
+        if (!name || !room) return showToast('请先填好名字和房间代码', 'error');
+        const btn = document.getElementById('apply-join-btn');
+        if (btn) { btn.disabled = true; btn.textContent = '正在提交申请...'; }
+        try {
+            const res = await submitJoinRequest(room, name);
+            if (!res.ok) {
+                showToast('提交申请失败：' + (res.message || res.reason || '未知错误'), 'error');
+                if (btn) { btn.disabled = false; btn.textContent = '🙋 申请加入房间'; }
+                return;
+            }
+            // 进入等待页
+            document.getElementById('login-area').style.display = 'none';
+            showApplyScreen();
+            const totalMembers = await getRoomMemberCount(room);
+            renderWaitingScreen(room, name, res.requestId, 0, totalMembers);
+        } catch (e) {
+            console.error('申请失败:', e);
+            showToast('申请失败：' + (e.message || ''), 'error');
+            if (btn) { btn.disabled = false; btn.textContent = '🙋 申请加入房间'; }
+        }
+    };
+
+    /** 被拒后重新申请 */
+    window.reapplyJoin = async function() {
+        const name = document.getElementById('username').value.trim();
+        const room = document.getElementById('room-input').value.trim();
+        if (!name || !room) return showToast('请先填好名字和房间代码', 'error');
+        const btn = document.getElementById('reapply-btn');
+        if (btn) { btn.disabled = true; btn.textContent = '正在提交...'; }
+        try {
+            const res = await submitJoinRequest(room, name);
+            if (!res.ok) {
+                showToast('重新申请失败：' + (res.message || res.reason || ''), 'error');
+                if (btn) { btn.disabled = false; btn.textContent = '申请重新加入'; }
+                return;
+            }
+            document.getElementById('login-area').style.display = 'none';
+            showApplyScreen();
+            const totalMembers = await getRoomMemberCount(room);
+            renderWaitingScreen(room, name, res.requestId, 0, totalMembers);
+        } catch (e) {
+            console.error('重新申请失败:', e);
+            showToast('重新申请失败：' + (e.message || ''), 'error');
+            if (btn) { btn.disabled = false; btn.textContent = '申请重新加入'; }
         }
     };
 
@@ -2461,6 +2645,426 @@
             setRoomTitle(room.room_name || currentRoomCode);
         }
 
+    }
+
+    // ============================================
+    // 房间成员白名单 + 加入审批
+    // ============================================
+
+    /** 查询当前房间的成员总数（用于计算投票阈值） */
+    async function getRoomMemberCount(roomCode) {
+        const { count, error } = await supabaseClient
+            .from('room_members')
+            .select('user_name', { count: 'exact', head: true })
+            .eq('room_code', roomCode);
+        if (error) { console.warn('[members] count error:', error); return 0; }
+        return count || 0;
+    }
+
+    /** 查询用户在某房间的成员身份 */
+    async function checkRoomMembership(roomCode, userName) {
+        const { data, error } = await supabaseClient
+            .from('room_members')
+            .select('user_name')
+            .eq('room_code', roomCode)
+            .eq('user_name', userName)
+            .maybeSingle();
+        if (error) { console.warn('[members] check error:', error); return false; }
+        return !!data;
+    }
+
+    /** 查询某房间某用户的最新加入申请状态（pending 优先，其次按时间倒序） */
+    async function getLatestJoinRequest(roomCode, userName) {
+        const { data, error } = await supabaseClient
+            .from('join_requests')
+            .select('id,room_code,user_name,status,created_at,resolved_at')
+            .eq('room_code', roomCode)
+            .eq('user_name', userName)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        if (error) { console.warn('[join] query error:', error); return null; }
+        return data;
+    }
+
+    /** 查询某条申请的所有投票 */
+    async function getJoinVotes(requestId) {
+        const { data, error } = await supabaseClient
+            .from('join_votes')
+            .select('voter,vote,voted_at')
+            .eq('request_id', requestId);
+        if (error) { console.warn('[votes] query error:', error); return []; }
+        return data || [];
+    }
+
+    /** 计算审批阈值：需要 approvals > totalMembers / 2 */
+    function votesNeeded(totalMembers) {
+        return Math.floor(totalMembers / 2) + 1; // > N/2 等价于 ≥ floor(N/2)+1
+    }
+
+    /**
+     * 完整加入流程：
+     * 1) 成员白名单命中 → 'member'
+     * 2) 房间在白名单里无任何成员（全新房间）→ 'new_room'（自动添加为第一个成员）
+     * 3) 已有 pending 申请 → 'pending'（请求展示 id）
+     * 4) 已有 approved 申请（但还没写入 room_members，可能是并发或之前未自动同步）→ 'approved'
+     * 5) 否则 → 'none'（需申请）
+     */
+    async function evaluateJoinStatus(roomCode, userName) {
+        const isMember = await checkRoomMembership(roomCode, userName);
+        if (isMember) return { status: 'member' };
+        const totalMembers = await getRoomMemberCount(roomCode);
+        if (totalMembers === 0) return { status: 'new_room', totalMembers: 0 };
+        const req = await getLatestJoinRequest(roomCode, userName);
+        if (!req) return { status: 'none', totalMembers };
+        const votes = req.status === 'pending' ? await getJoinVotes(req.id) : [];
+        const approveCount = votes.filter(v => v.vote === 'approve').length;
+        const rejectCount = votes.filter(v => v.vote === 'reject').length;
+        return {
+            status: req.status,            // pending | approved | rejected
+            requestId: req.id,
+            totalMembers,
+            approveCount,
+            rejectCount,
+            createdAt: req.created_at
+        };
+    }
+
+    /** 申请人提交申请 → 写入 join_requests 并发系统消息 */
+    async function submitJoinRequest(roomCode, userName) {
+        // 防止重复：先查 latest
+        const existing = await getLatestJoinRequest(roomCode, userName);
+        if (existing && existing.status === 'pending') {
+            return { ok: false, reason: 'already_pending', requestId: existing.id };
+        }
+        // 如果之前被拒过或已批准，则覆盖为新的一条 pending
+        const { data, error } = await supabaseClient
+            .from('join_requests')
+            .insert([{ room_code: roomCode, user_name: userName, status: 'pending' }])
+            .select()
+            .single();
+        if (error) {
+            console.warn('[join] insert error:', error);
+            // 如果触发器报「已有进行中」也算已有
+            if (error.code === 'P0001' || (error.message || '').includes('进行中')) {
+                const cur = await getLatestJoinRequest(roomCode, userName);
+                if (cur && cur.status === 'pending') return { ok: true, requestId: cur.id };
+            }
+            return { ok: false, reason: 'db_error', message: error.message };
+        }
+        // 系统消息：广播给现有成员（写入 messages 表，所有订阅者都会收到）
+        const sysMsg = `🙋 [新用户申请] ${userName} 请求加入本房间，老用户可投票（需超过 1/2 同意）`;
+        try {
+            await supabaseClient.from('messages').insert([{
+                room_code: roomCode,
+                sender: 'system',
+                content: sysMsg,
+                media_url: null,
+                media_type: 'system_join_request:' + data.id   // 用 media_type 编码 request id，便于渲染投票 UI
+            }]);
+        } catch (e) { console.warn('[join] broadcast message failed:', e); }
+        return { ok: true, requestId: data.id };
+    }
+
+    /** 老用户投票：写入 join_votes（已投过则覆盖原票） */
+    async function castJoinVote(requestId, voter, vote) {
+        if (vote !== 'approve' && vote !== 'reject') return { ok: false };
+        const { error } = await supabaseClient
+            .from('join_votes')
+            .upsert([{ request_id: requestId, voter: voter, vote: vote, voted_at: new Date().toISOString() }],
+                { onConflict: 'request_id,voter' });
+        if (error) { console.warn('[vote] insert error:', error); return { ok: false, message: error.message }; }
+        // 投票后立即评估是否够阈值
+        await evaluateAndResolveRequest(requestId);
+        return { ok: true };
+    }
+
+    /**
+     * 评估某条申请：阈值达成则批准、自动入群、广播系统消息
+     */
+    async function evaluateAndResolveRequest(requestId) {
+        try {
+            const { data: req, error: reqErr } = await supabaseClient
+                .from('join_requests')
+                .select('id,room_code,user_name,status')
+                .eq('id', requestId)
+                .single();
+            if (reqErr || !req) return;
+            if (req.status !== 'pending') return;
+            const totalMembers = await getRoomMemberCount(req.room_code);
+            if (totalMembers === 0) {
+                // 极端情况：房间白名单空了（不应该发生），先按 1 算
+            }
+            const votes = await getJoinVotes(requestId);
+            const approveCount = votes.filter(v => v.vote === 'approve').length;
+            const needed = votesNeeded(totalMembers);
+            if (approveCount >= needed) {
+                // 标记 approved
+                await supabaseClient.from('join_requests')
+                    .update({ status: 'approved', resolved_at: new Date().toISOString() })
+                    .eq('id', requestId);
+                // 写入 room_members（如果尚未存在）
+                await supabaseClient.from('room_members')
+                    .upsert([{ room_code: req.room_code, user_name: req.user_name }],
+                        { onConflict: 'room_code,user_name' });
+                // 广播系统消息
+                try {
+                    await supabaseClient.from('messages').insert([{
+                        room_code: req.room_code,
+                        sender: 'system',
+                        content: `✅ ${req.user_name} 已通过审批加入房间`,
+                        media_url: null,
+                        media_type: 'system_join_approved:' + requestId
+                    }]);
+                } catch (e) { console.warn('[join] approval broadcast failed:', e); }
+            }
+        } catch (e) {
+            console.warn('[join] evaluate error:', e);
+        }
+    }
+
+    /** 显示申请/等待屏幕 */
+    function showApplyScreen(contentHtml) {
+        const screen = document.getElementById('apply-screen');
+        const login = document.getElementById('login-area');
+        document.getElementById('apply-card-content').innerHTML = contentHtml;
+        screen.style.display = 'flex';
+        if (login) login.style.display = 'none';
+        document.getElementById('chat-container').style.display = 'none';
+    }
+
+    function hideApplyScreen() {
+        const screen = document.getElementById('apply-screen');
+        screen.style.display = 'none';
+    }
+
+    /**
+     * 渲染申请等待页（含实时进度）
+     * @param roomCode 房间代码
+     * @param userName 申请者
+     * @param requestId 当前申请 ID
+     * @param initialApproveCount 初始已同意票数
+     * @param totalMembers 房间总成员数
+     */
+    function renderWaitingScreen(roomCode, userName, requestId, initialApproveCount, totalMembers) {
+        function paint(approveCount, memberCount) {
+            const need = votesNeeded(memberCount);
+            const have = Math.min(approveCount, need);
+            const pct = Math.min(100, Math.round(have / need * 100));
+            const remaining = Math.max(0, need - approveCount);
+            const html = `
+                <div class="apply-icon">⏳</div>
+                <h3>正在等待房间「${escapeHtml(roomCode)}」的成员审批</h3>
+                <p>共 <b>${memberCount}</b> 名现有成员，需要超过 1/2（即 <b>${need}</b> 票）同意才能通过。</p>
+                <div class="apply-progress">
+                    <div class="apply-progress-row">
+                        <span>当前进度</span>
+                        <span>${approveCount} / ${need}</span>
+                    </div>
+                    <div class="apply-bar"><div class="apply-bar-fill" style="width:${pct}%;"></div></div>
+                    <div class="apply-detail">
+                        ${remaining > 0
+                            ? '还差 <b>' + remaining + '</b> 票同意'
+                            : '🎉 票数已满足，正在进入房间…'}
+                    </div>
+                </div>
+                <p style="font-size:12px;color:var(--muted);margin-top:6px;">
+                    不用刷新页面，审批通过后会自动进入。
+                </p>
+                <button class="apply-back" onclick="window.cancelJoinWait()">取消申请</button>
+            `;
+            document.getElementById('apply-card-content').innerHTML = html;
+        }
+        paint(initialApproveCount, totalMembers);
+        // 订阅 join_requests 和 join_votes
+        if (window.__joinWaitChannel) {
+            try { supabaseClient.removeChannel(window.__joinWaitChannel); } catch (e) {}
+        }
+        const channel = supabaseClient.channel('join_wait_' + requestId)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'join_requests', filter: 'id=eq.' + requestId }, async (payload) => {
+                if (payload.new && payload.new.status === 'approved') {
+                    // 被批准：写入成员 + 跳转
+                    await supabaseClient.from('room_members')
+                        .upsert([{ room_code: roomCode, user_name: userName }], { onConflict: 'room_code,user_name' });
+                    stopJoinWaitWatcher();
+                    hideApplyScreen();
+                    showToast('🎉 你已通过审批，欢迎加入房间！', 'success', 3000);
+                    actuallyEnterRoom();
+                }
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'join_votes', filter: 'request_id=eq.' + requestId }, async () => {
+                const votes = await getJoinVotes(requestId);
+                const approveCount = votes.filter(v => v.vote === 'approve').length;
+                const mc = await getRoomMemberCount(roomCode);
+                paint(approveCount, mc);
+            })
+            .subscribe();
+        window.__joinWaitChannel = channel;
+    }
+
+    function stopJoinWaitWatcher() {
+        if (window.__joinWaitChannel) {
+            try { supabaseClient.removeChannel(window.__joinWaitChannel); } catch (e) {}
+            window.__joinWaitChannel = null;
+        }
+    }
+
+    window.cancelJoinWait = async function() {
+        stopJoinWaitWatcher();
+        hideApplyScreen();
+        const login = document.getElementById('login-area');
+        if (login) login.style.display = 'flex';
+        showToast('已取消申请', 'info', 1800);
+    };
+
+    /**
+     * 渲染一条加入申请卡片（用于聊天内的 system 消息）
+     * @param requestId 申请 ID
+     * @param requesterName 申请者名字
+     * @param currentUserIsMember 当前用户是否是房间成员
+     * @param currentVoterVote 当前用户的票（'approve' | 'reject' | null）
+     */
+    function renderJoinRequestCard(requestId, requesterName, currentUserIsMember, currentVoterVote) {
+        const card = document.createElement('div');
+        card.className = 'join-request-card';
+        card.dataset.joinRequestId = String(requestId);
+        card.innerHTML = `
+            <div class="jr-head">
+                <span class="jr-icon">🙋</span>
+                <span>新用户 <b>${escapeHtml(requesterName)}</b> 请求加入本房间</span>
+            </div>
+            <div class="jr-meta" data-role="meta">老用户可投票，需要超过 1/2 同意</div>
+            <div class="jr-progress" data-role="progress-wrap"><div class="jr-progress-bar" data-role="progress-bar" style="width:0%;"></div></div>
+            <div class="jr-vote-btns-locked" data-role="locked" style="display:none;">你不是本房间成员，无法投票</div>
+            <div class="jr-actions" data-role="actions" style="display:none;">
+                <button class="jr-vote-btn jr-approve" data-vote="approve">👍 同意</button>
+                <button class="jr-vote-btn jr-reject" data-vote="reject">👎 拒绝</button>
+            </div>
+        `;
+        if (!currentUserIsMember) {
+            card.querySelector('[data-role="locked"]').style.display = '';
+        } else {
+            const actions = card.querySelector('[data-role="actions"]');
+            actions.style.display = '';
+            const approveBtn = card.querySelector('.jr-approve');
+            const rejectBtn = card.querySelector('.jr-reject');
+            if (currentVoterVote === 'approve') approveBtn.classList.add('voted');
+            if (currentVoterVote === 'reject') rejectBtn.classList.add('voted');
+            approveBtn.addEventListener('click', async function() {
+                if (approveBtn.disabled) return;
+                approveBtn.disabled = true; rejectBtn.disabled = true;
+                const res = await castJoinVote(requestId, mySender, 'approve');
+                if (res.ok) {
+                    approveBtn.classList.add('voted');
+                    rejectBtn.classList.remove('voted');
+                }
+                approveBtn.disabled = false; rejectBtn.disabled = false;
+            });
+            rejectBtn.addEventListener('click', async function() {
+                if (rejectBtn.disabled) return;
+                approveBtn.disabled = true; rejectBtn.disabled = true;
+                const res = await castJoinVote(requestId, mySender, 'reject');
+                if (res.ok) {
+                    rejectBtn.classList.add('voted');
+                    approveBtn.classList.remove('voted');
+                }
+                approveBtn.disabled = false; rejectBtn.disabled = false;
+            });
+        }
+        // 立即拉一次最新进度
+        refreshJoinRequestCardProgress(card, requestId);
+        return card;
+    }
+
+    async function refreshJoinRequestCardProgress(card, requestId) {
+        try {
+            const votes = await getJoinVotes(requestId);
+            const approveCount = votes.filter(v => v.vote === 'approve').length;
+            const memberCount = await getRoomMemberCount(currentRoomCode);
+            const need = votesNeeded(memberCount);
+            const pct = Math.min(100, Math.round(approveCount / need * 100));
+            const bar = card.querySelector('[data-role="progress-bar"]');
+            const meta = card.querySelector('[data-role="meta"]');
+            if (bar) bar.style.width = pct + '%';
+            if (meta) meta.innerText = `当前进度：${approveCount} / ${need} 票${memberCount > 0 ? `（房间共 ${memberCount} 人）` : ''}`;
+        } catch (e) { console.warn('[join] refresh progress failed:', e); }
+    }
+
+    /**
+     * 真正进入房间（成员审批通过 / 全新房间自动加入时调用）
+     */
+    async function actuallyEnterRoom() {
+        // 此函数复用 joinRoom 后半段（消息加载 + realtime）
+        try {
+            await loadHistory(true);
+            hideRoomLoading();
+            updateWxNotifyButton();
+            logJoinRoom('manual');
+            setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
+            ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
+            initRealtime();
+            realtimeReady.catch(() => startPolling());
+            if (isPollingEnabled) startPolling();
+            // 通知所有现有成员：「我加入了」
+            if (roomSubscription) {
+                roomSubscription.send({
+                    type: 'broadcast',
+                    event: 'presence_notice',
+                    payload: { user: mySender, room: currentRoomCode, text: `${mySender} 加入了房间` }
+                });
+            }
+        } catch (error) {
+            console.error('进入房间失败:', error);
+            const login = document.getElementById('login-area');
+            if (login) login.style.display = 'flex';
+            document.getElementById('chat-container').style.display = 'none';
+            showToast('进入房间失败，请检查网络后重试。', 'error');
+        }
+    }
+
+    /**
+     * 加载历史消息后，把已存在的 pending 申请也渲染为可投票卡片
+     */
+    async function decorateHistoryJoinRequests() {
+        try {
+            // 找出本房间所有 pending 申请
+            const { data: pendingReqs } = await supabaseClient
+                .from('join_requests')
+                .select('id,room_code,user_name,status')
+                .eq('room_code', currentRoomCode)
+                .eq('status', 'pending');
+            if (!pendingReqs || pendingReqs.length === 0) {
+                window.__joinReqIdsCache = [];
+                return;
+            }
+            window.__joinReqIdsCache = pendingReqs.map(r => r.id);
+            // 找出当前用户已投的票
+            const reqIds = pendingReqs.map(r => r.id);
+            const { data: myVotes } = await supabaseClient
+                .from('join_votes')
+                .select('request_id,vote')
+                .in('request_id', reqIds)
+                .eq('voter', mySender);
+            const myVoteMap = {};
+            (myVotes || []).forEach(v => { myVoteMap[v.request_id] = v.vote; });
+            // 在聊天框里查找对应的 system 消息位置；如果找不到就在顶部插入
+            const chatBox = document.getElementById('chat-box');
+            for (const r of pendingReqs) {
+                const card = renderJoinRequestCard(r.id, r.user_name, true, myVoteMap[r.id] || null);
+                // 尝试插入到对应的 system message 后面
+                const sysMsgs = chatBox.querySelectorAll('.system-message');
+                let inserted = false;
+                for (const sm of sysMsgs) {
+                    if (sm.textContent && sm.textContent.indexOf('[' + r.user_name + ']') !== -1 &&
+                        sm.textContent.indexOf('请求加入') !== -1) {
+                        sm.insertAdjacentElement('afterend', card);
+                        inserted = true;
+                        break;
+                    }
+                }
+                if (!inserted) chatBox.appendChild(card);
+            }
+        } catch (e) { console.warn('[join] decorate history error:', e); }
     }
 
     /**
@@ -2526,6 +3130,8 @@
                 if (!isSpeedMode) {
                     fetchAndApplyUserAvatars(msgs.map(m => m.sender));
                 }
+                // ====== 装饰：把已存在的 pending 申请渲染为可投票卡片 ======
+                await decorateHistoryJoinRequests();
             } else {
                 // 上拉加载：如果已经没有更多则直接返回
                 if (noMoreHistory) {
@@ -2709,6 +3315,73 @@
                         }
                     });
                 }
+            })
+            // ====== 加入申请 / 投票 实时事件 ======
+            .on('postgres_changes', {
+                event: 'INSERT',
+                schema: 'public',
+                table: 'join_requests',
+                filter: `room_code=eq.${currentRoomCode}`
+            }, async (payload) => {
+                const r = payload.new;
+                if (!r || r.status !== 'pending') return;
+                if (r.user_name === mySender) return; // 自己不看自己的请求（已在等待页）
+                const card = renderJoinRequestCard(r.id, r.user_name, true, null);
+                const chatBox = document.getElementById('chat-box');
+                // 紧跟在对应 system message 后
+                const sysMsgs = chatBox.querySelectorAll('.system-message');
+                let inserted = false;
+                for (const sm of sysMsgs) {
+                    if (sm.textContent && sm.textContent.indexOf('[' + r.user_name + ']') !== -1 &&
+                        sm.textContent.indexOf('请求加入') !== -1) {
+                        sm.insertAdjacentElement('afterend', card);
+                        inserted = true;
+                        break;
+                    }
+                }
+                if (!inserted) {
+                    chatBox.appendChild(card);
+                }
+                chatBox.scrollTop = chatBox.scrollHeight;
+            })
+            .on('postgres_changes', {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'join_requests',
+                filter: `room_code=eq.${currentRoomCode}`
+            }, async (payload) => {
+                const r = payload.new;
+                if (!r) return;
+                // 申请被批准后，刷新卡片样式
+                const card = document.querySelector(`.join-request-card[data-join-request-id="${r.id}"]`);
+                if (r.status === 'approved') {
+                    if (card) {
+                        card.classList.add('resolved');
+                        card.querySelector('[data-role="actions"]').style.display = 'none';
+                        card.querySelector('[data-role="locked"]').style.display = '';
+                        card.querySelector('[data-role="locked"]').innerText = '✅ 已批准';
+                    }
+                } else if (r.status === 'rejected') {
+                    if (card) {
+                        card.classList.add('resolved');
+                        card.querySelector('[data-role="actions"]').style.display = 'none';
+                        card.querySelector('[data-role="locked"]').style.display = '';
+                        card.querySelector('[data-role="locked"]').innerText = '❌ 已拒绝';
+                    }
+                }
+            })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'join_votes',
+                filter: `request_id=in.(${window.__joinReqIdsCache ? window.__joinReqIdsCache.join(',') : '0'})`
+            }, async (payload) => {
+                // 重新刷新所有相关卡片进度
+                const cards = document.querySelectorAll('.join-request-card');
+                cards.forEach(card => {
+                    const rid = parseInt(card.dataset.joinRequestId, 10);
+                    if (rid) refreshJoinRequestCardProgress(card, rid);
+                });
             })
             .subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
@@ -3865,7 +4538,7 @@
 
     function appendMessageToUI(id, sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false, skipAvatarRefresh = false, fileName = null, fileSize = null) {
         if (isNew && sender !== mySender && content && content !== '[已撤回]') {
-            notifyViaQmsg(sender, content);
+            notifyViaPushplus(sender, content);
         }
         const chatBox = document.getElementById('chat-box');
         if (isNew && id && Array.from(chatBox.querySelectorAll('.msg-wrapper[data-msg-id]')).some((item) => item.dataset.msgId === String(id))) return;
@@ -4425,143 +5098,150 @@
         }
     };
 
-    window.saveQmsgKey = function(key) {
-        localStorage.setItem('chat_qmsg_key', key || '');
+    window.savePushplusToken = function(token) {
+        localStorage.setItem('chat_pushplus_token', token || '');
         updateWxNotifyButton();
     };
 
-    window.saveQmsgQQ = function(qq) {
-        localStorage.setItem('chat_qmsg_qq', qq || '');
+    window.savePushplusChannel = function(channel) {
+        if (channel !== 'qq' && channel !== 'wechat') return;
+        localStorage.setItem('chat_pushplus_channel', channel);
     };
 
-    window.toggleQmsg = function(toggle) {
+    window.refreshPushplusChannelUI = function() {
+        const channel = localStorage.getItem('chat_pushplus_channel') || 'wechat';
+        document.querySelectorAll('input[name="pushplus-channel"]').forEach(function(r) {
+            r.checked = (r.value === channel);
+        });
+    };
+
+    window.togglePushplus = function(toggle) {
         const enabled = toggle.checked;
-        localStorage.setItem('chat_qmsg_enabled', enabled ? '1' : '0');
+        localStorage.setItem('chat_pushplus_enabled', enabled ? '1' : '0');
         if (enabled) {
-            const key = localStorage.getItem('chat_qmsg_key') || '';
-            if (!key) {
-                showToast('⚠ 请先填写 Qmsg酱 Key', 'error', 3000);
+            const token = localStorage.getItem('chat_pushplus_token') || '';
+            if (!token) {
+                showToast('⚠ 请先粘贴 pushplus Token 再开启', 'error', 3000);
                 toggle.checked = false;
-                localStorage.setItem('chat_qmsg_enabled', '0');
+                localStorage.setItem('chat_pushplus_enabled', '0');
                 updateWxNotifyButton();
                 return;
             }
-            showToast('✅ Qmsg酱通知已开启，新消息将通过QQ推送', 'success', 2500);
+            showToast('✅ 推送通知已开启，新消息将通过所选渠道推送', 'success', 2500);
         } else {
-            showToast('Qmsg酱通知已关闭', 'info', 2000);
+            showToast('推送通知已关闭', 'info', 2000);
         }
         updateWxNotifyButton();
     };
 
-    window.testQmsgNotify = async function(btn) {
-        const key = localStorage.getItem('chat_qmsg_key') || '';
-        if (!key) {
-            showToast('⚠ 请先填写 Qmsg酱 Key 再测试', 'error', 3000);
+    window.testPushplusNotify = async function(btn) {
+        const token = localStorage.getItem('chat_pushplus_token') || '';
+        if (!token) {
+            showToast('⚠ 请先粘贴 pushplus Token 再测试', 'error', 3000);
             return;
         }
-        const qq = localStorage.getItem('chat_qmsg_qq') || '';
-        const msg = '✅ Qmsg酱通知测试成功！\n来自：Harry的聊天室\n如果你收到这条消息，说明配置正确。';
+        const channel = localStorage.getItem('chat_pushplus_channel') || 'wechat';
+        const chanLabel = channel === 'qq' ? 'QQ' : '微信';
+        const msg = '✅ pushplus 推送测试成功！\n来自：Harry 的聊天室\n如果你在' + chanLabel + '里看到这条，说明配置正确。';
         const restore = setButtonLoading(btn, '发送中…');
-        const code = await sendQmsgRequest(key, qq, msg);
+        const code = await sendPushplusRequest(token, channel, msg);
         restore();
         if (code === 'success') {
-            showToast('✅ 测试通知已发送，请查看QQ消息', 'success', 3500);
+            showToast('✅ 测试已发送，请查看' + chanLabel + '（「' + chanLabel + '服务通知」公众号或 pushplus 机器人）', 'success', 4000);
         } else {
-            showToast(describeQmsgResult(code) || QMSG_ERROR_MSG.unknown, 'error', 4000);
+            showToast(describePushplusResult(code) || PUSHPLUS_ERROR_MSG.unknown, 'error', 4500);
         }
     };
 
     /**
-     * 通过 Qmsg酱 发送消息
-     * 使用 POST + form-urlencoded（更稳定的 CORS 表现）
-     * API 文档: https://qmsg.zendee.cn
-     * @returns {'success'|'auth'|'network'|'unknown'}  失败时细分原因便于诊断
+     * 通过 pushplus 发送一条消息（支持 wechat 微信公众号 或 qq QQ机器人 渠道）。
+     * POST + JSON，接口同时支持 https/http，故不再受混合内容拦截。
+     * 参考：https://www.pushplus.plus/doc/guide/api.html
+     * @returns {'success'|'auth'|'network'|'unknown'|'verify'}  失败时细分原因
      */
-    async function sendQmsgRequest(key, qq, msg) {
-        if (!key) return 'auth';
+    async function sendPushplusRequest(token, channel, content) {
+        if (!token) return 'auth';
+        const url = 'https://www.pushplus.plus/send';
+        const payload = {
+            token: token,
+            title: 'Harry 的聊天室',
+            content: content,
+            channel: channel || 'wechat',
+            template: 'txt'
+        };
         try {
-            const body = new URLSearchParams();
-            body.append('msg', msg);
-            if (qq) body.append('qq', qq);
-            const url = `https://qmsg.zendee.cn/send/${encodeURIComponent(key)}`;
-            let response;
-            try {
-                response = await fetch(url, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-                    body: body.toString()
-                });
-            } catch (corsErr) {
-                // 部分浏览器/网络环境对 CORS POST 也不友好，回退一次 no-cors（无法读响应，按成功处理）
-                console.warn('[Qmsg] POST CORS 失败，回退 no-cors:', corsErr);
-                try {
-                    await fetch(url, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-                        body: body.toString()
-                    });
-                    return 'success';
-                } catch (e2) {
-                    return 'network';
-                }
-            }
+            const response = await fetch(url, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
             if (!response.ok) {
-                // 401/403 多半是 Key 错；5xx 是服务端
-                if (response.status === 401 || response.status === 403 || response.status === 404) return 'auth';
+                if (response.status === 401 || response.status === 403) return 'auth';
                 return 'unknown';
             }
-            const text = await response.text();
-            const data = tryParseJSON(text);
-            if (data) {
-                if (data.success === true) return 'success';
-                if (data.errno === 0 || data.code === 0) return 'success';
-                // 业务失败（key 错、没加好友等）
-                return 'auth';
-            }
-            if (text && /success/i.test(text)) return 'success';
+            const data = await response.json().catch(function() { return null; });
+            if (!data) return 'unknown';
+            if (data.code === 200) return 'success';
+            // pushplus 错误码：905=未实名；902/903=token 无效；其他=业务错
+            if (data.code === 905) return 'verify';
+            if (data.code === 902 || data.code === 903 || data.code === 901) return 'auth';
             return 'unknown';
         } catch (e) {
-            console.error('[Qmsg] 发送异常:', e);
-            return 'network';
+            console.warn('[pushplus] CORS POST 失败，尝试 no-cors 回退:', e);
+            try {
+                await fetch(url, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                return 'success';
+            } catch (e2) {
+                console.error('[pushplus] 发送异常:', e2);
+                return 'network';
+            }
         }
     }
 
-    const QMSG_ERROR_MSG = {
-        auth: '❌ Key 无效或还没加 Qmsg酱 为好友，请检查后重试',
+    const PUSHPLUS_ERROR_MSG = {
+        verify: '❌ 需要先完成「实名认证」（回 pushplus 后台实名后再试）',
+        auth: '❌ Token 无效或该渠道未绑定，请回 pushplus 后台检查',
         network: '❌ 网络异常，请检查网络后重试',
-        unknown: '❌ 发送失败，请稍后再试或检查 Key'
+        unknown: '❌ 发送失败，请稍后再试或检查 pushplus 后台'
     };
 
-    function describeQmsgResult(code) {
-        return code === 'success' ? null : (QMSG_ERROR_MSG[code] || QMSG_ERROR_MSG.unknown);
+    function describePushplusResult(code) {
+        return code === 'success' ? null : (PUSHPLUS_ERROR_MSG[code] || PUSHPLUS_ERROR_MSG.unknown);
     }
 
     function tryParseJSON(str) {
         try { return JSON.parse(str); } catch (e) { return null; }
     }
 
-    function notifyViaQmsg(sender, content) {
-        const enabled = localStorage.getItem('chat_qmsg_enabled') === '1';
+    function notifyViaPushplus(sender, content) {
+        const enabled = localStorage.getItem('chat_pushplus_enabled') === '1';
         if (!enabled) return;
-        const key = localStorage.getItem('chat_qmsg_key') || '';
-        if (!key) return;
+        const token = localStorage.getItem('chat_pushplus_token') || '';
+        if (!token) return;
         const now = Date.now();
-        const lastNotify = parseInt(localStorage.getItem('chat_qmsg_last_notify') || '0', 10);
+        const lastNotify = parseInt(localStorage.getItem('chat_pushplus_last_notify') || '0', 10);
         if (now - lastNotify < 30000) return;
-        const qq = localStorage.getItem('chat_qmsg_qq') || '';
+        const channel = localStorage.getItem('chat_pushplus_channel') || 'wechat';
         const preview = content.length > 80 ? content.slice(0, 80) + '...' : content;
-        const msg = `🔔 [Harry的聊天室] 新消息\n来自：${sender}\n内容：${preview}`;
-        sendQmsgRequest(key, qq, msg).then(code => {
+        const msg = '🔔 [Harry的聊天室] 新消息\n来自：' + sender + '\n内容：' + preview;
+        sendPushplusRequest(token, channel, msg).then(function(code) {
             if (code === 'success') {
-                localStorage.setItem('chat_qmsg_last_notify', String(now));
-            } else if (code === 'auth') {
-                // Key 失效时，给用户一次提示，之后每天最多一次
-                const lastAuthWarn = parseInt(localStorage.getItem('chat_qmsg_auth_warn') || '0', 10);
-                if (now - lastAuthWarn > 86400000) {
-                    localStorage.setItem('chat_qmsg_auth_warn', String(now));
-                    showToast('⚠ QQ通知发送失败：Key 可能已失效，请到设置中重新配置', 'error', 4500);
+                localStorage.setItem('chat_pushplus_last_notify', String(now));
+            } else if (code === 'auth' || code === 'verify') {
+                const lastWarn = parseInt(localStorage.getItem('chat_pushplus_auth_warn') || '0', 10);
+                if (now - lastWarn > 86400000) {
+                    localStorage.setItem('chat_pushplus_auth_warn', String(now));
+                    if (code === 'verify') {
+                        showToast('⚠ 推送失败：pushplus 账号未实名，请到设置中查看', 'error', 5000);
+                    } else {
+                        showToast('⚠ 推送失败：Token 可能失效或渠道未绑定，请到设置中重新配置', 'error', 5000);
+                    }
                 }
             }
         });
