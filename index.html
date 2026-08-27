@@ -228,13 +228,19 @@
         .remember-me input { width: auto; margin: 0; }
 
         /* --- 聊天主容器 --- */
-        #chat-container { 
-            display: flex; flex-direction: column; max-width: 1100px; margin: 0 auto;
+        #chat-container {
+            display: flex; flex-direction: column; max-width: 100%; margin: 0 auto;
             width: 100%; height: 100vh; height: 100dvh; background: transparent; position: relative;
             padding-bottom: env(safe-area-inset-bottom, 0px);
             padding-left: env(safe-area-inset-left, 0px);
             padding-right: env(safe-area-inset-right, 0px);
-            box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 0 0 40px rgba(0,0,0,0.03);
+        }
+        /* 大屏宽度限制，保留适度留白 */
+        @media (min-width: 1280px) {
+            #chat-container { max-width: 1480px; }
+        }
+        @media (min-width: 1920px) {
+            #chat-container { max-width: 1700px; }
         }
 
             /* 跳到最新按钮 */
@@ -260,9 +266,8 @@
         }
         #back-btn { font-size: clamp(21px, 2.4vw, 24px); cursor: pointer; padding: 5px; transition: transform 0.12s; user-select: none; min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--text-main); }
         #back-btn:active { transform: scale(0.88); }
-        #room-title-wrap { position:absolute; left:50%; transform:translateX(-50%); max-width:48%; display:flex; align-items:center; gap:8px; pointer-events:none; }
-        #room-badge { width:26px; height:26px; flex:0 0 26px; border-radius:8px; display:grid; place-items:center; color:#fff; font-size:13px; font-weight:700; background:linear-gradient(135deg,#6366f1,#8b5cf6); box-shadow:0 2px 8px rgba(30,35,70,0.18); }
-        #room-title { max-width:100%; font-weight: 600; font-size: clamp(14px, 1.6vw, 16px); color: var(--text-main); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); }
+        #room-title-wrap { position:absolute; left:50%; transform:translateX(-50%); max-width:48%; display:flex; align-items:center; justify-content:center; gap:8px; pointer-events:none; }
+        #room-title { max-width:100%; font-weight: 600; font-size: clamp(14px, 1.6vw, 16px); color: var(--text-main); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); letter-spacing: 0.01em; }
         .nav-icon { width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 0; margin: 0; background: transparent; color: var(--muted); border: 0; border-radius: 50%; font-size: 24px; font-weight: 400; line-height: 1; cursor: pointer; transition: background 0.12s, color 0.12s, transform 0.12s; display: flex; align-items: center; justify-content: center; }
         .nav-icon:hover { background: var(--chip-bg); color: var(--text-main); }
         .nav-icon:active { transform: scale(0.92); background: var(--chip-bg); }
@@ -338,7 +343,6 @@
             #input-area { padding-left: 10px; padding-right: 10px; padding-bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
             #back-btn { flex: 0 0 44px; min-width: 44px; min-height: 44px; font-size: 27px; line-height: 1; }
             #room-title-wrap { max-width: 42%; }
-            #room-badge { width: 24px; height: 24px; flex: 0 0 24px; border-radius: 7px; font-size: 12px; }
             #nav-bar > div { flex: 0 0 auto; gap: 4px !important; }
             .online-count { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
             .context-menu { min-width: 200px; right: 8px !important; left: auto !important; }
@@ -374,14 +378,23 @@
 
         @media (min-width: 1025px) {
             #chat-box { padding: 24px 40px 28px; }
-            .msg-wrapper { max-width: 65%; }
+            .msg-wrapper { max-width: min(70%, 760px); }
             #message-input { min-height: 48px; }
             #back-btn { font-size: 30px; min-width: 44px; min-height: 44px; }
-            #chat-container { border-radius: 0; }
+            #chat-container { border-radius: 0; max-width: 100%; }
             .action-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 20px; }
             .context-menu { min-width: 180px; }
             .wx-notify-content { max-width: 520px; }
             .update-modal-content { max-width: 440px; }
+            /* 大屏气泡更宽 */
+            @media (min-width: 1280px) {
+                #chat-container { max-width: 1480px; }
+                .msg-wrapper { max-width: min(60%, 820px); }
+            }
+            @media (min-width: 1920px) {
+                #chat-container { max-width: 1700px; }
+                .msg-wrapper { max-width: min(58%, 900px); }
+            }
         }
 
         .sender-name { font-size: 12px; font-weight: 600; margin-bottom: 2px; display: block; opacity: 0.72; }
@@ -1434,7 +1447,6 @@
     <div id="nav-bar">
         <span id="back-btn" onclick="window.leaveRoom()">←</span>
         <div id="room-title-wrap">
-            <div id="room-badge">#</div>
             <span id="room-title">正在加载...</span>
         </div>
         <div class="nav-actions" style="display:flex; gap:10px; align-items:center;">
