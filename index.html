@@ -888,17 +888,22 @@
         .admin-table th { text-align:left; padding:8px 6px; color:var(--muted); font-weight:600; border-bottom:1px solid var(--line); white-space:nowrap; position:sticky; top:-10px; background:var(--surface-solid); }
         .admin-table td { padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-all; }
         .admin-table tr:last-child td { border-bottom:none; }
-        .admin-chip { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; background:var(--chip-bg); color:var(--muted); }
+        .admin-batch-bar { display:none; align-items:center; gap:10px; padding:8px 10px; margin-bottom:8px; background:var(--panel-soft); border:1px solid var(--line); border-radius:10px; font-size:13px; }
+        .admin-batch-bar label { display:flex; align-items:center; gap:6px; cursor:pointer; font-weight:600; }
+        .admin-batch-bar input[type="checkbox"] { width:16px; height:16px; accent-color:var(--btn-bg); }
+        .admin-batch-bar #admin-msg-selected-count { color:var(--muted); font-size:12.5px; }
+        .admin-msg-row { display:flex; align-items:center; gap:8px; padding:8px 6px; border-bottom:1px solid var(--line); font-size:13px; line-height:1.4; }
+        .admin-msg-row:last-child { border-bottom:none; }
+        .admin-msg-row:hover { background:var(--panel-soft); }
+        .admin-msg-check { width:15px; height:15px; flex-shrink:0; accent-color:var(--btn-bg); cursor:pointer; }
+        .admin-msg-sender { font-weight:700; color:var(--btn-color); flex-shrink:0; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .admin-msg-room { font-size:11px; color:var(--muted); background:var(--chip-bg); padding:1px 6px; border-radius:6px; flex-shrink:0; }
+        .admin-chip { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; background:var(--chip-bg); color:var(--muted); flex-shrink:0; }
         .admin-chip.ok { background:#dcfce7; color:#166534; }
         .admin-chip.pending { background:#fef9c3; color:#854d0e; }
         .admin-chip.rejected { background:#fee2e2; color:#991b1b; }
-        .admin-msg-item { padding:9px 6px; border-bottom:1px solid var(--line); font-size:13px; }
-        .admin-msg-item:last-child { border-bottom:none; }
-        .admin-msg-head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:3px; }
-        .admin-msg-sender { font-weight:700; color:var(--btn-color); }
-        .admin-msg-time { font-size:11px; color:var(--muted); }
-        .admin-msg-room { font-size:11px; color:var(--muted); background:var(--chip-bg); padding:1px 7px; border-radius:8px; }
-        .admin-msg-content { color:var(--text-main); line-height:1.55; white-space:pre-wrap; word-break:break-all; }
+        .admin-msg-preview { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--text-main); }
+        .admin-msg-time { font-size:11px; color:var(--muted); flex-shrink:0; white-space:nowrap; }
         .admin-toolbar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
         .admin-toolbar select, .admin-toolbar input { padding:8px 10px; border:1px solid var(--input-border); border-radius:8px; font-size:13px; background:var(--input-bg); color:var(--text-main); outline:none; }
         .admin-toolbar button { padding:8px 14px; background:var(--panel-soft); color:var(--btn-color); border:1px solid var(--line); border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; }
@@ -1066,9 +1071,10 @@
         .admin-user-card { display:flex; align-items:center; gap:12px; padding:10px 8px; border-bottom:1px solid var(--line); }
         .admin-user-card:last-child { border-bottom:none; }
         .admin-user-avatar { flex-shrink:0; width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:700; color:#fff; background:var(--btn-bg); object-fit:cover; }
-        .admin-user-info { flex:1; min-width:0; }
-        .admin-user-name { font-size:14px; font-weight:700; color:var(--text-main); }
-        .admin-user-meta { font-size:11.5px; color:var(--muted); margin-top:2px; }
+        .admin-user-info { flex:1; min-width:0; overflow:hidden; }
+        .admin-user-name { font-size:14px; font-weight:700; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .admin-user-meta { font-size:11.5px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .admin-user-actions { display:flex; gap:6px; flex-shrink:0; }
 
 
         /* 上下文菜单 */
@@ -5863,7 +5869,40 @@
             });
     };
 
-    /** 消息浏览：选房间 + 搜索 + 分页 */
+    /** 删除用户（两步确认，级联删登录日志 + 成员记录 + 消息） */
+    window.adminDeleteUser = function(btn) {
+        if (btn.dataset.armed !== '1') {
+            btn.dataset.armed = '1';
+            btn.textContent = '确认删除?';
+            setTimeout(() => {
+                if (btn.isConnected && btn.dataset.armed === '1') { btn.dataset.armed = ''; btn.textContent = '删除'; }
+            }, 3000);
+            return;
+        }
+        const user = btn.dataset.username;
+        btn.disabled = true; btn.textContent = '删除中…';
+        // 级联删除：登录日志 + 房间成员 + 用户消息 + 用户记录
+        Promise.all([
+            supabaseClient.from('login_logs').delete().eq('username', user),
+            supabaseClient.from('room_members').delete().eq('user_name', user),
+            supabaseClient.from('messages').delete().eq('sender', user)
+        ]).then(() =>
+            supabaseClient.from('users').delete().eq('username', user)
+        ).then(({ error }) => {
+            if (error) {
+                showToast('删除失败：' + (error.message || ''), 'error');
+                btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
+                return;
+            }
+            showToast(`用户 ${user} 已删除`, 'success');
+            window.adminRenderUsers();
+        }).catch(e => {
+            showToast('删除失败：' + (e.message || e), 'error');
+            btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
+        });
+    };
+
+    /** 消息浏览：选房间 + 搜索 + 分页 + 批量勾选删除 */
     function adminInitMessagesTab() {
         const body = document.getElementById('admin-tab-body');
         adminMsgPage = 0;
@@ -5875,6 +5914,12 @@
                 <select id="admin-msg-room" onchange="window.adminMsgFilterChanged()">${options}</select>
                 <input type="text" id="admin-msg-search" placeholder="搜索消息内容…" value="${adminEsc(adminMsgSearch)}" onkeydown="if(event.key==='Enter')window.adminMsgFilterChanged()">
                 <button onclick="window.adminMsgFilterChanged()">查询</button>
+            </div>
+            <div class="admin-batch-bar" id="admin-batch-bar" style="display:none;">
+                <label><input type="checkbox" id="admin-msg-check-all" onchange="window.adminMsgToggleAll(this)"> 全选本页</label>
+                <span id="admin-msg-selected-count">已选 0 条</span>
+                <button class="admin-op danger" onclick="window.adminBatchDeleteMessages()">批量删除</button>
+                <button class="admin-op" onclick="window.adminClearSelection()">取消</button>
             </div>
             <div id="admin-msg-list"></div>
             <button id="admin-msg-more" class="admin-load-more" style="display:none" onclick="window.adminLoadMoreMessages()">加载更多</button>`;
@@ -5892,6 +5937,60 @@
         adminLoadMessagesPage(true);
     };
 
+    window.adminMsgToggleAll = function(cb) {
+        const list = document.getElementById('admin-msg-list');
+        if (!list) return;
+        list.querySelectorAll('.admin-msg-check').forEach(c => c.checked = cb.checked);
+        window.adminUpdateBatchCount();
+    };
+
+    window.adminClearSelection = function() {
+        const list = document.getElementById('admin-msg-list');
+        if (!list) return;
+        list.querySelectorAll('.admin-msg-check').forEach(c => c.checked = false);
+        const bar = document.getElementById('admin-batch-bar');
+        if (bar) bar.style.display = 'none';
+    };
+
+    window.adminUpdateBatchCount = function() {
+        const list = document.getElementById('admin-msg-list');
+        const bar = document.getElementById('admin-batch-bar');
+        if (!list || !bar) return;
+        const checked = list.querySelectorAll('.admin-msg-check:checked').length;
+        if (checked > 0) {
+            bar.style.display = 'flex';
+            document.getElementById('admin-msg-selected-count').textContent = `已选 ${checked} 条`;
+        } else {
+            bar.style.display = 'none';
+        }
+    };
+
+    window.adminBatchDeleteMessages = function() {
+        const list = document.getElementById('admin-msg-list');
+        if (!list) return;
+        const ids = Array.from(list.querySelectorAll('.admin-msg-check:checked')).map(c => Number(c.value));
+        if (!ids.length) { showToast('请先勾选要删除的消息', 'info'); return; }
+        if (!confirm(`确定删除选中的 ${ids.length} 条消息？此操作不可撤销`)) return;
+        showToast(`正在删除 ${ids.length} 条消息…`, 'info', 3000);
+        Promise.all(ids.map(id => supabaseClient.from('messages').delete().eq('id', id)))
+            .then(() => {
+                showToast('批量删除完成', 'success');
+                window.adminClearSelection();
+                // 移除已删节点
+                ids.forEach(id => {
+                    const row = list.querySelector(`.admin-msg-row[data-id="${id}"]`);
+                    if (row) row.remove();
+                });
+                // 如果列表空了，显示空提示
+                if (!list.children.length) {
+                    list.innerHTML = '<div class="admin-empty">没有匹配的消息</div>';
+                    const more = document.getElementById('admin-msg-more');
+                    if (more) more.style.display = 'none';
+                }
+            })
+            .catch(e => showToast('删除失败：' + (e.message || e), 'error'));
+    };
+
     async function adminLoadMessagesPage(append) {
         if (adminLoading) return;
         adminLoading = true;
@@ -5907,15 +6006,14 @@
             const rows = data || [];
             const html = rows.map(m => {
                 const tag = adminMediaTag(m.media_type);
-                return `<div class="admin-msg-item" data-msg-id="${m.id}">
-                    <div class="admin-msg-head">
-                        <span class="admin-msg-sender">${adminEsc(m.sender)}</span>
-                        ${adminMsgRoom ? '' : `<span class="admin-msg-room">${adminEsc(m.room_code)}</span>`}
-                        ${tag ? `<span class="admin-chip">${tag}</span>` : ''}
-                        <span class="admin-msg-time">${adminFmtTime(m.created_at)}</span>
-                        <button class="admin-op danger" style="margin-left:auto;" data-id="${m.id}" onclick="event.stopPropagation();window.adminDeleteMessage(this)">删除</button>
-                    </div>
-                    <div class="admin-msg-content">${adminEsc(stripReplyMetadata(m.content || ''))}${m.media_url && !m.content ? '[媒体消息]' : ''}</div>
+                const preview = adminEsc(stripReplyMetadata(m.content || '')) || (m.media_url ? '[媒体]' : '');
+                return `<div class="admin-msg-row" data-id="${m.id}">
+                    <input type="checkbox" class="admin-msg-check" value="${m.id}" onchange="window.adminUpdateBatchCount()">
+                    <span class="admin-msg-sender">${adminEsc(m.sender)}</span>
+                    ${adminMsgRoom ? '' : `<span class="admin-msg-room">${adminEsc(m.room_code)}</span>`}
+                    ${tag ? `<span class="admin-chip">${tag}</span>` : ''}
+                    <span class="admin-msg-preview">${preview}</span>
+                    <span class="admin-msg-time">${adminFmtTime(m.created_at)}</span>
                 </div>`;
             }).join('');
             if (append) list.insertAdjacentHTML('beforeend', html);
@@ -5964,7 +6062,10 @@
                             <button class="admin-op" onclick="window.adminSavePassword(${i})">保存</button>
                         </div>
                     </div>
-                    <button class="admin-op" onclick="window.adminTogglePwForm(${i})">改密码</button>
+                    <div class="admin-user-actions">
+                        <button class="admin-op" onclick="window.adminTogglePwForm(${i})">改密码</button>
+                        <button class="admin-op danger" data-username="${adminEsc(u.username).replace(/'/g, '&#39;')}" onclick="window.adminDeleteUser(this)">删除</button>
+                    </div>
                 </div>`;
             }).join('');
         } catch (e) {
