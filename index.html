@@ -2211,7 +2211,7 @@
         a.addEventListener('click', () => {
             // 每次点击带新时间戳：让旧 SW 的坏缓存 miss，强制走网络拉完整 APK（旧 SW 不 bypass .apk，靠参数破缓存）
             a.href = base + '?t=' + Date.now();
-            showToast('开始下载安卓 App，约 3MB，请在通知栏查看下载进度', 'info', 4000);
+            showToast('正在下载安卓 App，请等待1-2分钟，在通知栏可查看进度', 'info', 4000);
         });
     })();
 
