@@ -972,9 +972,6 @@
         .mrv-menu-item span:nth-child(2) { flex:1; }
         .mmi-arrow { color:var(--muted); }
         .mmi-danger { color:#ef4444; }
-        a.mrv-menu-item { text-decoration:none; color:var(--text-main); -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
-        a.mrv-menu-item:active { background:var(--chip-bg); }
-        @media (hover:hover) { a.mrv-menu-item:hover { background:var(--chip-bg); } }
         /* 底部导航栏 */
         .mrv-tabbar { flex-shrink:0; display:flex; border-top:1px solid var(--line); background:var(--surface-solid); padding-bottom:env(safe-area-inset-bottom, 0px); }
         .mrv-tab { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 0 6px; border:none; background:transparent; color:var(--muted); font-size:11px; cursor:pointer; }
@@ -1690,7 +1687,7 @@
                     <div class="mrv-me"><b id="mrv-username"></b><span>● 在线</span></div>
                 </div>
                 <div class="mrv-menu">
-                    <a class="mrv-menu-item" id="mrv-apk-download" download="Harry的聊天室.apk"><span class="mmi-icon">📲</span><span>下载安卓 App</span><span class="mmi-arrow">↓</span></a>
+                    <button class="mrv-menu-item" id="mrv-apk-download" onclick="window.downloadApk()"><span class="mmi-icon">📲</span><span>下载安卓 App</span><span class="mmi-arrow">↓</span></button>
                     <button class="mrv-menu-item" onclick="window.openGlobalSettings()"><span class="mmi-icon">⚙</span><span>全局设置</span><span class="mmi-arrow">›</span></button>
                     <button class="mrv-menu-item mmi-danger" onclick="window.doLogout()"><span class="mmi-icon">🚪</span><span>退出登录</span><span class="mmi-arrow">›</span></button>
                 </div>
@@ -2202,13 +2199,55 @@
     }
     setupNativeNotifications();
 
-    // 安卓 APK 下载入口：文件与 index.html 同目录（部署时一起上传），版本号跟随 CHAT_APP_VERSION；在原生 App 内隐藏
+    // 下载安卓 APK：fetch + 实时进度 + 时间戳破 SW 坏缓存，完成后用 Blob URL 触发干净下载
     (function initApkDownloadLink() {
-        const apkLink = document.getElementById('mrv-apk-download');
-        if (!apkLink) return;
-        if (isNativeApp) { apkLink.style.display = 'none'; return; }
-        apkLink.href = 'harry-chat-v' + CHAT_APP_VERSION + '.apk';
+        const btn = document.getElementById('mrv-apk-download');
+        if (!btn) return;
+        if (isNativeApp) { btn.style.display = 'none'; }
     })();
+
+    window.downloadApk = async function() {
+        const btn = document.getElementById('mrv-apk-download');
+        if (!btn || btn.dataset.busy === '1') return;
+        btn.dataset.busy = '1';
+        const original = btn.innerHTML;
+        const fileName = 'Harry的聊天室-v' + CHAT_APP_VERSION + '.apk';
+        // 时间戳参数：让旧 SW 的坏缓存 miss，强制走网络拉完整文件
+        const url = 'harry-chat-v' + CHAT_APP_VERSION + '.apk?t=' + Date.now();
+        btn.innerHTML = '<span class="mmi-icon">⏳</span><span>准备下载…</span><span class="mmi-arrow">↓</span>';
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const total = +(res.headers.get('content-length') || 0);
+            const reader = res.body.getReader();
+            let received = 0;
+            const chunks = [];
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                received += value.length;
+                chunks.push(value);
+                const pct = total ? Math.round(received / total * 100) : 0;
+                btn.innerHTML = '<span class="mmi-icon">⏳</span><span>下载中 ' + pct + '%</span><span class="mmi-arrow">↓</span>';
+            }
+            const blob = new Blob(chunks, { type: 'application/vnd.android.package-archive' });
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+            btn.innerHTML = '<span class="mmi-icon">✓</span><span>下载完成，点击安装</span><span class="mmi-arrow">↓</span>';
+            showToast('下载完成，请在通知栏点击安装', 'success', 4000);
+            setTimeout(() => { btn.innerHTML = original; btn.dataset.busy = ''; }, 8000);
+        } catch (e) {
+            showToast('下载失败：' + (e.message || e) + '，请稍后重试', 'error', 4000);
+            btn.innerHTML = original;
+            btn.dataset.busy = '';
+        }
+    };
 
     function showRoomLoading() {
         document.getElementById('login-area').style.display = 'none';
