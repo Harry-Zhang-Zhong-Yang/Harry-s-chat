@@ -1,4 +1,4 @@
-const CACHE_NAME = 'harrys-chat-v6';
+const CACHE_NAME = 'harrys-chat-v29';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -73,7 +73,6 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
     if (url.hostname.includes('supabase')) return;
     if (url.hostname.includes('api.qrserver.com')) return;
-    if (url.hostname.includes('wxpusher.zjiecode.com')) return;
     if (url.hostname.includes('cdn.jsdelivr.net')) {
         event.respondWith(
             caches.match(event.request).then((cached) => {
@@ -105,24 +104,19 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    if (STATIC_ASSETS.some(asset => url.pathname.endsWith(asset) || url.pathname === asset)) {
-        event.respondWith(
-            caches.match(event.request).then((cached) => {
+    // 其余静态资源：stale-while-revalidate —— 立即返回缓存（快），同时后台拉新版更新缓存（保证下次打开是最新）
+    event.respondWith(
+        caches.open(CACHE_NAME).then((cache) => {
+            return cache.match(event.request).then((cached) => {
                 const fetchPromise = fetch(event.request).then((response) => {
                     if (response && response.status === 200) {
-                        const clone = response.clone();
-                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                        cache.put(event.request, response.clone());
                     }
                     return response;
                 }).catch(() => cached);
                 return cached || fetchPromise;
-            })
-        );
-        return;
-    }
-
-    event.respondWith(
-        caches.match(event.request).then((cached) => cached || fetch(event.request))
+            });
+        })
     );
 });
 
