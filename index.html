@@ -862,12 +862,28 @@
         .admin-modal.show { display:flex; }
         .admin-login-view { flex:1; display:flex; align-items:center; justify-content:center; padding:16px; }
         .admin-login-card { background:var(--surface-solid); color:var(--text-main); border:1px solid var(--line); border-radius:16px; padding:24px 20px; width:92%; max-width:360px; box-shadow:0 12px 40px rgba(0,0,0,0.15); }
-        .admin-main-view { flex:1; display:flex; flex-direction:column; max-width:1100px; width:100%; margin:0 auto; padding:14px 14px 0; box-sizing:border-box; min-height:0; }
-        .admin-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-shrink:0; }
-        .admin-tabs { display:flex; gap:6px; overflow-x:auto; flex-shrink:0; padding-bottom:10px; }
-        .admin-tab { flex-shrink:0; padding:8px 14px; background:var(--panel-soft); color:var(--muted); border:1px solid var(--line); border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; }
-        .admin-tab.active { background:var(--btn-bg); color:#fff; border-color:var(--btn-bg); }
-        .admin-tab-body { flex:1; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:14px; min-height:0; }
+        /* 桌面端：左侧栏 + 右侧内容 */
+        .admin-main-view { flex:1; display:flex; min-height:0; overflow:hidden; }
+        .admin-sidebar { width:220px; flex-shrink:0; display:flex; flex-direction:column; background:var(--surface-solid); border-right:1px solid var(--line); padding:16px 0; }
+        .admin-sidebar-head { display:flex; align-items:center; gap:10px; padding:0 16px 18px; border-bottom:1px solid var(--line); margin-bottom:12px; }
+        .admin-logo { font-size:22px; }
+        .admin-title { font-size:16px; font-weight:700; color:var(--text-main); }
+        .admin-nav { flex:1; display:flex; flex-direction:column; padding:0 8px; gap:2px; overflow-y:auto; }
+        .admin-nav-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border:none; background:transparent; color:var(--muted); border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; text-align:left; transition:background .15s,color .15s; }
+        .admin-nav-item:hover { background:var(--panel-soft); color:var(--text-main); }
+        .admin-nav-item.active { background:var(--btn-bg); color:#fff; }
+        .admin-nav-item .ani-icon { font-size:17px; width:22px; text-align:center; }
+        .admin-sidebar-foot { padding:10px; border-top:1px solid var(--line); display:flex; flex-direction:column; gap:6px; }
+        .admin-foot-btn { padding:9px 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel-soft); color:var(--text-main); font-size:13px; font-weight:600; cursor:pointer; }
+        .admin-foot-btn.danger { color:#dc2626; }
+        .admin-content { flex:1; display:flex; flex-direction:column; min-width:0; overflow:hidden; padding:14px; box-sizing:border-box; }
+        .admin-tab-body { flex:1; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; padding:14px; min-height:0; }
+        /* 手机端底部 tabbar */
+        .admin-tabbar { display:none; flex-shrink:0; flex-direction:row; background:var(--surface-solid); border-top:1px solid var(--line); padding:6px 0 env(safe-area-inset-bottom, 6px); }
+        .admin-tab-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 0; border:none; background:transparent; color:var(--muted); font-size:11px; cursor:pointer; }
+        .admin-tab-item.active { color:var(--btn-bg); }
+        .admin-tab-item > span:first-child { font-size:20px; line-height:1; }
+        /* 通用元素 */
         .admin-table { width:100%; border-collapse:collapse; font-size:12.5px; color:var(--text-main); }
         .admin-table th { text-align:left; padding:8px 6px; color:var(--muted); font-weight:600; border-bottom:1px solid var(--line); white-space:nowrap; position:sticky; top:-10px; background:var(--surface-solid); }
         .admin-table td { padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-all; }
@@ -896,12 +912,12 @@
         .admin-back-btn { padding:6px 12px; background:var(--panel-soft); color:var(--btn-color); border:1px solid var(--line); border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; }
         .admin-pw-form { display:flex; gap:6px; margin-top:8px; }
         .admin-pw-form input { flex:1; min-width:0; padding:7px 10px; margin:0; border:1px solid var(--input-border); border-radius:8px; font-size:12.5px; background:var(--input-bg); color:var(--text-main); outline:none; }
-        @media (max-width:600px) {
-            .admin-main-view { padding:10px 10px 0; }
-        }
-        /* 后台管理 · 手机端专用布局（表格变卡片、竖排工具栏、加大触控） */
+        /* 手机端（<768px）：隐藏侧栏，显示底部 tabbar + 表格变卡片 */
         @media (max-width:767px) {
-            .admin-tab { padding:10px 18px; font-size:14px; }
+            .admin-main-view { flex-direction:column; }
+            .admin-sidebar { display:none; }
+            .admin-tabbar { display:flex; }
+            .admin-content { flex:1; padding:10px 8px 0; overflow:hidden; }
             .admin-tab-body { padding:8px; }
             .admin-toolbar { flex-direction:column; align-items:stretch; }
             .admin-toolbar select, .admin-toolbar input, .admin-toolbar button { width:100%; box-sizing:border-box; }
@@ -909,8 +925,8 @@
             .admin-table thead { display:none; }
             .admin-table, .admin-table tbody { display:block; width:100%; }
             .admin-table tr { display:block; background:var(--panel-soft); border:1px solid var(--line); border-radius:12px; padding:8px 12px; margin-bottom:8px; }
-            .admin-table td { display:flex; align-items:baseline; gap:8px; border-bottom:none; padding:5px 0; font-size:13.5px; }
-            .admin-table td::before { content:attr(data-label); flex-shrink:0; min-width:58px; color:var(--muted); font-size:12px; font-weight:600; }
+            .admin-table td { display:flex; align-items:center; gap:8px; border-bottom:none; padding:5px 0; font-size:13.5px; flex-wrap:wrap; }
+            .admin-table td::before { content:attr(data-label); flex-shrink:0; min-width:auto; background:var(--line); color:var(--muted); font-size:11px; font-weight:600; padding:1px 6px; border-radius:6px; }
             .admin-op { padding:8px 14px; font-size:13px; }
             .admin-back-btn { padding:8px 14px; font-size:13px; }
             .admin-load-more { padding:12px; font-size:13.5px; }
@@ -1006,7 +1022,9 @@
         .sidebar-room-item .sri-text b { font-size:14px; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .sidebar-room-item .sri-text small { font-size:11px; color:var(--muted); }
         .sidebar-room-item .sri-arrow { flex-shrink:0; color:var(--muted); font-size:13px; }
-        .sidebar-room-item.active .sri-arrow { color:#fff; }
+    .sidebar-room-item.active .sri-arrow { color:#fff; }
+    .sidebar-room-item .sri-time { flex-shrink:0; font-size:11px; color:var(--muted); white-space:nowrap; }
+    .sidebar-room-item.active .sri-time { color:rgba(255,255,255,.7); }
         .sidebar-empty { text-align:center; color:var(--muted); font-size:12.5px; padding:28px 12px; line-height:1.9; }
         .skeleton-item { height:44px; border-radius:10px; margin:6px 2px; background:linear-gradient(90deg, var(--chip-bg, #eef0f5) 25%, var(--surface-solid, #f8f9fc) 50%, var(--chip-bg, #eef0f5) 75%); background-size:200% 100%; animation:skel 1.1s infinite; }
         @keyframes skel { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
@@ -2008,21 +2026,34 @@
     </div>
     <!-- 面板主体 -->
     <div id="admin-main-view" class="admin-main-view" style="display:none;">
-        <div class="admin-header">
-            <h3 style="margin:0;font-size:17px;">后台管理</h3>
-            <div style="display:flex;gap:8px;">
-                <button onclick="window.adminReload()" style="padding:6px 12px;background:var(--panel-soft);color:var(--btn-color);border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;">刷新</button>
-                <button onclick="window.adminLogout()" style="padding:6px 12px;background:var(--panel-soft);color:var(--muted);border:1px solid var(--line);border-radius:8px;font-size:12.5px;cursor:pointer;">退出</button>
-                <button onclick="window.closeAdminPanel()" style="padding:6px 12px;background:transparent;color:var(--muted);border:none;font-size:18px;cursor:pointer;">✕</button>
+        <!-- 桌面端左侧栏（≥768px） -->
+        <aside class="admin-sidebar">
+            <div class="admin-sidebar-head">
+                <span class="admin-logo">⚙️</span>
+                <span class="admin-title">后台管理</span>
             </div>
-        </div>
-        <div class="admin-tabs">
-            <button class="admin-tab active" data-tab="rooms" onclick="window.adminSwitchTab('rooms')">房间</button>
-            <button class="admin-tab" data-tab="users" onclick="window.adminSwitchTab('users')">用户</button>
-            <button class="admin-tab" data-tab="messages" onclick="window.adminSwitchTab('messages')">消息</button>
-            <button class="admin-tab" data-tab="login-logs" onclick="window.adminSwitchTab('login-logs')">登录日志</button>
-        </div>
-        <div id="admin-tab-body" class="admin-tab-body"></div>
+            <nav class="admin-nav">
+                <button class="admin-nav-item active" data-tab="rooms" onclick="window.adminSwitchTab('rooms')"><span class="ani-icon">🏠</span><span>房间</span></button>
+                <button class="admin-nav-item" data-tab="users" onclick="window.adminSwitchTab('users')"><span class="ani-icon">👥</span><span>用户</span></button>
+                <button class="admin-nav-item" data-tab="messages" onclick="window.adminSwitchTab('messages')"><span class="ani-icon">💬</span><span>消息</span></button>
+                <button class="admin-nav-item" data-tab="login-logs" onclick="window.adminSwitchTab('login-logs')"><span class="ani-icon">📋</span><span>日志</span></button>
+            </nav>
+            <div class="admin-sidebar-foot">
+                <button onclick="window.adminReload()" class="admin-foot-btn">🔄 刷新</button>
+                <button onclick="window.adminLogout()" class="admin-foot-btn danger">🚪 退出</button>
+            </div>
+        </aside>
+        <!-- 主内容区 -->
+        <main class="admin-content">
+            <div id="admin-tab-body" class="admin-tab-body"></div>
+        </main>
+        <!-- 手机端底部 tabbar（<768px） -->
+        <nav class="admin-tabbar">
+            <button class="admin-tab-item active" data-tab="rooms" onclick="window.adminSwitchTab('rooms')"><span>🏠</span><span>房间</span></button>
+            <button class="admin-tab-item" data-tab="users" onclick="window.adminSwitchTab('users')"><span>👥</span><span>用户</span></button>
+            <button class="admin-tab-item" data-tab="messages" onclick="window.adminSwitchTab('messages')"><span>💬</span><span>消息</span></button>
+            <button class="admin-tab-item" data-tab="login-logs" onclick="window.adminSwitchTab('login-logs')"><span>📋</span><span>日志</span></button>
+        </nav>
     </div>
 </div>
 
@@ -2260,7 +2291,9 @@
                 listEl.innerHTML = '<div class="sidebar-empty">还没有加入任何房间<br>点击顶部 ＋ 加入或创建</div>';
                 return;
             }
-            // 并行拉取：房间名 + 每个房间的成员数（一次 in 查询客户端计数）
+            const joinedAt = {};
+            (data || []).forEach(r => { if (!(r.room_code in joinedAt)) joinedAt[r.room_code] = r.created_at; });
+            // 并行拉取：房间名 + 每个房间的成员数
             const nameMap = {};
             const countMap = {};
             try {
@@ -2271,7 +2304,15 @@
                 (roomsRes.data || []).forEach(r => { if (r.room_name) nameMap[r.room_code] = r.room_name; });
                 (membersRes.data || []).forEach(m => { countMap[m.room_code] = (countMap[m.room_code] || 0) + 1; });
             } catch (e) { /* 表不可用时忽略 */ }
-            sidebarRoomsData = codes.map(c => ({ code: c, name: nameMap[c] || c, memberCount: countMap[c] || 1 }));
+            // 每个房间取最新一条消息（用于排序 + 预览，和手机端逻辑一致）
+            const latestMap = {};
+            await Promise.all(codes.map(c =>
+                supabaseClient.from('messages').select('sender,content,media_type,created_at')
+                    .eq('room_code', c).order('created_at', { ascending: false }).limit(1)
+                    .then(res => { if (res.data && res.data[0]) latestMap[c] = res.data[0]; })
+                    .catch(() => {})
+            ));
+            sidebarRoomsData = codes.map(c => ({ code: c, name: nameMap[c] || c, memberCount: countMap[c] || 1, latest: latestMap[c] || null, joinedAt: joinedAt[c] }));
             renderSidebarList();
         } catch (e) {
             console.warn('侧栏房间加载失败:', e);
@@ -2283,18 +2324,30 @@
         const listEl = document.getElementById('sidebar-room-list');
         if (!listEl) return;
         const kw = (document.getElementById('sidebar-search')?.value || '').trim().toLowerCase();
-        const rows = kw
+        let rows = kw
             ? sidebarRoomsData.filter(r => r.code.toLowerCase().includes(kw) || r.name.toLowerCase().includes(kw))
-            : sidebarRoomsData;
+            : [...sidebarRoomsData];
         if (!rows.length) {
             listEl.innerHTML = `<div class="sidebar-empty">${kw ? '没有匹配的房间' : '还没有加入任何房间<br>点击顶部 ＋ 加入或创建'}</div>`;
             return;
         }
-        listEl.innerHTML = rows.map(r => `
+        // 排序：有最新消息的按时间倒序；没消息的按加入时间倒序排在后面（和手机端一致）
+        rows.sort((a, b) => {
+            const ta = a.latest ? new Date(a.latest.created_at).getTime() : 0;
+            const tb = b.latest ? new Date(b.latest.created_at).getTime() : 0;
+            if (ta !== tb) return tb - ta;
+            return new Date(b.joinedAt || 0) - new Date(a.joinedAt || 0);
+        });
+        listEl.innerHTML = rows.map(r => {
+            const m = r.latest;
+            const preview = m ? `${m.sender}: ${mrvPreviewText(m)}` : `${r.memberCount ? r.memberCount + ' 名成员 · ' : ''}${escapeHtml(r.code)}`;
+            const time = m ? mrvFmtTime(m.created_at) : '';
+            return `
             <div class="sidebar-room-item ${r.code === currentRoomCode ? 'active' : ''}" onclick="window.switchToRoom('${escapeHtml(r.code).replace(/'/g, '&#39;')}')">
-                <span class="sri-text"><b>${escapeHtml(r.name)}</b><small>${r.memberCount ? r.memberCount + ' 名成员 · ' : ''}${escapeHtml(r.code)}</small></span>
-                <span class="sri-arrow">›</span>
-            </div>`).join('');
+                <span class="sri-text"><b>${escapeHtml(r.name)}</b><small>${escapeHtml(preview)}</small></span>
+                ${time ? `<span class="sri-time">${time}</span>` : '<span class="sri-arrow">›</span>'}
+            </div>`;
+        }).join('');
     }
 
     window.filterSidebarRooms = function() { renderSidebarList(); };
@@ -5672,7 +5725,9 @@
 
     window.adminSwitchTab = function(tab) {
         adminTab = tab;
-        document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        // 同时更新桌面端侧栏和手机端底部 tabbar 的 active 状态
+        document.querySelectorAll('.admin-nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        document.querySelectorAll('.admin-tab-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
         const body = document.getElementById('admin-tab-body');
         body.innerHTML = '<div class="admin-empty">加载中…</div>';
         if (tab === 'rooms') adminRenderRooms();
@@ -5694,7 +5749,7 @@
             body.innerHTML = '<table class="admin-table"><thead><tr><th>房间号</th><th>房间名称</th><th>成员数</th><th>操作</th></tr></thead><tbody>' +
                 adminRoomsCache.map(r =>
                     `<tr><td data-label="房间号"><b>${adminEsc(r.room_code)}</b></td><td data-label="名称">${adminEsc(r.room_name || '-')}</td><td data-label="成员">${memberCount[r.room_code] || 0} 人</td>` +
-                    `<td data-label="管理"><button class="admin-op" onclick="window.adminOpenRoomMembers('${adminEsc(r.room_code).replace(/'/g, '&#39;')}')">成员管理</button></td></tr>`
+                    `<td data-label="管理"><button class="admin-op" onclick="window.adminOpenRoomMembers('${adminEsc(r.room_code).replace(/'/g, '&#39;')}')">成员管理</button> <button class="admin-op danger" data-code="${adminEsc(r.room_code).replace(/'/g, '&#39;')}" onclick="window.adminDeleteRoom(this)">删除</button></td></tr>`
                 ).join('') +
                 '</tbody></table>';
             if (!adminRoomsCache.length) body.innerHTML = '<div class="admin-empty">暂无房间</div>';
@@ -5750,6 +5805,64 @@
             });
     };
 
+    /** 删除房间（两步确认，级联删消息和成员） */
+    window.adminDeleteRoom = function(btn) {
+        if (btn.dataset.armed !== '1') {
+            btn.dataset.armed = '1';
+            btn.textContent = '确认删除?';
+            setTimeout(() => {
+                if (btn.isConnected && btn.dataset.armed === '1') { btn.dataset.armed = ''; btn.textContent = '删除'; }
+            }, 3000);
+            return;
+        }
+        const code = btn.dataset.code;
+        btn.disabled = true; btn.textContent = '删除中…';
+        // 级联删除：先删消息、再删成员、最后删房间
+        Promise.all([
+            supabaseClient.from('messages').delete().eq('room_code', code),
+            supabaseClient.from('room_members').delete().eq('room_code', code)
+        ]).then(() =>
+            supabaseClient.from('rooms').delete().eq('room_code', code)
+        ).then(({ error }) => {
+            if (error) {
+                showToast('删除失败：' + (error.message || ''), 'error');
+                btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
+                return;
+            }
+            showToast(`房间 ${code} 已删除`, 'success');
+            window.adminRenderRooms();
+        }).catch(e => {
+            showToast('删除失败：' + (e.message || e), 'error');
+            btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
+        });
+    };
+
+    /** 删除单条消息（两步确认） */
+    window.adminDeleteMessage = function(btn) {
+        if (btn.dataset.armed !== '1') {
+            btn.dataset.armed = '1';
+            btn.textContent = '确认删除?';
+            setTimeout(() => {
+                if (btn.isConnected && btn.dataset.armed === '1') { btn.dataset.armed = ''; btn.textContent = '删除'; }
+            }, 3000);
+            return;
+        }
+        const id = btn.dataset.id;
+        btn.disabled = true; btn.textContent = '删除中…';
+        supabaseClient.from('messages').delete().eq('id', id)
+            .then(({ error }) => {
+                if (error) {
+                    showToast('删除失败：' + (error.message || ''), 'error');
+                    btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
+                    return;
+                }
+                showToast('消息已删除', 'success');
+                // 从列表移除
+                const item = btn.closest('.admin-msg-item');
+                if (item) item.remove();
+            });
+    };
+
     /** 消息浏览：选房间 + 搜索 + 分页 */
     function adminInitMessagesTab() {
         const body = document.getElementById('admin-tab-body');
@@ -5794,14 +5907,15 @@
             const rows = data || [];
             const html = rows.map(m => {
                 const tag = adminMediaTag(m.media_type);
-                return `<div class="admin-msg-item">
+                return `<div class="admin-msg-item" data-msg-id="${m.id}">
                     <div class="admin-msg-head">
                         <span class="admin-msg-sender">${adminEsc(m.sender)}</span>
                         ${adminMsgRoom ? '' : `<span class="admin-msg-room">${adminEsc(m.room_code)}</span>`}
                         ${tag ? `<span class="admin-chip">${tag}</span>` : ''}
                         <span class="admin-msg-time">${adminFmtTime(m.created_at)}</span>
+                        <button class="admin-op danger" style="margin-left:auto;" data-id="${m.id}" onclick="event.stopPropagation();window.adminDeleteMessage(this)">删除</button>
                     </div>
-                    <div class="admin-msg-content">${adminEsc(m.content || '')}${m.media_url && !m.content ? '[媒体消息]' : ''}</div>
+                    <div class="admin-msg-content">${adminEsc(stripReplyMetadata(m.content || ''))}${m.media_url && !m.content ? '[媒体消息]' : ''}</div>
                 </div>`;
             }).join('');
             if (append) list.insertAdjacentHTML('beforeend', html);
