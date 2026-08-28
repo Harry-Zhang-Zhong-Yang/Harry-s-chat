@@ -214,19 +214,25 @@
         }
         @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         #login-area { position: fixed; inset: 0; background: var(--app-bg); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; transition: opacity 0.25s ease, background 0.3s ease; }
-        .login-box { width: 100%; max-width: 380px; padding: 34px; background: var(--surface); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--surface-border); border-radius: 16px; box-shadow: 0 12px 35px rgba(32,33,36,0.08); }
-        .login-box h2 { margin-bottom: 26px; text-align: center; color: var(--text-main); font-size: 22px; letter-spacing: -0.02em; font-family: var(--font-display); }
         input:not([type="radio"]):not([type="checkbox"]) { width: 100%; padding: 13px 14px; margin: 8px 0; border: 1px solid var(--input-border); border-radius: 9px; font-size: 16px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: var(--input-bg); color: var(--text-main); }
         input[type="radio"], input[type="checkbox"] { width: auto; height: auto; min-width: 0; min-height: 0; margin: 0; padding: 0; accent-color: var(--btn-color); cursor: pointer; flex-shrink: 0; }
         input::placeholder { color: var(--muted); opacity: 0.8; }
         input:focus { border-color: var(--btn-color); box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
+
+        /* 设置面板-房间成员（微信聊天信息风格） */
+        .members-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 6px; margin-top: 4px; }
+        .member-cell { display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; min-width: 0; }
+        .member-cell:active { opacity: 0.75; }
+        .member-ava-wrap { position: relative; width: 46px; height: 46px; }
+        .member-ava-wrap .message-avatar { width: 46px !important; height: 46px !important; flex: none; font-size: 17px !important; border-radius: 10px !important; }
+        .member-online-dot { position: absolute; right: -1px; bottom: -1px; width: 12px; height: 12px; border-radius: 50%; background: #22c55e; border: 2px solid var(--surface-solid); display: none; }
+        .member-cell.online .member-online-dot { display: block; }
+        .member-name { max-width: 100%; font-size: 11.5px; color: var(--text-main); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        @media (max-width:400px) { .members-grid { grid-template-columns: repeat(4, 1fr); gap: 10px 4px; } .member-ava-wrap { width: 42px; height: 42px; } .member-ava-wrap .message-avatar { width: 42px !important; height: 42px !important; font-size: 15px !important; } }
         button { width: 100%; padding: 13px 14px; background: var(--btn-bg); color: white; border: none; border-radius: 9px; font-size: 15px; cursor: pointer; margin-top: 15px; font-weight: 600; transition: opacity 0.2s, transform 0.2s; min-height: 44px; }
         button:active { opacity: 0.8; transform: scale(0.98); }
         button:disabled { opacity: 0.55; cursor: not-allowed; }
         button:focus-visible { outline: 2px solid var(--btn-color); outline-offset: 2px; }
-
-        .remember-me { display: flex; align-items: center; gap: 8px; margin-top: -5px; margin-bottom: 15px; font-size: 14px; color: var(--muted); cursor: pointer; }
-        .remember-me input { width: auto; margin: 0; }
 
         /* --- 聊天主容器 --- */
         #chat-container {
@@ -266,7 +272,8 @@
         .loading-spinner { width:28px; height:28px; border:3px solid var(--line); border-top-color:var(--btn-color); border-radius:50%; animation:spin .8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        #nav-bar { 
+        #nav-bar {
+            position: relative;
             min-height: clamp(52px, 7vh, 62px); height: calc(clamp(52px, 7vh, 62px) + env(safe-area-inset-top, 0px)); background: var(--surface); backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-bottom: 1px solid var(--surface-border); display: flex; align-items: center; 
@@ -410,18 +417,6 @@
         .apply-card button.apply-back:hover { background: var(--surface-solid); }
         .apply-card button.apply-reapply { width:100%; padding:11px; background: var(--btn-bg); color:white; border:0; border-radius: 9px; font-size:14px; font-weight:600; cursor:pointer; margin-top:8px; }
 
-        /* 登录区提示条：不是房间成员 */
-        .login-notice {
-            margin: -10px 0 18px;
-            padding: 10px 12px;
-            background: #fff7e6;
-            border: 1px solid #ffd591;
-            border-radius: 10px;
-            font-size: 12.5px;
-            color: #874800;
-            line-height: 1.55;
-        }
-        .login-notice b { color: #5a3d12; }
         .left .msg-content { background: var(--msg-others-bg); color: var(--msg-others-text); border: 1px solid var(--msg-others-border); border-radius: var(--radius-other); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
         .right .msg-content { background: var(--bubble-bg); color: var(--bubble-text); border: none; border-radius: var(--radius-self); box-shadow: var(--bubble-shadow); }
         .msg-wrapper.media-only .msg-content { padding:0; border:0; background:transparent; box-shadow:none; }
@@ -442,8 +437,6 @@
             .context-menu button { font-size:16px; padding:12px 14px; min-height: 44px; }
             .action-btn { width: 40px; height: 40px; min-width: 40px; min-height: 40px; padding: 6px; font-size: 18px; }
             #message-input { font-size: 16px; }
-            .login-box { padding: 24px 20px; border-radius: 0; max-width: 100%; }
-            .login-box h2 { font-size: 19px; margin-bottom: 20px; }
             input { padding: 14px 15px; font-size: 16px; min-height: 44px; }
             button { padding: 14px; font-size: 16px; min-height: 44px; }
             .settings-header h3 { font-size: 16px; }
@@ -454,7 +447,7 @@
             .message-avatar { width: 28px; height: 28px; flex: 0 0 28px; font-size: 11px; }
             .sender-name { font-size: 11px; }
             .msg-content { font-size: 15px; }
-            #install-popup > div { width: 94% !important; padding: 16px !important; }
+
             body { position: fixed; }
             .nav-icon { width: 40px; height: 40px; min-width: 40px; min-height: 40px; font-size: 22px; }
             .update-modal-content { padding: 20px 16px !important; width: 92% !important; }
@@ -477,7 +470,6 @@
             #chat-container { border-radius: 0; max-width: 100%; }
             .action-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 20px; }
             .context-menu { min-width: 180px; }
-            .wx-notify-content { max-width: 520px; }
             .update-modal-content { max-width: 440px; }
             /* 大屏气泡更宽 */
             @media (min-width: 1280px) {
@@ -861,36 +853,183 @@
         .switch input:checked + .switch-track::after { transform:translateX(20px); }
         .setting-item label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 8px; }
 
-        .wx-notify-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 5000; padding: env(safe-area-inset-top, 16px) env(safe-area-inset-right, 16px) env(safe-area-inset-bottom, 16px) env(safe-area-inset-left, 16px); }
-        .wx-notify-modal.show { display: flex; }
-        .wx-notify-content { background: var(--surface-solid); color: var(--text-main); padding: 24px; border-radius: 16px; width: 90%; max-width: 400px; max-height: 85vh; max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-        /* QQ通知配置图文教程 */
-        .push-guide { background:var(--panel-soft); border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:16px; }
-        .push-guide-title { font-size:13px; font-weight:700; color:var(--text-main); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
-        .push-steps { display:flex; flex-direction:column; gap:12px; }
-        .push-step { background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; padding:12px; }
-        .push-step-head { display:flex; align-items:center; gap:9px; margin-bottom:7px; }
-        .push-step-num { flex-shrink:0; width:24px; height:24px; background:var(--btn-bg); color:#fff; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
-        .push-step-title { font-size:13.5px; font-weight:700; color:var(--text-main); line-height:1.35; }
-        .push-step-text { font-size:12.5px; color:var(--muted); line-height:1.7; }
-        .push-step-text b { color:var(--text-main); }
-        .push-step-tips { display:flex; flex-direction:column; gap:2px; margin-top:6px; }
-        .push-tip { font-size:11.5px; color:var(--muted); line-height:1.55; }
-        .push-tip::before { content:'✦ '; color:var(--btn-color); }
-        .push-fig { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:var(--panel-soft); margin-top:9px; }
-        .push-fig svg { display:block; width:100%; height:auto; }
-        .push-fig-cap { font-size:10.5px; color:var(--muted); text-align:center; padding:5px 8px; background:var(--surface-solid); border-top:1px dashed var(--line); }
-        .push-faq { border:1px solid var(--line); border-radius:12px; overflow:hidden; }
-        .push-faq summary { list-style:none; cursor:pointer; padding:11px 14px; font-size:12.5px; font-weight:700; color:var(--text-main); background:var(--panel-soft); display:flex; align-items:center; gap:6px; }
-        .push-faq summary::-webkit-details-marker { display:none; }
-        .push-faq summary::after { content:'▾'; margin-left:auto; color:var(--muted); transition:.2s; }
-        .push-faq[open] summary::after { transform:rotate(180deg); }
-        .push-faq-body { padding:4px 14px 12px; display:flex; flex-direction:column; gap:9px; }
-        .push-faq-item { font-size:12px; color:var(--muted); line-height:1.65; }
-        .push-faq-item b { color:var(--text-main); display:block; margin-bottom:1px; }
         .setting-item input { width: 100%; padding: 10px; border: 1px solid var(--input-border); border-radius: 8px; }
         .settings-search-button { margin:0 0 22px; background:var(--chip-bg); color:var(--text-main); border:1px solid var(--line); text-align:left; font-weight:500; }
         .settings-search-button:hover { background:var(--chip-bg); filter:brightness(0.96); }
+
+        /* ========== 后台管理面板 ========== */
+        .admin-modal { position:fixed; inset:0; z-index:9500; background:var(--bg-color, #f7f8fa); display:none; flex-direction:column; overflow:hidden; }
+        .admin-modal.show { display:flex; }
+        .admin-login-view { flex:1; display:flex; align-items:center; justify-content:center; padding:16px; }
+        .admin-login-card { background:var(--surface-solid); color:var(--text-main); border:1px solid var(--line); border-radius:16px; padding:24px 20px; width:92%; max-width:360px; box-shadow:0 12px 40px rgba(0,0,0,0.15); }
+        .admin-main-view { flex:1; display:flex; flex-direction:column; max-width:1100px; width:100%; margin:0 auto; padding:14px 14px 0; box-sizing:border-box; min-height:0; }
+        .admin-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-shrink:0; }
+        .admin-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; flex-shrink:0; }
+        .admin-stat-card { background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; padding:10px 8px; text-align:center; }
+        .admin-stat-num { font-size:20px; font-weight:700; color:var(--btn-color); }
+        .admin-stat-label { font-size:11.5px; color:var(--muted); margin-top:2px; }
+        .admin-tabs { display:flex; gap:6px; overflow-x:auto; flex-shrink:0; padding-bottom:10px; }
+        .admin-tab { flex-shrink:0; padding:8px 14px; background:var(--panel-soft); color:var(--muted); border:1px solid var(--line); border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; }
+        .admin-tab.active { background:var(--btn-bg); color:#fff; border-color:var(--btn-bg); }
+        .admin-tab-body { flex:1; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; padding:10px; margin-bottom:14px; min-height:0; }
+        .admin-table { width:100%; border-collapse:collapse; font-size:12.5px; color:var(--text-main); }
+        .admin-table th { text-align:left; padding:8px 6px; color:var(--muted); font-weight:600; border-bottom:1px solid var(--line); white-space:nowrap; position:sticky; top:-10px; background:var(--surface-solid); }
+        .admin-table td { padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; word-break:break-all; }
+        .admin-table tr:last-child td { border-bottom:none; }
+        .admin-chip { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; background:var(--chip-bg); color:var(--muted); }
+        .admin-chip.ok { background:#dcfce7; color:#166534; }
+        .admin-chip.pending { background:#fef9c3; color:#854d0e; }
+        .admin-chip.rejected { background:#fee2e2; color:#991b1b; }
+        .admin-msg-item { padding:9px 6px; border-bottom:1px solid var(--line); font-size:13px; }
+        .admin-msg-item:last-child { border-bottom:none; }
+        .admin-msg-head { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:3px; }
+        .admin-msg-sender { font-weight:700; color:var(--btn-color); }
+        .admin-msg-time { font-size:11px; color:var(--muted); }
+        .admin-msg-room { font-size:11px; color:var(--muted); background:var(--chip-bg); padding:1px 7px; border-radius:8px; }
+        .admin-msg-content { color:var(--text-main); line-height:1.55; white-space:pre-wrap; word-break:break-all; }
+        .admin-toolbar { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; align-items:center; }
+        .admin-toolbar select, .admin-toolbar input { padding:8px 10px; border:1px solid var(--input-border); border-radius:8px; font-size:13px; background:var(--input-bg); color:var(--text-main); outline:none; }
+        .admin-toolbar button { padding:8px 14px; background:var(--panel-soft); color:var(--btn-color); border:1px solid var(--line); border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; }
+        .admin-load-more { display:block; width:100%; margin-top:10px; padding:10px; background:var(--panel-soft); color:var(--btn-color); border:1px solid var(--line); border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; }
+        .admin-empty { text-align:center; color:var(--muted); font-size:13px; padding:30px 0; }
+        .admin-error { text-align:center; color:#dc2626; font-size:13px; padding:20px 0; }
+        @media (max-width:600px) {
+            .admin-stats { grid-template-columns:repeat(2,1fr); }
+            .admin-main-view { padding:10px 10px 0; }
+        }
+
+        /* ========== 登录/注册（账号系统） ========== */
+        .auth-overlay { position:fixed; inset:0; z-index:2500; background:var(--app-bg); display:none; align-items:center; justify-content:center; padding:20px; }
+        .auth-overlay.show { display:flex; }
+        .auth-card { background:var(--surface-solid); border:1px solid var(--line); border-radius:18px; padding:28px 22px 24px; width:100%; max-width:360px; box-shadow:0 14px 44px rgba(20,25,60,0.14); }
+        .auth-avatar { width:60px; height:60px; margin:0 auto 12px; border-radius:18px; background:var(--btn-bg); color:#fff; font-size:30px; display:flex; align-items:center; justify-content:center; }
+        .auth-card h2 { margin:0 0 4px; font-size:20px; text-align:center; color:var(--text-main); }
+        .auth-subtitle { margin:0 0 18px; font-size:13px; color:var(--muted); text-align:center; }
+        .auth-input { width:100%; box-sizing:border-box; padding:12px 14px; border:1px solid var(--input-border); border-radius:10px; font-size:15px; margin-bottom:12px; outline:none; background:var(--input-bg); color:var(--text-main); }
+        .auth-input:focus { border-color:var(--btn-color); }
+        .auth-input[readonly] { opacity:0.75; }
+        .auth-password-wrap { position:relative; }
+        .auth-password-wrap .auth-input { padding-right:44px; }
+        .pwd-toggle { position:absolute; right:12px; top:50%; transform:translateY(-50%); cursor:pointer; font-size:16px; user-select:none; }
+        .auth-error { color:#dc2626; font-size:12.5px; min-height:18px; margin:-4px 0 8px; }
+        .auth-btn { width:100%; padding:12px; border:0; border-radius:10px; background:var(--btn-bg); color:#fff; font-size:15px; font-weight:700; cursor:pointer; }
+        .auth-btn:disabled { opacity:.6; cursor:wait; }
+        .auth-link { display:block; text-align:center; margin-top:14px; font-size:13px; color:var(--btn-color); cursor:pointer; }
+
+        /* ========== 手机端：主页（微信式底部导航：消息 / 我的） ========== */
+        #mobile-room-view { display:none; width:100%; max-width:430px; height:100%; }
+        #login-area.show-room-view { align-items:stretch; padding:0; }
+        #login-area.show-room-view #mobile-room-view { display:flex; flex-direction:column; animation:fadeUp .22s ease; }
+        .mrv-body { flex:1; min-height:0; display:flex; flex-direction:column; }
+        .mrv-page { flex:1; min-height:0; display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain; }
+        .mrv-topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 16px 10px; flex-shrink:0; }
+        .mrv-topbar b { font-size:19px; color:var(--text-main); }
+        .mrv-plus { width:34px; min-height:34px; height:34px; padding:0; margin:0; border:none; border-radius:50%; background:var(--chip-bg); color:var(--text-main); font-size:19px; font-weight:700; cursor:pointer; line-height:1; }
+        .mrv-plus:active { background:var(--btn-bg); color:#fff; }
+        .mrv-list { padding:0 10px 12px; }
+        .mrv-item { display:flex; align-items:center; gap:12px; padding:12px; border-radius:14px; background:var(--surface-solid); border:1px solid var(--surface-border); margin-bottom:8px; cursor:pointer; }
+        .mrv-item:active { background:var(--chip-bg); }
+        .mrv-badge { width:44px; height:44px; border-radius:12px; flex-shrink:0; color:#fff; font-weight:700; font-size:17px; display:flex; align-items:center; justify-content:center; }
+        .mrv-item-text { flex:1; min-width:0; }
+        .mrv-item-text b { display:block; font-size:15px; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .mrv-item-text small { font-size:12px; color:var(--muted); }
+        .mrv-arrow { color:var(--muted); font-size:15px; }
+        .mrv-empty { text-align:center; color:var(--muted); font-size:13px; padding:28px 12px; line-height:2; background:var(--surface-solid); border:1px dashed var(--surface-border); border-radius:14px; margin:4px 2px 0; }
+        .mrv-add { display:flex; gap:8px; padding:2px 14px 10px; flex-shrink:0; }
+        .mrv-add input { flex:1; min-width:0; margin:0; }
+        .mrv-add button { width:auto; flex-shrink:0; padding:0 18px; margin:0; min-height:46px; border-radius:12px; }
+        /* 我的 tab */
+        .mrv-me-card { display:flex; align-items:center; gap:14px; margin:4px 12px 14px; padding:18px 14px; background:var(--surface-solid); border:1px solid var(--surface-border); border-radius:16px; }
+        .mrv-avatar { width:60px; height:60px; border-radius:16px; flex-shrink:0; color:#fff; font-size:26px; font-weight:700; display:flex; align-items:center; justify-content:center; background:var(--btn-bg); overflow:hidden; }
+        .mrv-avatar img { width:100%; height:100%; object-fit:cover; }
+        .mrv-me { flex:1; min-width:0; }
+        .mrv-me b { display:block; font-size:19px; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .mrv-me span { font-size:12px; color:#22c55e; }
+        .mrv-menu { margin:0 12px; background:var(--surface-solid); border:1px solid var(--surface-border); border-radius:16px; overflow:hidden; }
+        .mrv-menu-item { display:flex; align-items:center; gap:12px; width:100%; box-sizing:border-box; padding:15px 14px; border:none; border-bottom:1px solid var(--line); background:transparent; color:var(--text-main); font-size:15px; cursor:pointer; text-align:left; }
+        .mrv-menu-item:last-child { border-bottom:none; }
+        .mrv-menu-item:active { background:var(--chip-bg); }
+        .mmi-icon { font-size:17px; }
+        .mrv-menu-item span:nth-child(2) { flex:1; }
+        .mmi-arrow { color:var(--muted); }
+        .mmi-danger { color:#ef4444; }
+        /* 底部导航栏 */
+        .mrv-tabbar { flex-shrink:0; display:flex; border-top:1px solid var(--line); background:var(--surface-solid); padding-bottom:env(safe-area-inset-bottom, 0px); }
+        .mrv-tab { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 0 6px; border:none; background:transparent; color:var(--muted); font-size:11px; cursor:pointer; }
+        .mrv-tab .mt-icon { font-size:21px; line-height:1; filter:grayscale(1) opacity(.6); }
+        .mrv-tab .mt-label { font-weight:600; }
+        .mrv-tab.active { color:var(--btn-color); }
+        .mrv-tab.active .mt-icon { filter:none; }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+
+        /* ========== 电脑端左侧房间栏（微信 PC 版） ========== */
+        #room-sidebar { display:none; position:fixed; left:0; top:0; bottom:0; width:280px; z-index:1400; flex-direction:column; background:var(--surface-solid, #fff); border-right:1px solid var(--line, #e5e7eb); }
+        body.in-chat-desktop #room-sidebar { display:flex; }
+        .sidebar-head { display:flex; align-items:center; gap:10px; padding:16px 14px 12px; border-bottom:1px solid var(--line); }
+        .sidebar-avatar { width:38px; height:38px; border-radius:10px; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:#fff; font-size:17px; font-weight:700; background:var(--btn-bg); overflow:hidden; }
+        .sidebar-avatar img { width:100%; height:100%; object-fit:cover; border-radius:10px; }
+        .sidebar-me { flex:1; min-width:0; display:flex; flex-direction:column; }
+        .sidebar-me b { font-size:14.5px; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sidebar-status { font-size:11px; color:#22c55e; }
+        .sidebar-add { flex-shrink:0; width:32px; min-height:32px; height:32px; padding:0; margin:0; border:none; border-radius:9px; background:var(--chip-bg, #f3f4f6); color:var(--text-main); font-size:19px; font-weight:700; cursor:pointer; line-height:1; }
+        .sidebar-add:hover { background:var(--btn-bg); color:#fff; }
+        .sidebar-room-list { flex:1; overflow-y:auto; overscroll-behavior:contain; padding:8px; }
+        .sidebar-search-wrap { padding: 10px 12px 2px; }
+        .sidebar-search { width:100%; box-sizing:border-box; padding:9px 12px; border:1px solid var(--line, #e5e7eb); border-radius:9px; font-size:13.5px; outline:none; background:var(--chip-bg, #f3f4f6); color:var(--text-main); }
+        .sidebar-search:focus { border-color:var(--btn-color); background:var(--input-bg); }
+        .sidebar-room-item { display:flex; align-items:center; gap:10px; padding:10px 10px; border-radius:10px; cursor:pointer; margin-bottom:2px; }
+        .sidebar-room-item:hover { background:var(--chip-bg, #f3f4f6); }
+        .sidebar-room-item.active { background:var(--btn-bg); }
+        .sidebar-room-item.active .sri-text b, .sidebar-room-item.active .sri-text small { color:#fff; }
+        .sidebar-room-item .sri-text { flex:1; min-width:0; display:flex; flex-direction:column; }
+        .sidebar-room-item .sri-text b { font-size:14px; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sidebar-room-item .sri-text small { font-size:11px; color:var(--muted); }
+        .sidebar-room-item .sri-arrow { flex-shrink:0; color:var(--muted); font-size:13px; }
+        .sidebar-room-item.active .sri-arrow { color:#fff; }
+        .sidebar-empty { text-align:center; color:var(--muted); font-size:12.5px; padding:28px 12px; line-height:1.9; }
+        .skeleton-item { height:44px; border-radius:10px; margin:6px 2px; background:linear-gradient(90deg, var(--chip-bg, #eef0f5) 25%, var(--surface-solid, #f8f9fc) 50%, var(--chip-bg, #eef0f5) 75%); background-size:200% 100%; animation:skel 1.1s infinite; }
+        @keyframes skel { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+        .sidebar-settings { display:flex; align-items:center; gap:10px; width:calc(100% - 28px); box-sizing:border-box; margin:10px 14px 14px; padding:11px 14px; border:1px solid var(--line); border-radius:10px; background:transparent; color:var(--text-main); font-size:14px; cursor:pointer; }
+        .sidebar-settings:hover { background:var(--chip-bg, #f3f4f6); }
+        .sidebar-settings .ss-icon { font-size:16px; }
+
+        /* ========== 全局设置页（全屏覆盖，从聊天设置进入） ========== */
+        #global-settings-page { display:none; position:fixed; inset:0; z-index:8000; background:var(--bg, #f4f5fb); overflow-y:auto; overscroll-behavior:contain; }
+        .gsp-header { position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:10px; padding:14px 18px; background:var(--surface-solid); border-bottom:1px solid var(--line); }
+        .gsp-back { width:34px; min-height:34px; height:34px; padding:0; margin:0; border:none; border-radius:9px; background:var(--chip-bg, #f3f4f6); color:var(--text-main); font-size:22px; line-height:1; cursor:pointer; }
+        .gsp-back:hover { background:var(--btn-bg); color:#fff; }
+        .gsp-title { font-size:17px; font-weight:700; color:var(--text-main); }
+        .gsp-body { max-width:720px; margin:0 auto; padding:14px 16px calc(30px + env(safe-area-inset-bottom, 0px)); }
+        .gsp-account { display:flex; align-items:center; gap:16px; margin:6px 0 4px; padding:16px; background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; }
+        .gsp-account .profile-avatar-preview { width:56px; height:56px; flex:0 0 56px; font-size:22px; }
+        .gsp-account .profile-avatar-action::after { display:none; }
+        .gsp-account-info { display:flex; flex-direction:column; gap:3px; min-width:0; }
+        .gsp-account-info b { font-size:17px; color:var(--text-main); }
+        .gsp-account-info span { font-size:12px; color:var(--muted); }
+        @media (min-width:1024px) {
+            /* 桌面端：聊天区贴着侧栏占满剩余宽度（width 改 auto，避免 100%+280px 溢出屏幕右侧） */
+            body.in-chat-desktop #chat-container {
+                margin-left: 280px;
+                margin-right: 0;
+                width: auto;
+                max-width: none;
+                padding-left: 0;
+                padding-right: 0;
+            }
+            /* 桌面端：隐藏返回按钮，nav 显示房间徽标 */
+            body.in-chat-desktop #back-btn { display:none; }
+            /* 桌面端：nav 只剩右侧操作组，靠右排列（标题为绝对定位居中不受影响） */
+            body.in-chat-desktop #nav-bar { justify-content: flex-end; }
+            /* room-loading 为容器内 absolute inset:0，容器已贴侧栏，无需额外偏移（加 left:280 会双重偏移） */
+        }
+
+        /* 后台-用户卡片 */
+        .admin-user-card { display:flex; align-items:center; gap:12px; padding:10px 8px; border-bottom:1px solid var(--line); }
+        .admin-user-card:last-child { border-bottom:none; }
+        .admin-user-avatar { flex-shrink:0; width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:17px; font-weight:700; color:#fff; background:var(--btn-bg); object-fit:cover; }
+        .admin-user-info { flex:1; min-width:0; }
+        .admin-user-name { font-size:14px; font-weight:700; color:var(--text-main); }
+        .admin-user-meta { font-size:11.5px; color:var(--muted); margin-top:2px; }
 
 
         /* 上下文菜单 */
@@ -1482,21 +1621,6 @@
 <!-- Toast 通知容器 -->
 <div id="toast-container"></div>
 
-<!-- 安装到桌面弹窗 -->
-<div id="install-popup" style="display:none; position:fixed; inset:0; z-index:9800; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:16px;" onclick="if(event.target===this)window.dismissInstallPopup()">
-    <div style="background:var(--surface-solid); color:var(--text-main); width:92%; max-width:380px; max-height:85vh; max-height:85dvh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; border-radius:16px; padding:clamp(16px,4vw,24px); text-align:center; position:relative; border:1px solid var(--surface-border);">
-        <button onclick="window.dismissInstallPopup()" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:22px; color:var(--muted); cursor:pointer; width:auto; padding:4px 8px; margin:0; line-height:1;">✕</button>
-        <div style="font-size:40px; margin-bottom:10px; margin-top:8px;" id="install-popup-icon">📱</div>
-        <div style="font-size:18px; font-weight:700; color:var(--text-main); margin-bottom:6px;" id="install-popup-title">安装到桌面，体验更好</div>
-        <div style="font-size:13px; color:var(--muted); margin-bottom:16px; line-height:1.6;" id="install-popup-desc">安装后可使用后台通知、全屏聊天</div>
-        <div style="background:var(--panel-soft); border-radius:10px; padding:12px; margin-bottom:14px; text-align:left; font-size:13px; line-height:1.8; color:var(--text-main);" id="install-popup-steps"></div>
-        <div id="install-popup-actions">
-            <button id="install-popup-btn" onclick="window.doInstallPWA()" style="width:100%; padding:12px; background:var(--btn-bg); color:white; border:none; border-radius:12px; font-size:15px; font-weight:600; cursor:pointer;">查看教程</button>
-        </div>
-        <div id="install-popup-noremind" style="margin-top:12px; font-size:12px; color:var(--muted); cursor:pointer;" onclick="window.dismissInstallPopupForever()">不再提示</div>
-    </div>
-</div>
-
 <!-- 更新公告 -->
 <div id="update-modal" onclick="window.closeUpdateModal()" style="padding:16px;">
     <div class="update-modal-content" onclick="event.stopPropagation()" style="position:relative; max-height:85vh; max-height:85dvh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; width:92%; max-width:400px;">
@@ -1519,18 +1643,74 @@
     <div class="lightbox-hint">滚轮 / 双击缩放 · 拖动查看细节</div>
 </div>
 
-<!-- 登录区域 -->
+<!-- 登录区域（容器：手机端主页 / 电脑端兜底主页） -->
 <div id="login-area">
-    <div class="login-box">
-        <h2>进入 Harry 的聊天室</h2>
-        <input type="text" id="username" placeholder="输入你的名字" autocomplete="off" inputmode="text">
-        <input type="text" id="room-input" placeholder="输入房间代码 (字母、数字、符号)" autocomplete="off" inputmode="text">
-        <div id="login-membership-notice" class="login-notice" style="display:none;"></div>
-        <div class="remember-me">
-            <input type="checkbox" id="auto-login-check" checked>
-            <label for="auto-login-check">10天内免登录（自动进入上次房间）</label>
+    <!-- 手机端：主页（微信式底部导航：消息 / 我的） -->
+    <div id="mobile-room-view">
+        <div class="mrv-body">
+            <!-- 消息 tab：房间列表 -->
+            <div class="mrv-page" id="mrv-page-msgs">
+                <div class="mrv-topbar">
+                    <b>消息</b>
+                    <button class="mrv-plus" onclick="window.toggleMrvAdd()" aria-label="加入或创建房间">＋</button>
+                </div>
+                <div class="mrv-add" id="mrv-add-row" style="display:none;">
+                    <input type="text" id="mrv-room-input" placeholder="输入房间代码（新代码=创建新房间）" autocomplete="off" inputmode="text">
+                    <button onclick="window.mrvJoin()">进入</button>
+                </div>
+                <div class="mrv-list" id="mrv-list"></div>
+            </div>
+            <!-- 我的 tab -->
+            <div class="mrv-page" id="mrv-page-me" style="display:none;">
+                <div class="mrv-topbar"><b>我的</b></div>
+                <div class="mrv-me-card">
+                    <div class="mrv-avatar" id="mrv-avatar">•</div>
+                    <div class="mrv-me"><b id="mrv-username"></b><span>● 在线</span></div>
+                </div>
+                <div class="mrv-menu">
+                    <button class="mrv-menu-item" onclick="window.openGlobalSettings()"><span class="mmi-icon">⚙</span><span>全局设置</span><span class="mmi-arrow">›</span></button>
+                    <button class="mrv-menu-item mmi-danger" onclick="window.doLogout()"><span class="mmi-icon">🚪</span><span>退出登录</span><span class="mmi-arrow">›</span></button>
+                </div>
+            </div>
         </div>
-        <button id="join-btn" onclick="window.joinRoom()">开始聊天</button>
+        <nav class="mrv-tabbar">
+            <button class="mrv-tab active" id="mrv-tab-msgs" onclick="window.switchMrvTab('msgs')"><span class="mt-icon">💬</span><span class="mt-label">消息</span></button>
+            <button class="mrv-tab" id="mrv-tab-me" onclick="window.switchMrvTab('me')"><span class="mt-icon">👤</span><span class="mt-label">我的</span></button>
+        </nav>
+    </div>
+</div>
+
+<!-- 登录/注册（账号系统，与安卓端共用 users 表） -->
+<div id="auth-overlay" class="auth-overlay">
+    <div class="auth-card" id="auth-login-card">
+        <div class="auth-avatar">💬</div>
+        <h2>Harry 的聊天室</h2>
+        <p class="auth-subtitle">登录你的账号开始聊天</p>
+        <input type="text" id="auth-username" class="auth-input" placeholder="用户名" autocomplete="off" inputmode="text">
+        <div class="auth-password-wrap">
+            <input type="password" id="auth-password" class="auth-input" placeholder="密码" autocomplete="off">
+            <span class="pwd-toggle" onclick="window.togglePwd('auth-password', this)">👁</span>
+        </div>
+        <div class="auth-error" id="auth-error"></div>
+        <button class="auth-btn" id="auth-login-btn" onclick="window.doLogin()">登 录</button>
+        <a class="auth-link" onclick="window.showRegister()">还没有账号？立即注册</a>
+    </div>
+    <div class="auth-card" id="auth-register-card" style="display:none;">
+        <div class="auth-avatar">✨</div>
+        <h2>注册新账号</h2>
+        <p class="auth-subtitle">创建你的聊天账号（电脑 / 安卓 / 苹果通用）</p>
+        <input type="text" id="reg-username" class="auth-input" placeholder="用户名" autocomplete="off" inputmode="text">
+        <div class="auth-password-wrap">
+            <input type="password" id="reg-password" class="auth-input" placeholder="密码（至少 4 位）" autocomplete="off">
+            <span class="pwd-toggle" onclick="window.togglePwd('reg-password', this)">👁</span>
+        </div>
+        <div class="auth-password-wrap">
+            <input type="password" id="reg-password2" class="auth-input" placeholder="确认密码" autocomplete="off">
+            <span class="pwd-toggle" onclick="window.togglePwd('reg-password2', this)">👁</span>
+        </div>
+        <div class="auth-error" id="reg-error"></div>
+        <button class="auth-btn" id="auth-register-btn" onclick="window.doRegister()">注 册</button>
+        <a class="auth-link" onclick="window.showLogin()">已有账号？返回登录</a>
     </div>
 </div>
 
@@ -1538,6 +1718,37 @@
 <div id="apply-screen" class="apply-screen" style="display:none;">
     <div class="apply-card" id="apply-card-content">
         <!-- 由 JS 动态填充 -->
+    </div>
+</div>
+
+<!-- 电脑端左侧房间栏（微信 PC 版风格，仅宽屏显示） -->
+<aside id="room-sidebar">
+    <div class="sidebar-head">
+        <div class="sidebar-avatar" id="sidebar-avatar">•</div>
+        <div class="sidebar-me">
+            <b id="sidebar-username"></b>
+            <span class="sidebar-status">● 在线</span>
+        </div>
+        <button class="sidebar-add" onclick="window.openJoinRoomModal()" title="加入 / 创建房间" aria-label="加入或创建房间">＋</button>
+    </div>
+    <div class="sidebar-search-wrap">
+        <input type="text" id="sidebar-search" class="sidebar-search" placeholder="搜索房间" autocomplete="off" oninput="window.filterSidebarRooms(this.value)">
+    </div>
+    <div id="sidebar-room-list" class="sidebar-room-list"></div>
+    <button class="sidebar-settings" onclick="window.openGlobalSettings()" title="全局设置">
+        <span class="ss-icon">⚙</span><span>设置</span>
+    </button>
+</aside>
+
+<!-- 电脑端：加入/创建房间小弹窗 -->
+<div id="join-room-modal" style="display:none; position:fixed; inset:0; z-index:9500; background:rgba(0,0,0,0.4); align-items:center; justify-content:center;" onclick="if(event.target===this)window.closeJoinRoomModal()">
+    <div style="background:var(--surface-solid); color:var(--text-main); width:92%; max-width:360px; border-radius:14px; padding:22px 20px; border:1px solid var(--surface-border);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+            <strong style="color:var(--text-main); font-size:16px;">加入 / 创建房间</strong>
+            <button onclick="window.closeJoinRoomModal()" style="border:none; background:none; font-size:20px; cursor:pointer; color:var(--muted); width:auto; padding:4px 8px; margin:0; line-height:1;">&times;</button>
+        </div>
+        <input id="join-room-modal-input" type="text" placeholder="输入房间代码（新代码将创建新房间）" style="width:100%; box-sizing:border-box; padding:11px 12px; border:1px solid var(--input-border); border-radius:9px; font-size:14px; background:var(--input-bg); color:var(--text-main); outline:none; margin-bottom:14px;" onkeydown="if(event.key==='Enter')window.confirmJoinRoomModal()">
+        <button onclick="window.confirmJoinRoomModal()" style="width:100%; padding:11px; background:var(--btn-bg); color:#fff; border:none; border-radius:9px; font-size:14px; font-weight:700; cursor:pointer;">进入房间</button>
     </div>
 </div>
 
@@ -1551,7 +1762,7 @@
             <span id="room-title">正在加载...</span>
         </div>
         <div class="nav-actions" style="display:flex; gap:10px; align-items:center;">
-            <button id="online-count" class="online-count" aria-live="polite">在线 1 人</button>
+            <button id="online-count" class="online-count" aria-live="polite" onclick="window.toggleSettings()" title="查看房间成员">在线 1 人</button>
             <button id="settings-btn" class="nav-icon" onclick="window.toggleSettings()" aria-label="设置">⋯</button>
         </div>
     </div>
@@ -1651,12 +1862,59 @@
     </div>
 </div>
 
-<!-- 设置弹窗：移至 body 直接子级，避开 backdrop-filter 父级对 fixed 定位的影响 -->
+<!-- 聊天设置弹窗（右上角 ⚙ / 在线人数 打开）：仅聊天相关设置 -->
 <div id="settings-modal" onclick="window.toggleSettings(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
         <div class="settings-header">
-            <h3>设置</h3>
+            <h3>聊天设置</h3>
             <button class="close-settings" onclick="window.toggleSettings()" aria-label="关闭设置">&times;</button>
+        </div>
+        <div class="settings-section" id="members-section" style="display:none;">
+            <div class="settings-section-title">房间成员（<span id="members-count">0</span>）</div>
+            <div id="members-grid" class="members-grid"></div>
+            <div id="members-tip" style="font-size:11.5px;color:var(--muted);margin-top:6px;">点击成员头像可快速 @TA</div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-section-title">聊天</div>
+            <div class="settings-row-item"><button class="settings-row-button" onclick="window.updateRoomName()">修改房间名称</button></div>
+            <div class="settings-row-item"><button class="settings-row-button" onclick="window.searchMessages()">查找聊天内容</button></div>
+            <div class="settings-row-item">
+                <label>消息通知</label>
+                <button class="settings-row-button" id="wx-notify-btn" onclick="showToast('该功能正在开发中，敬请期待', 'info')">配置微信 / QQ 通知</button>
+            </div>
+            <div class="settings-row-item"><label>气泡颜色</label><div style="display:flex;align-items:center;gap:8px;"><input type="color" id="color-selector" value="#6366f1" onchange="window.saveSettings()"><button class="settings-row-button" style="padding:6px 12px;font-size:12px;" onclick="window.resetBubbleColor()">恢复默认</button></div></div>
+            <div class="settings-row-item"><button class="settings-row-button" onclick="window.clearLocalHistory()">清空聊天记录</button></div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-section-title">更多</div>
+            <div class="settings-row-item"><button class="settings-row-button" onclick="window.openGlobalSettings()">全局设置（外观 / 账号 / 性能）</button></div>
+        </div>
+    </div>
+</div>
+
+<!-- 全局设置页（左下角"设置"打开）：覆盖整个聊天区域的全屏页面 -->
+<div id="global-settings-page">
+    <div class="gsp-header">
+        <button class="gsp-back" onclick="window.closeGlobalSettings()" aria-label="返回">‹</button>
+        <span class="gsp-title">设置</span>
+    </div>
+    <div class="gsp-body">
+        <div class="gsp-account">
+            <button class="profile-avatar-action" onclick="document.getElementById('avatar-upload-input').click()" style="border:none;background:transparent;padding:0;">
+                <span id="profile-avatar-preview" class="profile-avatar-preview" aria-label="我的头像" style="width:56px;height:56px;"></span>
+            </button>
+            <div class="gsp-account-info">
+                <b id="gsp-username"></b>
+                <span>点击头像可更换</span>
+            </div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-section-title">账号安全</div>
+            <div class="settings-row-item"><label>当前密码</label><input type="password" id="pwd-old" placeholder="输入当前密码" autocomplete="current-password" style="flex:1;min-width:0;padding:8px 10px;border:1px solid var(--input-border);border-radius:8px;font-size:13px;max-width:200px;background:var(--input-bg);color:var(--text-main);"></div>
+            <div class="settings-row-item"><label>新密码</label><input type="password" id="pwd-new" placeholder="至少4位" autocomplete="new-password" style="flex:1;min-width:0;padding:8px 10px;border:1px solid var(--input-border);border-radius:8px;font-size:13px;max-width:200px;background:var(--input-bg);color:var(--text-main);"></div>
+            <div class="settings-row-item"><label>确认新密码</label><input type="password" id="pwd-new2" placeholder="再次输入新密码" autocomplete="new-password" style="flex:1;min-width:0;padding:8px 10px;border:1px solid var(--input-border);border-radius:8px;font-size:13px;max-width:200px;background:var(--input-bg);color:var(--text-main);"></div>
+            <div class="settings-row-item" id="pwd-msg" style="font-size:12px;color:var(--muted);padding:4px 0 8px;border-bottom:0;display:none;"></div>
+            <div class="settings-row-item"><button class="settings-row-button" onclick="window.changePassword()">确认修改密码</button></div>
         </div>
         <div class="settings-section">
             <div class="settings-section-title">外观</div>
@@ -1682,20 +1940,6 @@
             </div>
         </div>
         <div class="settings-section">
-            <div class="settings-section-title">聊天设置</div>
-            <div class="settings-row-item"><button class="settings-row-button" onclick="window.updateRoomName()">修改房间名称</button></div>
-            <div class="settings-row-item"><button class="settings-row-button" onclick="window.searchMessages()">查找聊天内容</button></div>
-            <div class="settings-row-item">
-                <label>消息通知</label>
-                <button class="settings-row-button" id="wx-notify-btn" onclick="window.showWxNotifySetup()">配置微信 / QQ 通知</button>
-            </div>
-            <div class="settings-row-item"><label>气泡颜色</label><div style="display:flex;align-items:center;gap:8px;"><input type="color" id="color-selector" value="#6366f1" onchange="window.saveSettings()"><button class="settings-row-button" style="padding:6px 12px;font-size:12px;" onclick="window.resetBubbleColor()">恢复默认</button></div></div>
-        </div>
-        <div class="settings-section">
-            <div class="settings-section-title">我的资料</div>
-            <div class="settings-row-item"><button class="profile-avatar-action" onclick="document.getElementById('avatar-upload-input').click()"><span id="profile-avatar-preview" class="profile-avatar-preview" aria-label="我的头像"></span><span>更换头像</span></button></div>
-        </div>
-        <div class="settings-section">
             <div class="settings-section-title">性能</div>
             <div class="settings-row-item">
                 <label>极速模式</label>
@@ -1709,10 +1953,6 @@
             <div class="settings-row-item" style="font-size:12px;color:var(--muted);padding:8px 0;border-bottom:0;">开启后每5秒主动拉取新消息，适合实时推送不稳定时使用</div>
         </div>
         <div class="settings-section">
-            <div class="settings-section-title">其他</div>
-            <div class="settings-row-item"><button class="settings-row-button" onclick="window.clearLocalHistory()">清空聊天记录</button></div>
-        </div>
-        <div class="settings-section">
             <div class="settings-section-title">文件下载</div>
             <div class="settings-row-item" style="font-size:12px;color:var(--muted);padding:8px 0;border-bottom:0;">💻 文件下载功能仅支持电脑端使用</div>
             <div class="settings-row-item">
@@ -1721,254 +1961,56 @@
             </div>
             <div class="settings-row-item" style="font-size:12px;color:var(--muted);padding:8px 0;border-bottom:0;">⚠ 实际下载位置由浏览器设置决定，此处仅作记录参考</div>
         </div>
+        <div class="settings-section">
+            <div class="settings-section-title">其他</div>
+            <div class="settings-row-item"><button class="settings-row-button" onclick="window.openAdminPanel()">后台管理</button></div>
+            <div class="settings-row-item"><button class="settings-row-button" id="settings-logout-btn" style="color:#dc2626;font-weight:600;" onclick="window.doLogout()">退出登录</button></div>
+        </div>
         <input type="file" id="avatar-upload-input" accept="image/*" style="display:none;" onchange="window.handleAvatarUpload(event)">
     </div>
 </div>
 
-<div id="wx-notify-modal" class="wx-notify-modal" onclick="window.closeWxNotifySetup(event)">
-    <div class="wx-notify-content" onclick="event.stopPropagation()" style="padding:24px 18px 20px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-            <h3 style="margin:0;font-size:19px;">📬 微信 / QQ 消息通知</h3>
-            <button onclick="window.closeWxNotifySetup(null)" style="width:auto;margin:0;padding:4px 10px;background:transparent;color:var(--muted);font-size:20px;border:none;cursor:pointer;">✕</button>
-        </div>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.6;">
-            通过 <a href="https://www.pushplus.plus" target="_blank" style="color:var(--btn-color);font-weight:600;">pushplus（推送加）</a>（免费，每天 200 条额度），把聊天室新消息实时推送到你的 <b>微信</b> 或 <b>QQ</b>。下面 4 步实操，整个流程约 3 分钟。
-        </p>
-
-        <div class="push-guide">
-            <div class="push-guide-title">📋 实操步骤（按顺序做完）</div>
-            <div class="push-steps">
-
-                <div class="push-step">
-                    <div class="push-step-head">
-                        <div class="push-step-num">1</div>
-                        <div class="push-step-title">微信扫码登录 pushplus（推送加）</div>
-                    </div>
-                    <div class="push-step-text">
-                        浏览器打开 <a href="https://www.pushplus.plus" target="_blank" style="color:var(--btn-color);font-weight:600;">pushplus.plus</a>，点首页的「微信登录」按钮，用手机微信扫码即可登录。首次扫码会自动注册账号，无需手机号。
-                        <div class="push-step-tips">
-                            <div class="push-tip">扫码后会先跳到「个人中心」</div>
-                            <div class="push-tip">立即按提示完成「实名认证」——2024 年 8 月起 pushplus 强制要求实名，否则发送接口会返回错误码 905</div>
-                        </div>
-                    </div>
-                    <div class="push-fig">
-                        <svg viewBox="0 0 340 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：pushplus 首页，点击微信登录">
-                            <defs>
-                                <marker id="pp-arw1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
-                                    <path d="M0 0 L10 5 L0 10 z" fill="#ef4444"/>
-                                </marker>
-                            </defs>
-                            <rect width="340" height="210" fill="#f1f5f9"/>
-                            <rect x="14" y="12" width="312" height="186" rx="10" fill="#0f172a"/>
-                            <text x="170" y="42" text-anchor="middle" font-size="20" font-weight="700" fill="#ffffff">pushplus</text>
-                            <text x="170" y="58" text-anchor="middle" font-size="8.5" fill="#94a3b8">推送加 · 一个 API 推送所有渠道</text>
-                            <rect x="105" y="83" width="130" height="34" rx="17" fill="#22c55e"/>
-                            <text x="170" y="105" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">💬 微信登录</text>
-                            <text x="170" y="138" text-anchor="middle" font-size="8" fill="#64748b">扫码即注册 · 永久免费</text>
-                            <ellipse cx="170" cy="100" rx="82" ry="28" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <rect x="240" y="36" width="80" height="20" rx="10" fill="#fef2f2" stroke="#ef4444" stroke-width="1.2"/>
-                            <text x="280" y="50" text-anchor="middle" font-size="10" font-weight="700" fill="#ef4444">点这里登录</text>
-                            <path d="M 278 58 Q 282 76 228 86" fill="none" stroke="#ef4444" stroke-width="2" marker-end="url(#pp-arw1)"/>
-                            <rect x="14" y="170" width="312" height="28" rx="6" fill="#1e293b"/>
-                            <text x="170" y="188" text-anchor="middle" font-size="9" font-weight="700" fill="#facc15">⚠ 登录后立即完成「实名认证」，否则无法发送消息</text>
-                        </svg>
-                        <div class="push-fig-cap">示意图：pushplus 官网首页</div>
-                    </div>
-                </div>
-
-                <div class="push-step">
-                    <div class="push-step-head">
-                        <div class="push-step-num">2</div>
-                        <div class="push-step-title">在 pushplus 后台绑定接收渠道</div>
-                    </div>
-                    <div class="push-step-text">
-                        登录后自动进入个人中心。<b>左侧菜单</b>点「<b>渠道配置</b>」→ 在右侧的渠道卡片里选你要的：微信选「微信公众号」并扫码关注推送加公众号；QQ 选「QQ 机器人」并用自己的 QQ 扫码加好友。
-                        <div class="push-step-tips">
-                            <div class="push-tip">微信公众号：用绑定 pushplus 的同一个微信扫码关注「pushplus 推送加」</div>
-                            <div class="push-tip">QQ 机器人：用你自己的 QQ 扫描页面上的二维码加好友（绑定后机器人会发一条确认消息）</div>
-                            <div class="push-tip">这一步只是「绑定」，绑定后切回本页继续</div>
-                        </div>
-                    </div>
-                    <div class="push-fig">
-                        <svg viewBox="0 0 340 232" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：pushplus 后台，渠道配置">
-                            <rect width="340" height="232" fill="#f1f5f9"/>
-                            <rect x="14" y="12" width="312" height="208" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
-                            <path d="M14 22 a10 10 0 0 1 10 -10 h292 a10 10 0 0 1 10 10 v16 h-312 z" fill="#f1f5f9"/>
-                            <circle cx="30" cy="25" r="3.5" fill="#f87171"/>
-                            <circle cx="42" cy="25" r="3.5" fill="#fbbf24"/>
-                            <circle cx="54" cy="25" r="3.5" fill="#34d399"/>
-                            <rect x="100" y="18.5" width="148" height="13" rx="6.5" fill="#ffffff" stroke="#e2e8f0"/>
-                            <text x="174" y="28" text-anchor="middle" font-size="8" fill="#64748b" font-family="monospace">www.pushplus.plus/ucent.html</text>
-                            <rect x="22" y="46" width="74" height="160" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-                            <rect x="30" y="55" width="58" height="14" rx="4" fill="#22c55e"/>
-                            <text x="59" y="65" text-anchor="middle" font-size="8.5" font-weight="700" fill="#ffffff">📬 渠道配置</text>
-                            <text x="30" y="86" font-size="8.5" fill="#94a3b8">个人中心</text>
-                            <text x="30" y="103" font-size="8.5" fill="#94a3b8">发送消息</text>
-                            <text x="30" y="120" font-size="8.5" fill="#94a3b8">群组</text>
-                            <text x="30" y="137" font-size="8.5" fill="#94a3b8">好友</text>
-                            <text x="30" y="154" font-size="8.5" fill="#94a3b8">设置</text>
-                            <text x="30" y="188" text-anchor="middle" font-size="7.5" fill="#cbd5e1">————</text>
-                            <text x="30" y="202" text-anchor="middle" font-size="7.5" fill="#94a3b8">登出</text>
-                            <text x="105" y="62" font-size="10.5" font-weight="700" fill="#1e293b">渠道配置</text>
-                            <text x="105" y="75" font-size="8" fill="#94a3b8">选择要接收消息的渠道，每个渠道扫码绑定</text>
-                            <rect x="105" y="82" width="100" height="58" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.3"/>
-                            <circle cx="120" cy="98" r="9" fill="#22c55e"/>
-                            <text x="120" y="101" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">微</text>
-                            <text x="135" y="103" font-size="9" font-weight="700" fill="#166534">微信公众号</text>
-                            <rect x="113" y="112" width="22" height="22" rx="3" fill="#000"/>
-                            <rect x="116" y="115" width="16" height="16" fill="#fff"/>
-                            <text x="124" y="125" text-anchor="middle" font-size="4" fill="#000">QR</text>
-                            <text x="143" y="125" font-size="7.5" fill="#16a34a">✓ 已绑定</text>
-                            <text x="143" y="135" font-size="7" fill="#94a3b8">→ 微信里关注推送加</text>
-                            <rect x="211" y="82" width="100" height="58" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.3"/>
-                            <circle cx="226" cy="98" r="9" fill="#3b82f6"/>
-                            <text x="226" y="101" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">Q</text>
-                            <text x="241" y="103" font-size="9" font-weight="700" fill="#1e40af">QQ 机器人</text>
-                            <rect x="219" y="112" width="22" height="22" rx="3" fill="#000"/>
-                            <rect x="222" y="115" width="16" height="16" fill="#fff"/>
-                            <text x="230" y="125" text-anchor="middle" font-size="4" fill="#000">QR</text>
-                            <text x="249" y="125" font-size="7.5" fill="#2563eb">扫码绑定</text>
-                            <text x="249" y="135" font-size="7" fill="#94a3b8">→ 加 QQ 机器人为好友</text>
-                            <rect x="105" y="148" width="100" height="58" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-                            <circle cx="120" cy="164" r="9" fill="#94a3b8"/>
-                            <text x="120" y="167" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">微</text>
-                            <text x="135" y="169" font-size="9" fill="#64748b">企业微信应用</text>
-                            <text x="135" y="184" font-size="7.5" fill="#94a3b8">需自建应用</text>
-                            <rect x="211" y="148" width="100" height="58" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-                            <circle cx="226" cy="164" r="9" fill="#94a3b8"/>
-                            <text x="226" y="167" text-anchor="middle" font-size="9" font-weight="700" fill="#ffffff">邮</text>
-                            <text x="241" y="169" font-size="9" fill="#64748b">邮件</text>
-                            <text x="241" y="184" font-size="7.5" fill="#94a3b8">需绑定邮箱</text>
-                            <ellipse cx="155" cy="111" rx="58" ry="38" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <text x="170" y="218" text-anchor="middle" font-size="9" font-weight="700" fill="#ef4444">↑ 选「微信公众号」或「QQ 机器人」并扫码绑定</text>
-                        </svg>
-                        <div class="push-fig-cap">示意图：pushplus 后台「渠道配置」</div>
-                    </div>
-                </div>
-
-                <div class="push-step">
-                    <div class="push-step-head">
-                        <div class="push-step-num">3</div>
-                        <div class="push-step-title">复制你的 pushplus Token</div>
-                    </div>
-                    <div class="push-step-text">
-                        渠道绑定后，<b>同一个 pushplus 后台页面</b>里找「<b>Token</b>」一栏（一般在「渠道配置」上方或「发送消息」页），点「复制」按钮得到一串字母数字。整段粘到下方输入框，前后不要带空格。
-                        <div class="push-step-tips">
-                            <div class="push-tip">一个 token 适用所有渠道，只是推送时选不同的渠道（微信/QQ）即可</div>
-                            <div class="push-tip">Token 等同于推送密码，不要发给别人、不要截到群里</div>
-                        </div>
-                    </div>
-                    <div class="push-fig">
-                        <svg viewBox="0 0 340 188" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：复制pushplus token">
-                            <rect width="340" height="188" fill="#f1f5f9"/>
-                            <rect x="14" y="12" width="312" height="164" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
-                            <path d="M14 22 a10 10 0 0 1 10 -10 h292 a10 10 0 0 1 10 10 v16 h-312 z" fill="#f1f5f9"/>
-                            <circle cx="30" cy="25" r="3.5" fill="#f87171"/>
-                            <circle cx="42" cy="25" r="3.5" fill="#fbbf24"/>
-                            <circle cx="54" cy="25" r="3.5" fill="#34d399"/>
-                            <rect x="100" y="18.5" width="148" height="13" rx="6.5" fill="#ffffff" stroke="#e2e8f0"/>
-                            <text x="174" y="28" text-anchor="middle" font-size="8" fill="#64748b" font-family="monospace">个人中心 · 我的 token</text>
-                            <text x="26" y="56" font-size="10.5" font-weight="700" fill="#1e293b">📌 我的 Token</text>
-                            <text x="26" y="70" font-size="8" fill="#94a3b8">这是你的一对一推送令牌，用于调用发送接口</text>
-                            <rect x="26" y="80" width="288" height="28" rx="6" fill="#f8fafc" stroke="#e2e8f0"/>
-                            <text x="38" y="98" font-size="10" fill="#1e293b" font-family="monospace" font-weight="700">a91e3f8c7d2b56e9f0c4a8e2d3b7c5f9</text>
-                            <rect x="232" y="86" width="74" height="16" rx="8" fill="#22c55e"/>
-                            <text x="269" y="97" text-anchor="middle" font-size="8.5" font-weight="700" fill="#ffffff">📋 复制</text>
-                            <rect x="26" y="116" width="288" height="44" rx="8" fill="#fff7ed" stroke="#fdba74" stroke-width="1.2"/>
-                            <text x="40" y="134" font-size="9" font-weight="700" fill="#9a3412">⚠ 务必：</text>
-                            <text x="40" y="148" font-size="9" fill="#7c2d12">token 等同于账号密码，不要截图发给别人</text>
-                            <ellipse cx="170" cy="94" rx="170" ry="22" fill="none" stroke="#ef4444" stroke-width="2" stroke-dasharray="5 4"/>
-                            <text x="170" y="175" text-anchor="middle" font-size="9" font-weight="700" fill="#ef4444">↑ 完整复制这一整串 token</text>
-                        </svg>
-                        <div class="push-fig-cap">示意图：pushplus「Token」一栏，复制整串</div>
-                    </div>
-                </div>
-
-                <div class="push-step">
-                    <div class="push-step-head">
-                        <div class="push-step-num">4</div>
-                        <div class="push-step-title">粘到下方选择渠道，开启 + 测试</div>
-                    </div>
-                    <div class="push-step-text">
-                        把 token 粘进下方「Pushplus Token」框，<b>选一个收消息的渠道</b>（微信 / QQ 任意），打开「启用」开关 → 点「🧪 测试通知」。微信或 QQ 收到测试消息就成功了。
-                    </div>
-                    <div class="push-fig">
-                        <svg viewBox="0 0 340 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="示意图：在本设置页填token、选渠道、测试">
-                            <rect width="340" height="220" fill="#eef2f7"/>
-                            <rect x="14" y="12" width="312" height="196" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
-                            <path d="M14 22 a10 10 0 0 1 10 -10 h292 a10 10 0 0 1 10 10 v16 h-312 z" fill="#f1f5f9"/>
-                            <text x="170" y="28" text-anchor="middle" font-size="9" font-weight="700" fill="#475569">Harry 的聊天室 · 通知设置</text>
-                            <text x="30" y="62" font-size="10.5" font-weight="700" fill="#475569">Pushplus Token</text>
-                            <rect x="120" y="48" width="180" height="22" rx="7" fill="#ffffff" stroke="#d0d5dd"/>
-                            <text x="128" y="63" font-size="8.5" fill="#1e293b" font-family="monospace">a91e3f8c7d2b56e9…</text>
-                            <text x="30" y="92" font-size="10.5" font-weight="700" fill="#475569">渠道</text>
-                            <rect x="120" y="78" width="84" height="24" rx="12" fill="#dcfce7" stroke="#22c55e" stroke-width="1.2"/>
-                            <circle cx="135" cy="90" r="5" fill="#22c55e"/>
-                            <text x="148" y="93" font-size="10" font-weight="700" fill="#166534">📬 微信</text>
-                            <rect x="210" y="78" width="84" height="24" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
-                            <circle cx="225" cy="90" r="5" fill="#cbd5e1"/>
-                            <text x="238" y="93" font-size="10" fill="#475569">🐧 QQ</text>
-                            <text x="30" y="124" font-size="10.5" font-weight="700" fill="#475569">启用</text>
-                            <rect x="120" y="112" width="42" height="22" rx="11" fill="#22c55e"/>
-                            <circle cx="152" cy="123" r="9" fill="#ffffff"/>
-                            <text x="30" y="170" font-size="10.5" font-weight="600" fill="#15803d">① 粘贴 Token</text>
-                            <text x="30" y="195" font-size="10.5" font-weight="600" fill="#15803d">② 选渠道 + 开开关</text>
-                            <text x="180" y="170" font-size="10.5" font-weight="600" fill="#15803d">③ 点「测试通知」</text>
-                            <rect x="170" y="148" width="130" height="22" rx="8" fill="#22c55e"/>
-                            <text x="235" y="163" text-anchor="middle" font-size="10" font-weight="700" fill="#ffffff">🧪 测试通知</text>
-                            <ellipse cx="120" cy="118" rx="35" ry="15" fill="none" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="4 3"/>
-                        </svg>
-                        <div class="push-fig-cap">示意图：粘贴 Token → 选渠道 → 测试</div>
-                    </div>
-                </div>
-
+<div id="admin-modal" class="admin-modal">
+    <!-- 密码门 -->
+    <div id="admin-login-view" class="admin-login-view" style="display:none;">
+        <div class="admin-login-card">
+            <h3 style="margin:0 0 6px;font-size:19px;">🔐 后台管理</h3>
+            <p style="margin:0 0 14px;font-size:12.5px;color:var(--muted);">请输入管理密码</p>
+            <input type="password" id="admin-pwd-input" placeholder="管理密码" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--input-border);border-radius:8px;font-size:14px;outline:none;background:var(--input-bg);color:var(--text-main);" onkeydown="if(event.key==='Enter')window.adminTryLogin()">
+            <div id="admin-pwd-err" style="display:none;font-size:12px;color:#dc2626;margin-top:8px;">密码错误，请重试</div>
+            <div style="display:flex;gap:10px;margin-top:14px;">
+                <button id="admin-login-btn" onclick="window.adminTryLogin()" style="flex:1;padding:10px 0;background:var(--btn-bg);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">进入</button>
+                <button onclick="window.closeAdminPanel()" style="flex:1;padding:10px 0;background:var(--panel-soft);color:var(--text-main);border:1px solid var(--line);border-radius:8px;font-size:14px;cursor:pointer;">取消</button>
             </div>
         </div>
-
-        <div style="font-size:12px;font-weight:700;color:var(--btn-color);margin:18px 0 8px;">⬇️ 在下方粘贴 Token + 选渠道</div>
-        <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
-            <div style="display:flex;align-items:center;gap:10px;">
-                <label style="font-size:13px;color:var(--muted);white-space:nowrap;font-weight:600;">Pushplus Token</label>
-                <input type="text" id="modal-pushplus-token" placeholder="粘贴 pushplus Token（看第 3 步）" style="flex:1;padding:9px 12px;border:1px solid var(--input-border);border-radius:8px;font-size:13px;font-family:monospace;outline:none;background:var(--input-bg);color:var(--text-main);" oninput="window.savePushplusToken(this.value)">
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <label style="font-size:13px;color:var(--muted);white-space:nowrap;font-weight:600;">收消息渠道</label>
-                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid var(--input-border);border-radius:10px;background:var(--input-bg);font-size:13px;">
-                    <input type="radio" name="pushplus-channel" value="wechat" onchange="window.savePushplusChannel('wechat');window.refreshPushplusChannelUI()" checked>📬 微信
-                </label>
-                <label style="cursor:pointer;display:flex;align-items:center;gap:5px;padding:6px 12px;border:1.5px solid var(--input-border);border-radius:10px;background:var(--input-bg);font-size:13px;">
-                    <input type="radio" name="pushplus-channel" value="qq" onchange="window.savePushplusChannel('qq');window.refreshPushplusChannelUI()">🐧 QQ
-                </label>
-            </div>
-            <div style="display:flex;align-items:center;gap:10px;">
-                <label style="font-size:13px;color:var(--muted);white-space:nowrap;font-weight:600;">启用</label>
-                <label class="switch" aria-label="开启 pushplus 通知"><input id="modal-pushplus-toggle" type="checkbox" onchange="window.togglePushplus(this)"><span class="switch-track"></span></label>
-                <span style="font-size:12px;color:var(--muted);">30 秒内多条消息合并推送一条</span>
+    </div>
+    <!-- 面板主体 -->
+    <div id="admin-main-view" class="admin-main-view" style="display:none;">
+        <div class="admin-header">
+            <h3 style="margin:0;font-size:17px;">🛠 后台管理</h3>
+            <div style="display:flex;gap:8px;">
+                <button onclick="window.adminRefreshStats()" style="padding:6px 12px;background:var(--panel-soft);color:var(--btn-color);border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;">刷新</button>
+                <button onclick="window.adminLogout()" style="padding:6px 12px;background:var(--panel-soft);color:var(--muted);border:1px solid var(--line);border-radius:8px;font-size:12.5px;cursor:pointer;">退出</button>
+                <button onclick="window.closeAdminPanel()" style="padding:6px 12px;background:transparent;color:var(--muted);border:none;font-size:18px;cursor:pointer;">✕</button>
             </div>
         </div>
-        <div style="display:flex;gap:10px;margin-bottom:10px;">
-            <button onclick="window.testPushplusNotify(this)" style="flex:1;margin:0;padding:10px 16px;background:var(--panel-soft);color:var(--btn-color);border:1px solid var(--line);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;">🧪 测试通知</button>
-            <a href="https://www.pushplus.plus" target="_blank" style="flex:1;text-align:center;padding:10px 16px;background:var(--btn-bg);color:white;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;">🔗 打开 pushplus</a>
+        <div id="admin-stats" class="admin-stats"></div>
+        <div class="admin-tabs">
+            <button class="admin-tab active" data-tab="rooms" onclick="window.adminSwitchTab('rooms')">房间</button>
+            <button class="admin-tab" data-tab="messages" onclick="window.adminSwitchTab('messages')">消息</button>
+            <button class="admin-tab" data-tab="users" onclick="window.adminSwitchTab('users')">用户</button>
+            <button class="admin-tab" data-tab="login-logs" onclick="window.adminSwitchTab('login-logs')">登录日志</button>
+            <button class="admin-tab" data-tab="members" onclick="window.adminSwitchTab('members')">成员</button>
+            <button class="admin-tab" data-tab="requests" onclick="window.adminSwitchTab('requests')">加入申请</button>
+            <button class="admin-tab" data-tab="logs" onclick="window.adminSwitchTab('logs')">加入日志</button>
         </div>
-        <button onclick="window.closeWxNotifySetup(null)" style="width:100%;margin:0;padding:10px 16px;background:var(--panel-soft);color:var(--text-main);border-radius:10px;font-size:14px;font-weight:600;border:1px solid var(--line);cursor:pointer;">关闭</button>
-
-        <details class="push-faq" style="margin-top:14px;">
-            <summary>❓ 收不到消息？点开看常见问题</summary>
-            <div class="push-faq-body">
-                <div class="push-faq-item"><b>测试返回「905 / 需要实名」</b>pushplus 2024 年 8 月起强制实名认证。回「个人中心」完成实名后再试。</div>
-                <div class="push-faq-item"><b>测试返回「Token 无效」</b>检查 token 是否复制完整（看是不是 32 位字母数字混合），前后不要带空格。</div>
-                <div class="push-faq-item"><b>微信收不到？</b>用「扫码登录 pushplus 的那个微信」去扫码关注「pushplus 推送加」公众号。关注后等 10 秒再测试。</div>
-                <div class="push-faq-item"><b>QQ 收不到？</b>必须先在 pushplus 后台的「渠道配置」里用自己的 QQ 扫码加机器人为好友（绑定），机器人会发一条确认。绑定后再测试。</div>
-                <div class="push-faq-item"><b>会不会太吵？</b>30 秒内多条新消息只合并推送一条；随时关闭「启用」开关即可停用。</div>
-                <div class="push-faq-item"><b>安全吗？</b>Token 只保存在你设备的浏览器本地，不会上传到任何服务器。你也可以随时去 pushplus 后台重置 token 让旧 token 失效。</div>
-            </div>
-        </details>
+        <div id="admin-tab-body" class="admin-tab-body"></div>
     </div>
 </div>
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "2.6.0";
+    const CHAT_APP_VERSION = "3.3.1";
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -2018,50 +2060,9 @@
         }, duration);
     }
 
-    /**
-     * 临时把按钮置为 loading 状态（变灰、显示 loading 文字、不可点）。
-     * 返回 restore 回调，调用后恢复原样。
-     * 用法：const restore = setButtonLoading(btn, '加载中…'); ... restore();
-     */
-    function setButtonLoading(btn, loadingText) {
-        if (!btn) return () => {};
-        const original = {
-            text: btn.textContent,
-            disabled: btn.disabled,
-            style: btn.getAttribute('style') || ''
-        };
-        btn.disabled = true;
-        btn.setAttribute('data-loading', '1');
-        btn.textContent = loadingText || '处理中…';
-        btn.style.opacity = '0.7';
-        btn.style.cursor = 'wait';
-        return function restore() {
-            btn.disabled = original.disabled;
-            btn.removeAttribute('data-loading');
-            btn.textContent = original.text;
-            btn.style.opacity = '';
-            btn.style.cursor = '';
-        };
-    }
-
     let currentRoomCode = "";
+    let pendingUrlRoom = ""; // 通过链接 ?room=xxx 带入的目标房间（登录后自动继续）
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
-
-    async function checkWxBindStatus() {
-        const enabled = localStorage.getItem('chat_pushplus_enabled') === '1';
-        const token = localStorage.getItem('chat_pushplus_token') || '';
-        return !!(enabled && token);
-    }
-
-    function updateWxNotifyButton() {
-        const btn = document.getElementById('wx-notify-btn');
-        if (!btn) return;
-        checkWxBindStatus().then(bound => {
-            const channel = localStorage.getItem('chat_pushplus_channel') || 'wechat';
-            const chanTag = channel === 'qq' ? 'QQ' : '微信';
-            btn.textContent = bound ? '通知已开启（' + chanTag + '）✓' : '配置微信 / QQ 通知';
-        });
-    }
 
     let replyData = null;
     let roomSubscription = null;
@@ -2118,39 +2119,235 @@
     let messagesCache = [];
     let isLeavingRoom = false;
 
+    function isDesktopLayout() {
+        return window.matchMedia('(min-width: 1024px)').matches;
+    }
+
+    // ===== Service Worker（页面缓存 network-first + 推送通知基础） =====
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+        navigator.serviceWorker.register('/sw.js').then((reg) => {
+            // 每 60 秒检查一次 SW 更新，有新版立即激活（sw.js 内 skipWaiting + clients.claim）
+            setInterval(() => reg.update().catch(() => {}), 60000);
+        }).catch((e) => console.warn('[sw] 注册失败:', e.message));
+    }
+
     function showRoomLoading() {
         document.getElementById('login-area').style.display = 'none';
         document.getElementById('chat-container').style.display = 'flex';
+        // 电脑端（宽屏）：微信 PC 版布局 —— 左侧房间栏 + 右侧聊天区
+        if (isDesktopLayout()) {
+            document.body.classList.add('in-chat-desktop');
+            renderRoomSidebar();
+        } else {
+            document.body.classList.remove('in-chat-desktop');
+        }
         document.getElementById('room-loading').classList.remove('hidden');
     }
+
+    // ===== 电脑端左侧房间栏 =====
+    let sidebarRoomsData = []; // [{code, name, memberCount}]
+    async function renderRoomSidebar() {
+        const user = getLoggedInUser();
+        if (!user || !supabaseClient) return;
+        const nameEl = document.getElementById('sidebar-username');
+        const avaEl = document.getElementById('sidebar-avatar');
+        if (nameEl) nameEl.textContent = user;
+        if (avaEl) {
+            avaEl.textContent = String(user).slice(0, 1).toUpperCase();
+            avaEl.style.background = hashGradient(user);
+        }
+        // 侧栏头像用自定义头像（有缓存则替换为图片）
+        fetchAndApplyUserAvatars([user]);
+        const listEl = document.getElementById('sidebar-room-list');
+        if (!listEl) return;
+        // 首次加载显示骨架屏（不出现"加载中"文字）；已有数据时保留旧列表
+        if (!sidebarRoomsData.length) {
+            listEl.innerHTML = '<div class="skeleton-item"></div><div class="skeleton-item"></div><div class="skeleton-item"></div>';
+        }
+        try {
+            const { data, error } = await supabaseClient
+                .from('room_members')
+                .select('room_code')
+                .eq('user_name', user)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            const codes = [...new Set((data || []).map(r => r.room_code))];
+            if (!codes.length) {
+                sidebarRoomsData = [];
+                listEl.innerHTML = '<div class="sidebar-empty">还没有加入任何房间<br>点击顶部 ＋ 加入或创建</div>';
+                return;
+            }
+            // 并行拉取：房间名 + 每个房间的成员数（一次 in 查询客户端计数）
+            const nameMap = {};
+            const countMap = {};
+            try {
+                const [roomsRes, membersRes] = await Promise.all([
+                    supabaseClient.from('rooms').select('room_code,room_name').in('room_code', codes),
+                    supabaseClient.from('room_members').select('room_code').in('room_code', codes)
+                ]);
+                (roomsRes.data || []).forEach(r => { if (r.room_name) nameMap[r.room_code] = r.room_name; });
+                (membersRes.data || []).forEach(m => { countMap[m.room_code] = (countMap[m.room_code] || 0) + 1; });
+            } catch (e) { /* 表不可用时忽略 */ }
+            sidebarRoomsData = codes.map(c => ({ code: c, name: nameMap[c] || c, memberCount: countMap[c] || 1 }));
+            renderSidebarList();
+        } catch (e) {
+            console.warn('侧栏房间加载失败:', e);
+            listEl.innerHTML = '<div class="sidebar-empty">加载失败，请重试</div>';
+        }
+    }
+
+    function renderSidebarList() {
+        const listEl = document.getElementById('sidebar-room-list');
+        if (!listEl) return;
+        const kw = (document.getElementById('sidebar-search')?.value || '').trim().toLowerCase();
+        const rows = kw
+            ? sidebarRoomsData.filter(r => r.code.toLowerCase().includes(kw) || r.name.toLowerCase().includes(kw))
+            : sidebarRoomsData;
+        if (!rows.length) {
+            listEl.innerHTML = `<div class="sidebar-empty">${kw ? '没有匹配的房间' : '还没有加入任何房间<br>点击顶部 ＋ 加入或创建'}</div>`;
+            return;
+        }
+        listEl.innerHTML = rows.map(r => `
+            <div class="sidebar-room-item ${r.code === currentRoomCode ? 'active' : ''}" onclick="window.switchToRoom('${escapeHtml(r.code).replace(/'/g, '&#39;')}')">
+                <span class="sri-text"><b>${escapeHtml(r.name)}</b><small>${r.memberCount ? r.memberCount + ' 名成员 · ' : ''}${escapeHtml(r.code)}</small></span>
+                <span class="sri-arrow">›</span>
+            </div>`).join('');
+    }
+
+    window.filterSidebarRooms = function() { renderSidebarList(); };
+
+    window.switchToRoom = function(code) {
+        code = String(code || '').trim();
+        if (!code) return;
+        if (code === currentRoomCode) return;
+        document.getElementById('join-room-modal').style.display = 'none';
+        window.joinRoom(code);
+    };
+
+    window.openJoinRoomModal = function() {
+        const modal = document.getElementById('join-room-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        setTimeout(() => document.getElementById('join-room-modal-input').focus(), 60);
+    };
+
+    window.closeJoinRoomModal = function() {
+        const modal = document.getElementById('join-room-modal');
+        if (modal) modal.style.display = 'none';
+        const input = document.getElementById('join-room-modal-input');
+        if (input) input.value = '';
+    };
+
+    window.confirmJoinRoomModal = function() {
+        const input = document.getElementById('join-room-modal-input');
+        const code = input ? input.value.trim() : '';
+        if (!code) return showToast('请输入房间代码', 'error');
+        window.switchToRoom(code);
+    };
 
     function hideRoomLoading() {
         document.getElementById('room-loading').classList.add('hidden');
     }
 
-    window.showWxNotifySetup = function() {
-        document.getElementById('settings-modal').style.display = 'none';
-        const tokenInput = document.getElementById('modal-pushplus-token');
-        const toggle = document.getElementById('modal-pushplus-toggle');
-        if (tokenInput) tokenInput.value = localStorage.getItem('chat_pushplus_token') || '';
-        if (toggle) toggle.checked = localStorage.getItem('chat_pushplus_enabled') === '1';
-        // 渠道默认值：首次没有存储就默认 wechat
-        if (!localStorage.getItem('chat_pushplus_channel')) {
-            localStorage.setItem('chat_pushplus_channel', 'wechat');
+    /** 回到主页（已登录→房间列表页；未登录→登录/注册层） */
+    function backToLoginArea() {
+        document.body.classList.remove('in-chat-desktop');
+        document.getElementById('room-loading').classList.add('hidden');
+        document.getElementById('chat-container').style.display = 'none';
+        if (getLoggedInUser()) {
+            showRoomListView();
+        } else {
+            showAuthOverlay();
         }
-        window.refreshPushplusChannelUI();
-        document.getElementById('wx-notify-modal').classList.add('show');
+    }
+
+    // ===== 手机端：主页（微信式底部导航：消息 / 我的） =====
+    function showRoomListView() {
+        const area = document.getElementById('login-area');
+        area.style.display = 'flex';
+        area.classList.add('show-room-view');
+        document.getElementById('chat-container').style.display = 'none';
+        const user = getLoggedInUser();
+        const nameEl = document.getElementById('mrv-username');
+        const avaEl = document.getElementById('mrv-avatar');
+        if (nameEl) nameEl.textContent = user || '';
+        if (avaEl) {
+            avaEl.textContent = String(user || '?').slice(0, 1).toUpperCase();
+            avaEl.style.background = hashGradient(user || '');
+        }
+        if (user) fetchAndApplyUserAvatars([user]); // 有自定义头像则替换首字母
+        window.switchMrvTab('msgs'); // 每次回到主页默认停在"消息"tab
+        renderMobileRoomList();
+    }
+
+    window.switchMrvTab = function(tab) {
+        const isMsgs = tab !== 'me';
+        document.getElementById('mrv-page-msgs').style.display = isMsgs ? 'flex' : 'none';
+        document.getElementById('mrv-page-me').style.display = isMsgs ? 'none' : 'flex';
+        document.getElementById('mrv-tab-msgs').classList.toggle('active', isMsgs);
+        document.getElementById('mrv-tab-me').classList.toggle('active', !isMsgs);
     };
 
-    window.closeWxNotifySetup = function(event) {
-        if (event && event.target !== document.getElementById('wx-notify-modal')) return;
-        document.getElementById('wx-notify-modal').classList.remove('show');
-        document.getElementById('settings-modal').style.display = 'flex';
+    window.toggleMrvAdd = function() {
+        const row = document.getElementById('mrv-add-row');
+        if (!row) return;
+        row.style.display = row.style.display === 'none' ? 'flex' : 'none';
+        if (row.style.display === 'flex') document.getElementById('mrv-room-input').focus();
+    };
+
+    async function renderMobileRoomList() {
+        const listEl = document.getElementById('mrv-list');
+        if (!listEl) return;
+        const user = getLoggedInUser();
+        if (!user || !supabaseClient) return;
+        listEl.innerHTML = '<div class="mrv-empty">加载中…</div>';
+        try {
+            const { data, error } = await supabaseClient
+                .from('room_members')
+                .select('room_code')
+                .eq('user_name', user)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            const codes = [...new Set((data || []).map(r => r.room_code))];
+            if (!codes.length) {
+                listEl.innerHTML = '<div class="mrv-empty">还没有房间<br>在下方输入房间代码加入或创建</div>';
+                return;
+            }
+            const nameMap = {}; const countMap = {};
+            try {
+                const [roomsRes, membersRes] = await Promise.all([
+                    supabaseClient.from('rooms').select('room_code,room_name').in('room_code', codes),
+                    supabaseClient.from('room_members').select('room_code').in('room_code', codes)
+                ]);
+                (roomsRes.data || []).forEach(r => { if (r.room_name) nameMap[r.room_code] = r.room_name; });
+                (membersRes.data || []).forEach(m => { countMap[m.room_code] = (countMap[m.room_code] || 0) + 1; });
+            } catch (e) { /* 表不可用时忽略 */ }
+            listEl.innerHTML = codes.map(c => `
+                <div class="mrv-item" onclick="window.mrvEnter('${escapeHtml(c).replace(/'/g, '&#39;')}')">
+                    <span class="mrv-badge" style="background:${hashGradient(c)}">${escapeHtml((nameMap[c] || c).slice(0, 1).toUpperCase())}</span>
+                    <span class="mrv-item-text"><b>${escapeHtml(nameMap[c] || c)}</b><small>${countMap[c] ? countMap[c] + ' 名成员 · ' : ''}${escapeHtml(c)}</small></span>
+                    <span class="mrv-arrow">›</span>
+                </div>`).join('');
+        } catch (e) {
+            console.warn('手机房间列表加载失败:', e);
+            listEl.innerHTML = '<div class="mrv-empty">加载失败，请下拉刷新重试</div>';
+        }
+    }
+
+    window.mrvEnter = function(code) {
+        code = String(code || '').trim();
+        if (!code) return;
+        window.joinRoom(code); // 直接进入，不再先露出旧登录页
+    };
+
+    window.mrvJoin = function() {
+        const v = document.getElementById('mrv-room-input').value.trim();
+        if (!v) return showToast('请输入房间代码', 'error');
+        document.getElementById('mrv-room-input').value = '';
+        window.mrvEnter(v);
     };
 
     window.onload = async () => {
-        showInstallBanner();
-        
         document.addEventListener('touchstart', function(){}, {passive: true});
         document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
         document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
@@ -2163,11 +2360,24 @@
         setVH();
         window.addEventListener('resize', setVH);
         window.addEventListener('orientationchange', () => setTimeout(setVH, 100));
+
+        // 窗口跨过电脑/手机布局阈值（1024px）时，同步侧栏显示与数据
+        let lastDesktopLayout = isDesktopLayout();
+        window.addEventListener('resize', () => {
+            const nowDesktop = isDesktopLayout();
+            if (nowDesktop === lastDesktopLayout) return;
+            lastDesktopLayout = nowDesktop;
+            const chatVisible = document.getElementById('chat-container').style.display !== 'none';
+            if (chatVisible && currentRoomCode) {
+                document.body.classList.toggle('in-chat-desktop', nowDesktop);
+                if (nowDesktop) renderRoomSidebar();
+            }
+        });
         
         const urlParams = new URLSearchParams(window.location.search);
         const roomFromUrl = urlParams.get('room');
         if (roomFromUrl) {
-            document.getElementById('room-input').value = roomFromUrl;
+            pendingUrlRoom = String(roomFromUrl).trim();
             if (window.history && window.history.replaceState) {
                 window.history.replaceState({}, '', window.location.pathname);
             }
@@ -2218,21 +2428,29 @@
             }
         });
 
+        // ===== 账号系统：已登录则恢复账号，未登录显示登录/注册层 =====
+        const loggedUser = getLoggedInUser();
+        if (loggedUser) {
+            mySender = loggedUser;
+            insertLoginLog('auto');
+        } else {
+            showAuthOverlay();
+        }
+
         const savedToken = localStorage.getItem('chat_auth_token');
         const savedRoom = localStorage.getItem('chat_last_room');
         const expiry = localStorage.getItem('chat_auth_expiry');
 
-        if (savedToken && savedRoom && expiry) {
+        if (loggedUser && savedRoom && expiry) {
             const now = new Date().getTime();
             if (now < parseInt(expiry)) {
                 currentRoomCode = savedRoom;
-                mySender = savedToken; 
+                mySender = loggedUser;
                 pendingJoinAnnounce = true;
                 showRoomLoading();
                 setRoomTitle(currentRoomCode);
                 await loadHistory(true);
                 hideRoomLoading();
-                updateWxNotifyButton();
                 logJoinRoom('auto');
                 setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
                 ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
@@ -2245,17 +2463,37 @@
             }
         }
 
-        var savedName = localStorage.getItem('chat_auth_token');
-        if (savedName) {
-            document.getElementById('username').value = savedName;
-            document.getElementById('room-input').focus();
+        if (loggedUser) {
+            await loadMyRooms();
+            // 链接带入的房间优先；其次电脑端自动进最近房间；否则显示房间列表主页
+            if (!currentRoomCode && pendingUrlRoom) {
+                const target = pendingUrlRoom;
+                pendingUrlRoom = '';
+                showRoomLoading();
+                await window.joinRoom(target);
+            } else if (isDesktopLayout() && !currentRoomCode && myRoomsCache.length) {
+                showRoomLoading();
+                window.switchToRoom(myRoomsCache[0]);
+            } else if (!currentRoomCode) {
+                showRoomListView();
+            }
         }
 
-        document.getElementById('username').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('room-input').focus(); }
+        // 登录/注册回车键
+        document.getElementById('auth-username').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('auth-password').focus(); }
         });
-        document.getElementById('room-input').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') { e.preventDefault(); window.joinRoom(); }
+        document.getElementById('auth-password').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); window.doLogin(); }
+        });
+        document.getElementById('reg-username').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('reg-password').focus(); }
+        });
+        document.getElementById('reg-password').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); document.getElementById('reg-password2').focus(); }
+        });
+        document.getElementById('reg-password2').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { e.preventDefault(); window.doRegister(); }
         });
 
         // ===== 图片查看器：缩放 / 平移 =====
@@ -2387,11 +2625,6 @@
                     roomNameModal.style.display = 'none';
                     return;
                 }
-                const installPopup = document.getElementById('install-popup');
-                if (installPopup && installPopup.style.display === 'flex') {
-                    installPopup.style.display = 'none';
-                    return;
-                }
                 const lightbox = document.getElementById('image-lightbox');
                 if (lightbox && lightbox.classList.contains('visible')) {
                     closeImageLightbox();
@@ -2470,31 +2703,41 @@
         });
     };
 
-    window.joinRoom = async function() {
-        const nameInput = document.getElementById('username').value.trim();
-        currentRoomCode = document.getElementById('room-input').value.trim();
-        const isAutoLogin = document.getElementById('auto-login-check').checked;
-        const joinBtn = document.getElementById('join-btn');
+    window.joinRoom = async function(codeOverride) {
+        // 账号系统：昵称强制使用已登录账号，未登录先弹登录层（记住目标房间，登录后自动继续）
+        const nameInput = getLoggedInUser();
+        const wantedCode = String(codeOverride || pendingUrlRoom || '').trim();
+        if (!nameInput) { pendingUrlRoom = wantedCode; showAuthOverlay(); return; }
+        const prevRoomCode = currentRoomCode; // 聊天中切换房间失败时用于回退
+        currentRoomCode = wantedCode || currentRoomCode;
+        pendingUrlRoom = '';
 
         if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
+            currentRoomCode = prevRoomCode;
             return showToast("房间代码格式不正确，请只使用字母、数字或符号。", 'error');
         }
 
-        if (!nameInput || !currentRoomCode) return showToast("请输入名字和房间代码", 'error');
+        if (!nameInput || !currentRoomCode) {
+            currentRoomCode = prevRoomCode;
+            return showToast("请输入名字和房间代码", 'error');
+        }
 
-        joinBtn.disabled = true;
-        const oldBtnText = joinBtn.textContent;
-        joinBtn.textContent = '正在进入...';
+        // 聊天中切换房间失败时留在原房间（不踢回登录页）
+        const switchingInChat = !!prevRoomCode && document.getElementById('chat-container').style.display === 'flex';
+        // 回退时恢复“自动进入房间”目标为原房间
+        const revertToPrev = () => {
+            currentRoomCode = prevRoomCode;
+            localStorage.setItem('chat_last_room', prevRoomCode);
+            if (isDesktopLayout()) renderRoomSidebar();
+        };
 
         localStorage.setItem('chat_auth_token', nameInput);
         mySender = nameInput;
         pendingJoinAnnounce = true;
 
-        if (isAutoLogin) {
-            const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000);
-            localStorage.setItem('chat_last_room', currentRoomCode);
-            localStorage.setItem('chat_auth_expiry', expiryTime.toString());
-        }
+        const expiryTime = new Date().getTime() + (10 * 24 * 60 * 60 * 1000);
+        localStorage.setItem('chat_last_room', currentRoomCode);
+        localStorage.setItem('chat_auth_expiry', expiryTime.toString());
 
         try {
             // ====== 成员白名单 + 审批检查 ======
@@ -2515,6 +2758,11 @@
                 setRoomTitle(currentRoomCode);
                 await actuallyEnterRoom();
             } else if (join.status === 'pending') {
+                if (switchingInChat) {
+                    revertToPrev();
+                    showToast('该房间的加入申请审核中，请等待成员审批', 'info', 3000);
+                    return;
+                }
                 // 已有进行中的申请：进入等待页
                 document.getElementById('login-area').style.display = 'none';
                 showApplyScreen();
@@ -2530,66 +2778,53 @@
                 setRoomTitle(currentRoomCode);
                 await actuallyEnterRoom();
             } else if (join.status === 'rejected') {
-                // 之前被拒，提示用户可以重新申请
-                document.getElementById('login-area').style.display = 'flex';
-                const notice = document.getElementById('login-membership-notice');
-                if (notice) {
-                    notice.innerHTML = `你之前的加入申请被拒绝了。可点下方「申请重新加入」再次发起。`;
-                    notice.style.display = 'block';
+                if (switchingInChat) {
+                    revertToPrev();
+                    showToast('你之前的加入申请被拒绝了，无法加入该房间', 'error', 3000);
+                    return;
                 }
-                // 注入「申请重新加入」按钮
-                let reapplyBtn = document.getElementById('reapply-btn');
-                if (!reapplyBtn) {
-                    reapplyBtn = document.createElement('button');
-                    reapplyBtn.id = 'reapply-btn';
-                    reapplyBtn.textContent = '申请重新加入';
-                    reapplyBtn.onclick = window.reapplyJoin;
-                    reapplyBtn.style.cssText = 'width:100%;margin:6px 0 0;padding:10px;background:var(--btn-bg);color:white;border:0;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;';
-                    notice.appendChild(reapplyBtn);
-                }
+                // 之前被拒：用申请屏提示可重新发起
+                document.getElementById('login-area').style.display = 'none';
+                showApplyScreen(`
+                    <div class="apply-icon">🚫</div>
+                    <h3>你之前的加入申请被拒绝了</h3>
+                    <p>房间「${escapeHtml(currentRoomCode)}」暂时无法进入，可以重新发起申请。</p>
+                    <button onclick="window.reapplyJoin()">申请重新加入</button>
+                `);
             } else {
                 // 'none'：房间存在但用户不是成员，需要申请加入
-                document.getElementById('login-area').style.display = 'flex';
+                if (switchingInChat) {
+                    revertToPrev();
+                    showToast('你不是该房间的成员，加入需要成员审批', 'error', 3000);
+                    return;
+                }
+                document.getElementById('login-area').style.display = 'none';
                 const totalMembers = join.totalMembers || 0;
                 const need = votesNeeded(totalMembers);
-                const notice = document.getElementById('login-membership-notice');
-                if (notice) {
-                    notice.innerHTML = `你不是房间「<b>${escapeHtml(currentRoomCode)}</b>」的成员（当前共 <b>${totalMembers}</b> 名成员）。<br>加入需要超过 1/2（即 <b>${need}</b> 票）现有成员同意。点下方按钮发起申请：`;
-                    notice.style.display = 'block';
-                }
-                let applyBtn = document.getElementById('apply-join-btn');
-                if (!applyBtn) {
-                    applyBtn = document.createElement('button');
-                    applyBtn.id = 'apply-join-btn';
-                    applyBtn.textContent = '🙋 申请加入房间';
-                    applyBtn.onclick = window.requestJoinRoom;
-                    applyBtn.style.cssText = 'width:100%;margin:6px 0 0;padding:11px;background:var(--btn-bg);color:white;border:0;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;';
-                    notice.appendChild(applyBtn);
-                }
+                showApplyScreen(`
+                    <div class="apply-icon">🙋</div>
+                    <h3>加入房间「${escapeHtml(currentRoomCode)}」需要审批</h3>
+                    <p>你不是该房间的成员（当前共 <b>${totalMembers}</b> 名成员）。<br>加入需要超过 1/2（即 <b>${need}</b> 票）现有成员同意。</p>
+                    <button onclick="window.requestJoinRoom()">🙋 申请加入房间</button>
+                `);
             }
         } catch (e) {
             console.error('加入房间检查失败:', e);
             showToast('加入房间检查失败：' + (e.message || ''), 'error');
-        } finally {
-            joinBtn.disabled = false;
-            joinBtn.textContent = oldBtnText;
         }
     };
 
     /**
-     * 在登录页面上「申请加入」按钮：发起申请 → 进入等待页
+     * 「申请加入」：发起申请 → 进入等待页
      */
     window.requestJoinRoom = async function() {
-        const name = document.getElementById('username').value.trim();
-        const room = document.getElementById('room-input').value.trim();
-        if (!name || !room) return showToast('请先填好名字和房间代码', 'error');
-        const btn = document.getElementById('apply-join-btn');
-        if (btn) { btn.disabled = true; btn.textContent = '正在提交申请...'; }
+        const name = getLoggedInUser();
+        const room = currentRoomCode;
+        if (!name || !room) return showToast('请先登录并输入房间代码', 'error');
         try {
             const res = await submitJoinRequest(room, name);
             if (!res.ok) {
                 showToast('提交申请失败：' + (res.message || res.reason || '未知错误'), 'error');
-                if (btn) { btn.disabled = false; btn.textContent = '🙋 申请加入房间'; }
                 return;
             }
             // 进入等待页
@@ -2600,22 +2835,18 @@
         } catch (e) {
             console.error('申请失败:', e);
             showToast('申请失败：' + (e.message || ''), 'error');
-            if (btn) { btn.disabled = false; btn.textContent = '🙋 申请加入房间'; }
         }
     };
 
     /** 被拒后重新申请 */
     window.reapplyJoin = async function() {
-        const name = document.getElementById('username').value.trim();
-        const room = document.getElementById('room-input').value.trim();
-        if (!name || !room) return showToast('请先填好名字和房间代码', 'error');
-        const btn = document.getElementById('reapply-btn');
-        if (btn) { btn.disabled = true; btn.textContent = '正在提交...'; }
+        const name = getLoggedInUser();
+        const room = currentRoomCode;
+        if (!name || !room) return showToast('请先登录并输入房间代码', 'error');
         try {
             const res = await submitJoinRequest(room, name);
             if (!res.ok) {
                 showToast('重新申请失败：' + (res.message || res.reason || ''), 'error');
-                if (btn) { btn.disabled = false; btn.textContent = '申请重新加入'; }
                 return;
             }
             document.getElementById('login-area').style.display = 'none';
@@ -2625,7 +2856,6 @@
         } catch (e) {
             console.error('重新申请失败:', e);
             showToast('重新申请失败：' + (e.message || ''), 'error');
-            if (btn) { btn.disabled = false; btn.textContent = '申请重新加入'; }
         }
     };
 
@@ -2912,8 +3142,7 @@
     window.cancelJoinWait = async function() {
         stopJoinWaitWatcher();
         hideApplyScreen();
-        const login = document.getElementById('login-area');
-        if (login) login.style.display = 'flex';
+        backToLoginArea();
         showToast('已取消申请', 'info', 1800);
     };
 
@@ -2998,7 +3227,7 @@
         try {
             await loadHistory(true);
             hideRoomLoading();
-            updateWxNotifyButton();
+            if (isDesktopLayout()) renderRoomSidebar(); // 进入房间后刷新左侧栏（高亮当前房间）
             logJoinRoom('manual');
             setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
@@ -3015,9 +3244,7 @@
             }
         } catch (error) {
             console.error('进入房间失败:', error);
-            const login = document.getElementById('login-area');
-            if (login) login.style.display = 'flex';
-            document.getElementById('chat-container').style.display = 'none';
+            backToLoginArea();
             showToast('进入房间失败，请检查网络后重试。', 'error');
         }
     }
@@ -3072,6 +3299,12 @@
      * @param {boolean} isInitial - 是否为初始加载（如果是，则只显示最新的30条）
      */
     async function loadHistory(isInitial = true) {
+        const roomAtStart = currentRoomCode;
+        if (isInitial) {
+            // 切换房间：打断上一次未完成的加载，立即清空消息区（旧结果会因下方房间校验被丢弃，避免串台）
+            isFetchingHistory = false;
+            document.getElementById('chat-box').innerHTML = '';
+        }
         if (isFetchingHistory) return;
         isFetchingHistory = true;
         const chatBox = document.getElementById('chat-box');
@@ -3081,6 +3314,7 @@
                 oldestLoadedAt = null;
                 noMoreHistory = false;
                 messagesCache = [];
+                lastKnownMessageId = null; // 跨房间重置，避免新房间消息被误跳过
 
                 let { data: recentData, error } = await supabaseClient
                     .from('messages')
@@ -3088,6 +3322,12 @@
                     .eq('room_code', currentRoomCode)
                     .order('created_at', { ascending: false })
                     .limit(PAGE_SIZE);
+
+                // 等待期间用户已切到其他房间：丢弃本次结果，避免旧房间消息渲染进新房
+                if (currentRoomCode !== roomAtStart) {
+                    isFetchingHistory = false;
+                    return;
+                }
 
                 if (error) {
                     console.error('[chat] 查询消息失败:', error.message, error.code, error.details);
@@ -3404,6 +3644,7 @@
         if (realtimePolling) return;
         realtimePolling = setInterval(async () => {
             try {
+                const roomAtStart = currentRoomCode;
                 const { data, error } = await supabaseClient
                     .from('messages')
                     .select('*')
@@ -3411,6 +3652,8 @@
                     .order('created_at', { ascending: false })
                     .limit(5);
                 if (error) return;
+                // 等待期间已切换房间：丢弃本次结果，避免旧房间消息串台
+                if (currentRoomCode !== roomAtStart) return;
                 if (data && data.length > 0) {
                     for (const msg of data.reverse()) {
                         const existing = document.querySelector(`.msg-wrapper[data-msg-id="${msg.id}"]`);
@@ -4358,16 +4601,8 @@
         return `linear-gradient(135deg, hsl(${a} ${sat}% ${light}%), hsl(${b} ${sat}% ${Math.max(38, light - 12)}%))`;
     }
 
-    function applyRoomBadge() {
-        const badge = document.getElementById('room-badge');
-        if (!badge) return;
-        badge.textContent = (currentRoomCode || '?').slice(0, 1).toUpperCase();
-        badge.style.background = hashGradient(currentRoomCode || 'chat');
-    }
-
     function setRoomTitle(text) {
         document.getElementById('room-title').innerText = text;
-        applyRoomBadge();
     }
 
     function avatarHtml(sender) {
@@ -4537,9 +4772,6 @@
     };
 
     function appendMessageToUI(id, sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false, skipAvatarRefresh = false, fileName = null, fileSize = null) {
-        if (isNew && sender !== mySender && content && content !== '[已撤回]') {
-            notifyViaPushplus(sender, content);
-        }
         const chatBox = document.getElementById('chat-box');
         if (isNew && id && Array.from(chatBox.querySelectorAll('.msg-wrapper[data-msg-id]')).some((item) => item.dataset.msgId === String(id))) return;
         const wrapper = document.createElement('div');
@@ -5044,6 +5276,7 @@
 
 
 
+    // 聊天设置弹窗（右上角）：仅房间成员、聊天相关项
     window.toggleSettings = function(e) {
         const modal = document.getElementById('settings-modal');
         // If called with an event (overlay click), only close when clicking the overlay itself
@@ -5055,16 +5288,132 @@
         }
         modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
         if (modal.style.display === 'flex') {
-            refreshProfileAvatar();
-            syncThemeCards();
-            const speedToggle = document.getElementById('speed-mode-toggle');
-            if (speedToggle) speedToggle.checked = isSpeedMode;
-            const pollingToggle = document.getElementById('polling-toggle');
-            if (pollingToggle) pollingToggle.checked = isPollingEnabled;
-            const downloadPathInput = document.getElementById('download-path-input');
-            if (downloadPathInput) downloadPathInput.value = localStorage.getItem('chat_download_path') || '';
+            renderRoomMembers();
         }
     };
+
+    // 全局设置页（左下角"设置"）：覆盖整个聊天区域
+    window.openGlobalSettings = function() {
+        const page = document.getElementById('global-settings-page');
+        if (!page) return;
+        document.getElementById('settings-modal').style.display = 'none';
+        const user = getLoggedInUser();
+        const nameEl = document.getElementById('gsp-username');
+        if (nameEl) nameEl.textContent = user || '未登录';
+        refreshProfileAvatar();
+        syncThemeCards();
+        const speedToggle = document.getElementById('speed-mode-toggle');
+        if (speedToggle) speedToggle.checked = isSpeedMode;
+        const pollingToggle = document.getElementById('polling-toggle');
+        if (pollingToggle) pollingToggle.checked = isPollingEnabled;
+        const darkToggle = document.getElementById('dark-mode-toggle');
+        if (darkToggle) darkToggle.checked = document.documentElement.getAttribute('data-theme') === 'dark';
+        const downloadPathInput = document.getElementById('download-path-input');
+        if (downloadPathInput) downloadPathInput.value = localStorage.getItem('chat_download_path') || '';
+        page.style.display = 'block';
+        page.scrollTop = 0;
+    };
+
+    window.closeGlobalSettings = function() {
+        const page = document.getElementById('global-settings-page');
+        if (page) page.style.display = 'none';
+    };
+
+    // 修改密码（全局设置 > 账号安全）：验证旧密码后更新 users.password
+    window.changePassword = async function() {
+        const msgEl = document.getElementById('pwd-msg');
+        const oldEl = document.getElementById('pwd-old');
+        const newEl = document.getElementById('pwd-new');
+        const new2El = document.getElementById('pwd-new2');
+        const user = getLoggedInUser();
+        if (!user || !supabaseClient) return;
+        const show = (text, ok) => {
+            msgEl.textContent = text;
+            msgEl.style.color = ok ? '#16a34a' : '#dc2626';
+            msgEl.style.display = 'block';
+        };
+        const oldPwd = oldEl.value.trim(), newPwd = newEl.value.trim(), newPwd2 = new2El.value.trim();
+        if (!oldPwd || !newPwd) { show('请填写完整', false); return; }
+        if (newPwd.length < 4) { show('新密码至少 4 位', false); return; }
+        if (newPwd !== newPwd2) { show('两次输入的新密码不一致', false); return; }
+        try {
+            const { data, error } = await supabaseClient
+                .from('users')
+                .select('password')
+                .eq('username', user)
+                .single();
+            if (error || !data) { show('获取账号信息失败', false); return; }
+            const oldHash = await sha256Hex(oldPwd + user);
+            if (data.password !== oldHash) { show('当前密码不正确', false); return; }
+            const newHash = await sha256Hex(newPwd + user);
+            const { error: upErr } = await supabaseClient
+                .from('users')
+                .update({ password: newHash })
+                .eq('username', user);
+            if (upErr) { show('修改失败：' + upErr.message, false); return; }
+            show('密码修改成功', true);
+            oldEl.value = ''; newEl.value = ''; new2El.value = '';
+            showToast('密码已更新', 'success', 2000);
+        } catch (e) {
+            show('修改失败，请重试', false);
+        }
+    };
+
+    // ===== 房间成员（微信聊天信息风格：头像网格 + 在线绿点 + 点击@TA） =====
+    window.insertMentionFromMembers = function(name) {
+        const input = document.getElementById('message-input');
+        if (!input) return;
+        input.value = (input.value || '') + '@' + name + ' ';
+        input.focus();
+    };
+
+    async function renderRoomMembers() {
+        const section = document.getElementById('members-section');
+        const grid = document.getElementById('members-grid');
+        const countEl = document.getElementById('members-count');
+        const tipEl = document.getElementById('members-tip');
+        if (!section || !grid) return;
+        if (!currentRoomCode || !supabaseClient) { section.style.display = 'none'; return; }
+        section.style.display = 'block';
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px;padding:8px 0;">加载中…</div>';
+        try {
+            const { data, error } = await supabaseClient
+                .from('room_members')
+                .select('user_name,created_at')
+                .eq('room_code', currentRoomCode)
+                .order('created_at', { ascending: true });
+            if (error) throw error;
+            const members = [...new Set((data || []).map(m => m.user_name))];
+            // 在线判断：presence key = `房间:用户`
+            const onlineKeys = new Set();
+            try {
+                if (roomSubscription) {
+                    const state = roomSubscription.presenceState();
+                    Object.keys(state || {}).forEach(k => {
+                        const idx = k.indexOf(':');
+                        if (idx > -1 && k.slice(0, idx) === currentRoomCode) onlineKeys.add(k.slice(idx + 1));
+                    });
+                }
+            } catch (e) { /* presence 不可用时忽略 */ }
+            if (countEl) countEl.textContent = members.length;
+            if (!members.length) {
+                grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px;padding:8px 0;">暂无固定成员</div>';
+                if (tipEl) tipEl.style.display = 'none';
+                return;
+            }
+            if (tipEl) tipEl.style.display = 'block';
+            grid.innerHTML = members.map(name =>
+                `<div class="member-cell ${onlineKeys.has(name) ? 'online' : ''}" onclick="window.insertMentionFromMembers('${escapeHtml(name).replace(/'/g, '&#39;')}')">
+                    <div class="member-ava-wrap">${avatarHtml(name)}<span class="member-online-dot"></span></div>
+                    <div class="member-name">${escapeHtml(name)}</div>
+                </div>`
+            ).join('');
+            // 头像未缓存时批量回填（会自动替换 DOM 中的头像）
+            fetchAndApplyUserAvatars(members);
+        } catch (e) {
+            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px;padding:8px 0;">加载失败</div>';
+        }
+    }
 
     window.toggleSpeedMode = function(toggle) {
         isSpeedMode = toggle.checked;
@@ -5098,153 +5447,553 @@
         }
     };
 
-    window.savePushplusToken = function(token) {
-        localStorage.setItem('chat_pushplus_token', token || '');
-        updateWxNotifyButton();
+    // ============================================
+    // 后台管理面板（只读，密码仅为前端拦截，非严格安全边界）
+    // ============================================
+    const ADMIN_PASSWORD = '12346789';
+    const ADMIN_MSG_PAGE_SIZE = 50;
+    let adminTab = 'rooms';
+    let adminMsgRoom = '';
+    let adminMsgSearch = '';
+    let adminMsgPage = 0;
+    let adminRoomsCache = [];
+    let adminLoading = false;
+
+    function adminEsc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+    function adminFmtTime(ts) {
+        if (!ts) return '-';
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return adminEsc(ts);
+        const p = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
+    function adminMediaTag(m) {
+        if (!m) return '';
+        const t = String(m);
+        if (t.startsWith('system_join_request')) return '📬 系统';
+        if (t.startsWith('image')) return '🖼 图片';
+        if (t.startsWith('audio')) return '🎤 语音';
+        if (t.startsWith('video')) return '🎬 视频';
+        return '📎 文件';
+    }
+
+    window.openAdminPanel = function() {
+        document.getElementById('settings-modal').style.display = 'none';
+        const modal = document.getElementById('admin-modal');
+        modal.classList.add('show');
+        const logged = sessionStorage.getItem('harry_admin_ok') === '1';
+        document.getElementById('admin-login-view').style.display = logged ? 'none' : 'flex';
+        document.getElementById('admin-main-view').style.display = logged ? 'flex' : 'none';
+        if (logged) { adminEnterMain(); } else {
+            const pwd = document.getElementById('admin-pwd-input');
+            pwd.value = '';
+            setTimeout(() => pwd.focus(), 100);
+        }
     };
 
-    window.savePushplusChannel = function(channel) {
-        if (channel !== 'qq' && channel !== 'wechat') return;
-        localStorage.setItem('chat_pushplus_channel', channel);
+    window.closeAdminPanel = function() {
+        document.getElementById('admin-modal').classList.remove('show');
     };
 
-    window.refreshPushplusChannelUI = function() {
-        const channel = localStorage.getItem('chat_pushplus_channel') || 'wechat';
-        document.querySelectorAll('input[name="pushplus-channel"]').forEach(function(r) {
-            r.checked = (r.value === channel);
-        });
-    };
-
-    window.togglePushplus = function(toggle) {
-        const enabled = toggle.checked;
-        localStorage.setItem('chat_pushplus_enabled', enabled ? '1' : '0');
-        if (enabled) {
-            const token = localStorage.getItem('chat_pushplus_token') || '';
-            if (!token) {
-                showToast('⚠ 请先粘贴 pushplus Token 再开启', 'error', 3000);
-                toggle.checked = false;
-                localStorage.setItem('chat_pushplus_enabled', '0');
-                updateWxNotifyButton();
-                return;
-            }
-            showToast('✅ 推送通知已开启，新消息将通过所选渠道推送', 'success', 2500);
+    window.adminTryLogin = function() {
+        const pwd = document.getElementById('admin-pwd-input').value;
+        const err = document.getElementById('admin-pwd-err');
+        if (pwd === ADMIN_PASSWORD) {
+            sessionStorage.setItem('harry_admin_ok', '1');
+            err.style.display = 'none';
+            document.getElementById('admin-login-view').style.display = 'none';
+            document.getElementById('admin-main-view').style.display = 'flex';
+            adminEnterMain();
         } else {
-            showToast('推送通知已关闭', 'info', 2000);
-        }
-        updateWxNotifyButton();
-    };
-
-    window.testPushplusNotify = async function(btn) {
-        const token = localStorage.getItem('chat_pushplus_token') || '';
-        if (!token) {
-            showToast('⚠ 请先粘贴 pushplus Token 再测试', 'error', 3000);
-            return;
-        }
-        const channel = localStorage.getItem('chat_pushplus_channel') || 'wechat';
-        const chanLabel = channel === 'qq' ? 'QQ' : '微信';
-        const msg = '✅ pushplus 推送测试成功！\n来自：Harry 的聊天室\n如果你在' + chanLabel + '里看到这条，说明配置正确。';
-        const restore = setButtonLoading(btn, '发送中…');
-        const code = await sendPushplusRequest(token, channel, msg);
-        restore();
-        if (code === 'success') {
-            showToast('✅ 测试已发送，请查看' + chanLabel + '（「' + chanLabel + '服务通知」公众号或 pushplus 机器人）', 'success', 4000);
-        } else {
-            showToast(describePushplusResult(code) || PUSHPLUS_ERROR_MSG.unknown, 'error', 4500);
+            err.style.display = 'block';
         }
     };
 
-    /**
-     * 通过 pushplus 发送一条消息（支持 wechat 微信公众号 或 qq QQ机器人 渠道）。
-     * POST + JSON，接口同时支持 https/http，故不再受混合内容拦截。
-     * 参考：https://www.pushplus.plus/doc/guide/api.html
-     * @returns {'success'|'auth'|'network'|'unknown'|'verify'}  失败时细分原因
-     */
-    async function sendPushplusRequest(token, channel, content) {
-        if (!token) return 'auth';
-        const url = 'https://www.pushplus.plus/send';
-        const payload = {
-            token: token,
-            title: 'Harry 的聊天室',
-            content: content,
-            channel: channel || 'wechat',
-            template: 'txt'
-        };
+    window.adminLogout = function() {
+        sessionStorage.removeItem('harry_admin_ok');
+        window.closeAdminPanel();
+        showToast('已退出后台管理', 'info', 1500);
+    };
+
+    function adminEnterMain() {
+        window.adminRefreshStats();
+        adminSwitchTab(adminTab);
+    }
+
+    window.adminRefreshStats = async function() {
+        if (!supabaseClient) return;
+        const stat = document.getElementById('admin-stats');
+        stat.innerHTML = '<div class="admin-stat-card"><div class="admin-stat-num">…</div><div class="admin-stat-label">加载中</div></div>'.repeat(4);
         try {
-            const response = await fetch(url, {
-                method: 'POST',
-                mode: 'cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            if (!response.ok) {
-                if (response.status === 401 || response.status === 403) return 'auth';
-                return 'unknown';
-            }
-            const data = await response.json().catch(function() { return null; });
-            if (!data) return 'unknown';
-            if (data.code === 200) return 'success';
-            // pushplus 错误码：905=未实名；902/903=token 无效；其他=业务错
-            if (data.code === 905) return 'verify';
-            if (data.code === 902 || data.code === 903 || data.code === 901) return 'auth';
-            return 'unknown';
+            const [rooms, msgs, members, pending] = await Promise.all([
+                supabaseClient.from('rooms').select('*', { count: 'exact', head: true }),
+                supabaseClient.from('messages').select('*', { count: 'exact', head: true }),
+                supabaseClient.from('room_members').select('*', { count: 'exact', head: true }),
+                supabaseClient.from('join_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+            ]);
+            const cards = [
+                ['房间总数', rooms.count],
+                ['消息总数', msgs.count],
+                ['固定成员', members.count],
+                ['待审申请', pending.count]
+            ];
+            stat.innerHTML = cards.map(([label, num]) =>
+                `<div class="admin-stat-card"><div class="admin-stat-num">${adminEsc(num ?? 0)}</div><div class="admin-stat-label">${label}</div></div>`
+            ).join('');
         } catch (e) {
-            console.warn('[pushplus] CORS POST 失败，尝试 no-cors 回退:', e);
-            try {
-                await fetch(url, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                return 'success';
-            } catch (e2) {
-                console.error('[pushplus] 发送异常:', e2);
-                return 'network';
-            }
+            stat.innerHTML = '<div class="admin-error">统计加载失败：' + adminEsc(e.message || e) + '</div>';
+        }
+    };
+
+    window.adminSwitchTab = function(tab) {
+        adminTab = tab;
+        document.querySelectorAll('.admin-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        const body = document.getElementById('admin-tab-body');
+        body.innerHTML = '<div class="admin-empty">加载中…</div>';
+        if (tab === 'rooms') adminRenderRooms();
+        else if (tab === 'messages') adminInitMessagesTab();
+        else if (tab === 'users') adminRenderUsers();
+        else if (tab === 'login-logs') adminRenderLoginLogs();
+        else if (tab === 'members') adminRenderMembers();
+        else if (tab === 'requests') adminRenderRequests();
+        else if (tab === 'logs') adminRenderLogs();
+    };
+
+    /** 房间列表：房间 + 成员数 + 消息数 */
+    async function adminRenderRooms() {
+        const body = document.getElementById('admin-tab-body');
+        try {
+            const { data: rooms, error } = await supabaseClient.from('rooms').select('room_code,room_name').order('room_code');
+            if (error) throw error;
+            adminRoomsCache = rooms || [];
+            const { data: members } = await supabaseClient.from('room_members').select('room_code,user_name');
+            const memberCount = {};
+            (members || []).forEach(m => { memberCount[m.room_code] = (memberCount[m.room_code] || 0) + 1; });
+            const counts = await Promise.all(adminRoomsCache.map(r =>
+                supabaseClient.from('messages').select('id', { count: 'exact', head: true }).eq('room_code', r.room_code)
+            ));
+            body.innerHTML = '<table class="admin-table"><thead><tr><th>房间号</th><th>房间名称</th><th>成员数</th><th>消息数</th></tr></thead><tbody>' +
+                adminRoomsCache.map((r, i) =>
+                    `<tr><td><b>${adminEsc(r.room_code)}</b></td><td>${adminEsc(r.room_name || '-')}</td><td>${memberCount[r.room_code] || 0}</td><td>${counts[i].count ?? 0}</td></tr>`
+                ).join('') +
+                '</tbody></table>';
+            if (!adminRoomsCache.length) body.innerHTML = '<div class="admin-empty">暂无房间</div>';
+        } catch (e) {
+            body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
         }
     }
 
-    const PUSHPLUS_ERROR_MSG = {
-        verify: '❌ 需要先完成「实名认证」（回 pushplus 后台实名后再试）',
-        auth: '❌ Token 无效或该渠道未绑定，请回 pushplus 后台检查',
-        network: '❌ 网络异常，请检查网络后重试',
-        unknown: '❌ 发送失败，请稍后再试或检查 pushplus 后台'
+    /** 消息浏览：选房间 + 搜索 + 分页 */
+    function adminInitMessagesTab() {
+        const body = document.getElementById('admin-tab-body');
+        adminMsgPage = 0;
+        const options = ['<option value="">全部房间</option>'].concat(
+            adminRoomsCache.map(r => `<option value="${adminEsc(r.room_code)}" ${r.room_code === adminMsgRoom ? 'selected' : ''}>${adminEsc(r.room_code)}</option>`)
+        ).join('');
+        body.innerHTML =
+            `<div class="admin-toolbar">
+                <select id="admin-msg-room" onchange="window.adminMsgFilterChanged()">${options}</select>
+                <input type="text" id="admin-msg-search" placeholder="搜索消息内容…" value="${adminEsc(adminMsgSearch)}" onkeydown="if(event.key==='Enter')window.adminMsgFilterChanged()">
+                <button onclick="window.adminMsgFilterChanged()">查询</button>
+            </div>
+            <div id="admin-msg-list"></div>
+            <button id="admin-msg-more" class="admin-load-more" style="display:none" onclick="window.adminLoadMoreMessages()">加载更多</button>`;
+        adminLoadMessagesPage(false);
+    }
+
+    window.adminMsgFilterChanged = function() {
+        adminMsgRoom = document.getElementById('admin-msg-room').value;
+        adminMsgSearch = document.getElementById('admin-msg-search').value.trim();
+        adminMsgPage = 0;
+        adminLoadMessagesPage(false);
     };
 
-    function describePushplusResult(code) {
-        return code === 'success' ? null : (PUSHPLUS_ERROR_MSG[code] || PUSHPLUS_ERROR_MSG.unknown);
+    window.adminLoadMoreMessages = function() {
+        adminLoadMessagesPage(true);
+    };
+
+    async function adminLoadMessagesPage(append) {
+        if (adminLoading) return;
+        adminLoading = true;
+        const list = document.getElementById('admin-msg-list');
+        const moreBtn = document.getElementById('admin-msg-more');
+        try {
+            let q = supabaseClient.from('messages').select('*').order('created_at', { ascending: false })
+                .range(adminMsgPage * ADMIN_MSG_PAGE_SIZE, adminMsgPage * ADMIN_MSG_PAGE_SIZE + ADMIN_MSG_PAGE_SIZE - 1);
+            if (adminMsgRoom) q = q.eq('room_code', adminMsgRoom);
+            if (adminMsgSearch) q = q.ilike('content', `%${adminMsgSearch}%`);
+            const { data, error } = await q;
+            if (error) throw error;
+            const rows = data || [];
+            const html = rows.map(m => {
+                const tag = adminMediaTag(m.media_type);
+                return `<div class="admin-msg-item">
+                    <div class="admin-msg-head">
+                        <span class="admin-msg-sender">${adminEsc(m.sender)}</span>
+                        ${adminMsgRoom ? '' : `<span class="admin-msg-room">${adminEsc(m.room_code)}</span>`}
+                        ${tag ? `<span class="admin-chip">${tag}</span>` : ''}
+                        <span class="admin-msg-time">${adminFmtTime(m.created_at)}</span>
+                    </div>
+                    <div class="admin-msg-content">${adminEsc(m.content || '')}${m.media_url && !m.content ? '[媒体消息]' : ''}</div>
+                </div>`;
+            }).join('');
+            if (append) list.insertAdjacentHTML('beforeend', html);
+            else list.innerHTML = html || '<div class="admin-empty">没有匹配的消息</div>';
+            adminMsgPage++;
+            if (moreBtn) moreBtn.style.display = rows.length === ADMIN_MSG_PAGE_SIZE ? 'block' : 'none';
+        } catch (e) {
+            list.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
+        }
+        adminLoading = false;
     }
 
-    function tryParseJSON(str) {
-        try { return JSON.parse(str); } catch (e) { return null; }
+    /** 固定成员 */
+    async function adminRenderMembers() {
+        const body = document.getElementById('admin-tab-body');
+        try {
+            const { data, error } = await supabaseClient.from('room_members').select('*').order('room_code').order('created_at');
+            if (error) throw error;
+            const rows = data || [];
+            body.innerHTML = rows.length
+                ? '<table class="admin-table"><thead><tr><th>房间号</th><th>成员</th><th>加入时间</th></tr></thead><tbody>' +
+                  rows.map(m => `<tr><td><b>${adminEsc(m.room_code)}</b></td><td>${adminEsc(m.user_name)}</td><td>${adminFmtTime(m.created_at)}</td></tr>`).join('') +
+                  '</tbody></table>'
+                : '<div class="admin-empty">暂无成员数据</div>';
+        } catch (e) {
+            body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
+        }
     }
 
-    function notifyViaPushplus(sender, content) {
-        const enabled = localStorage.getItem('chat_pushplus_enabled') === '1';
-        if (!enabled) return;
-        const token = localStorage.getItem('chat_pushplus_token') || '';
-        if (!token) return;
-        const now = Date.now();
-        const lastNotify = parseInt(localStorage.getItem('chat_pushplus_last_notify') || '0', 10);
-        if (now - lastNotify < 30000) return;
-        const channel = localStorage.getItem('chat_pushplus_channel') || 'wechat';
-        const preview = content.length > 80 ? content.slice(0, 80) + '...' : content;
-        const msg = '🔔 [Harry的聊天室] 新消息\n来自：' + sender + '\n内容：' + preview;
-        sendPushplusRequest(token, channel, msg).then(function(code) {
-            if (code === 'success') {
-                localStorage.setItem('chat_pushplus_last_notify', String(now));
-            } else if (code === 'auth' || code === 'verify') {
-                const lastWarn = parseInt(localStorage.getItem('chat_pushplus_auth_warn') || '0', 10);
-                if (now - lastWarn > 86400000) {
-                    localStorage.setItem('chat_pushplus_auth_warn', String(now));
-                    if (code === 'verify') {
-                        showToast('⚠ 推送失败：pushplus 账号未实名，请到设置中查看', 'error', 5000);
-                    } else {
-                        showToast('⚠ 推送失败：Token 可能失效或渠道未绑定，请到设置中重新配置', 'error', 5000);
-                    }
-                }
+    /** 加入申请 */
+    async function adminRenderRequests() {
+        const body = document.getElementById('admin-tab-body');
+        try {
+            const { data, error } = await supabaseClient.from('join_requests').select('*').order('created_at', { ascending: false }).limit(200);
+            if (error) throw error;
+            const rows = data || [];
+            const chip = s => s === 'approved' ? '<span class="admin-chip ok">已通过</span>'
+                : s === 'rejected' ? '<span class="admin-chip rejected">已拒绝</span>'
+                : '<span class="admin-chip pending">待审核</span>';
+            body.innerHTML = rows.length
+                ? '<table class="admin-table"><thead><tr><th>房间号</th><th>申请人</th><th>状态</th><th>申请时间</th><th>处理时间</th></tr></thead><tbody>' +
+                  rows.map(r => `<tr><td><b>${adminEsc(r.room_code)}</b></td><td>${adminEsc(r.user_name)}</td><td>${chip(r.status)}</td><td>${adminFmtTime(r.created_at)}</td><td>${adminFmtTime(r.resolved_at)}</td></tr>`).join('') +
+                  '</tbody></table>'
+                : '<div class="admin-empty">暂无申请记录</div>';
+        } catch (e) {
+            body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
+        }
+    }
+
+    /** 加入日志 */
+    async function adminRenderLogs() {
+        const body = document.getElementById('admin-tab-body');
+        try {
+            const { data, error } = await supabaseClient.from('join_logs').select('*').order('created_at', { ascending: false }).limit(200);
+            if (error) throw error;
+            const rows = data || [];
+            const shortUA = ua => { ua = String(ua || ''); return ua.length > 46 ? ua.slice(0, 46) + '…' : ua; };
+            body.innerHTML = rows.length
+                ? '<table class="admin-table"><thead><tr><th>时间</th><th>房间</th><th>用户</th><th>方式</th><th>设备</th></tr></thead><tbody>' +
+                  rows.map(l => `<tr><td>${adminFmtTime(l.created_at)}</td><td><b>${adminEsc(l.room_code)}</b></td><td>${adminEsc(l.user_name)}</td><td>${l.join_type === 'auto' ? '自动' : '手动'}</td><td title="${adminEsc(l.user_agent)}">${adminEsc(shortUA(l.user_agent))}</td></tr>`).join('') +
+                  '</tbody></table>'
+                : '<div class="admin-empty">暂无日志</div>';
+        } catch (e) {
+            body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
+        }
+    }
+
+    /** 用户列表（卡片式：头像 + 用户名 + 注册时间 + 最近登录） */
+    async function adminRenderUsers() {
+        const body = document.getElementById('admin-tab-body');
+        try {
+            const { data: users, error } = await supabaseClient.from('users').select('*').order('created_at', { ascending: true });
+            if (error) throw error;
+            const rows = users || [];
+            if (!rows.length) { body.innerHTML = '<div class="admin-empty">暂无注册用户</div>'; return; }
+            // 聚合最近登录时间和登录次数
+            const loginMap = {};
+            try {
+                const { data: logs } = await supabaseClient.from('login_logs').select('username,created_at').order('created_at', { ascending: false }).limit(1000);
+                (logs || []).forEach(l => {
+                    if (!loginMap[l.username]) loginMap[l.username] = { last: l.created_at, count: 0 };
+                    loginMap[l.username].count++;
+                });
+            } catch (e) { /* login_logs 表可能还没创建，忽略 */ }
+            // 头像颜色按用户名 hash 选
+            const palette = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
+            const colorOf = name => palette[Math.abs([].reduce.call(String(name), (a, c) => a + c.charCodeAt(0) * 31, 7)) % palette.length];
+            body.innerHTML = rows.map(u => {
+                const lm = loginMap[u.username];
+                const avatar = u.avatar_url
+                    ? `<img class="admin-user-avatar" src="${adminEsc(u.avatar_url)}" alt="" onerror="this.style.display='none'">`
+                    : `<div class="admin-user-avatar" style="background:${colorOf(u.username)}">${adminEsc(String(u.username).slice(0, 1).toUpperCase())}</div>`;
+                return `<div class="admin-user-card">
+                    ${avatar}
+                    <div class="admin-user-info">
+                        <div class="admin-user-name">${adminEsc(u.username)}</div>
+                        <div class="admin-user-meta">注册：${adminFmtTime(u.created_at)}</div>
+                        <div class="admin-user-meta">最近登录：${lm ? adminFmtTime(lm.last) : '暂无记录'}${lm ? ' · ' + lm.count + ' 次' : ''}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch (e) {
+            body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
+        }
+    }
+
+    /** 登录日志（手动 + 自动） */
+    async function adminRenderLoginLogs() {
+        const body = document.getElementById('admin-tab-body');
+        try {
+            const { data, error } = await supabaseClient.from('login_logs').select('*').order('created_at', { ascending: false }).limit(200);
+            if (error) throw error;
+            const rows = data || [];
+            const shortUA = ua => { ua = String(ua || ''); return ua.length > 46 ? ua.slice(0, 46) + '…' : ua; };
+            body.innerHTML = rows.length
+                ? '<table class="admin-table"><thead><tr><th>时间</th><th>用户</th><th>方式</th><th>设备</th></tr></thead><tbody>' +
+                  rows.map(l => `<tr><td>${adminFmtTime(l.created_at)}</td><td><b>${adminEsc(l.username)}</b></td><td>${l.login_type === 'auto' ? '<span class="admin-chip">自动</span>' : '<span class="admin-chip ok">手动</span>'}</td><td title="${adminEsc(l.user_agent)}">${adminEsc(shortUA(l.user_agent))}</td></tr>`).join('') +
+                  '</tbody></table>'
+                : '<div class="admin-empty">暂无登录日志</div>';
+        } catch (e) {
+            body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div><div class="admin-empty">如果提示关系不存在，请先在 Supabase 执行 migrations 里的 20260827_add_login_logs.sql</div>';
+        }
+    }
+
+    // ============================================
+    // 账号系统（与安卓端共用 users 表，sha256(密码+用户名)）
+    // ============================================
+    // 纯 JS sha256 兜底：http://局域网IP 等非安全上下文没有 crypto.subtle
+    function sha256Pure(str) {
+        function rr(v, a) { return (v >>> a) | (v << (32 - a)); }
+        var maxWord = Math.pow(2, 32), i, j, result = '';
+        var words = [], bitLen = str.length * 8;
+        var hash = [], k = [], primeCounter = 0;
+        var isComposite = {};
+        for (var candidate = 2; primeCounter < 64; candidate++) {
+            if (!isComposite[candidate]) {
+                for (i = 0; i < 313; i += candidate) isComposite[i] = candidate;
+                hash[primeCounter] = (Math.pow(candidate, .5) * maxWord) | 0;
+                k[primeCounter++] = (Math.pow(candidate, 1 / 3) * maxWord) | 0;
             }
-        });
+        }
+        str += '\x80';
+        while (str.length % 64 - 56) str += '\x00';
+        for (i = 0; i < str.length; i++) {
+            j = str.charCodeAt(i);
+            words[i >> 2] |= j << ((3 - i) % 4) * 8;
+        }
+        words[words.length] = ((bitLen / maxWord) | 0);
+        words[words.length] = (bitLen);
+        for (j = 0; j < words.length;) {
+            var w = words.slice(j, j += 16), oldHash = hash;
+            hash = hash.slice(0, 8);
+            for (i = 0; i < 64; i++) {
+                var w15 = w[i - 15], w2 = w[i - 2];
+                var a = hash[0], e = hash[4];
+                var temp1 = hash[7]
+                    + (rr(e, 6) ^ rr(e, 11) ^ rr(e, 25))
+                    + ((e & hash[5] ^ ((~e) & hash[6])))
+                    + k[i]
+                    + (w[i] = (i < 16) ? w[i] : (
+                        w[i - 16]
+                        + (rr(w15, 7) ^ rr(w15, 18) ^ (w15 >>> 3))
+                        + w[i - 7]
+                        + (rr(w2, 17) ^ rr(w2, 19) ^ (w2 >>> 10))
+                    ) | 0);
+                var temp2 = (rr(a, 2) ^ rr(a, 13) ^ rr(a, 22))
+                    + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+                hash = [(temp1 + temp2) | 0].concat(hash);
+                hash[4] = (hash[4] + temp1) | 0;
+            }
+            for (i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
+        }
+        for (i = 0; i < 8; i++) for (j = 3; j + 1; j--) {
+            var b = (hash[i] >> (j * 8)) & 255;
+            result += ((b < 16) ? 0 : '') + b.toString(16);
+        }
+        return result;
+    }
+
+    async function sha256Hex(message) {
+        // 安全上下文（https/localhost）用原生 API；否则用纯 JS 兜底，结果一致
+        if (window.crypto && crypto.subtle && crypto.subtle.digest) {
+            try {
+                const msgBuffer = new TextEncoder().encode(message);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+            } catch (e) { /* 降级到纯 JS */ }
+        }
+        var utf8 = unescape(encodeURIComponent(message)); // UTF-8 字节，与 TextEncoder 一致
+        return sha256Pure(utf8);
+    }
+
+    function getLoggedInUser() { return localStorage.getItem('chat_logged_user') || ''; }
+
+    window.togglePwd = function(inputId, el) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+        if (input.type === 'password') { input.type = 'text'; el.textContent = '🙈'; }
+        else { input.type = 'password'; el.textContent = '👁'; }
+    };
+
+    /** 登录日志：手动/自动登录都记录 */
+    async function insertLoginLog(type) {
+        try {
+            await supabaseClient.from('login_logs').insert([{
+                username: getLoggedInUser(),
+                login_type: type,
+                user_agent: navigator.userAgent || ''
+            }]);
+        } catch (e) { console.warn('login_logs insert failed:', e); }
+    }
+
+    window.showAuthOverlay = function() {
+        const overlay = document.getElementById('auth-overlay');
+        if (!overlay) return;
+        overlay.classList.add('show');
+        window.showLogin();
+    };
+
+    window.showLogin = function() {
+        document.getElementById('auth-login-card').style.display = '';
+        document.getElementById('auth-register-card').style.display = 'none';
+        const e1 = document.getElementById('auth-error');
+        const e2 = document.getElementById('reg-error');
+        if (e1) e1.textContent = '';
+        if (e2) e2.textContent = '';
+        setTimeout(() => { const i = document.getElementById('auth-username'); if (i && !i.value) i.focus(); }, 100);
+    };
+
+    window.showRegister = function() {
+        document.getElementById('auth-login-card').style.display = 'none';
+        document.getElementById('auth-register-card').style.display = '';
+        const e1 = document.getElementById('auth-error');
+        const e2 = document.getElementById('reg-error');
+        if (e1) e1.textContent = '';
+        if (e2) e2.textContent = '';
+        setTimeout(() => document.getElementById('reg-username').focus(), 100);
+    };
+
+    window.doLogin = async function() {
+        const username = document.getElementById('auth-username').value.trim();
+        const password = document.getElementById('auth-password').value.trim();
+        const errEl = document.getElementById('auth-error');
+        const btn = document.getElementById('auth-login-btn');
+        errEl.textContent = '';
+
+        if (!username || !password) { errEl.textContent = '请输入用户名和密码'; return; }
+
+        btn.disabled = true;
+        btn.textContent = '登录中…';
+        const passwordHash = await sha256Hex(password + username);
+        try {
+            const { data, error } = await supabaseClient
+                .from('users')
+                .select('username,password')
+                .eq('username', username)
+                .single();
+
+            if (error || !data) { errEl.textContent = '用户名或密码错误'; return; }
+            if (data.password !== passwordHash) { errEl.textContent = '用户名或密码错误'; return; }
+
+            localStorage.setItem('chat_logged_user', username);
+            localStorage.setItem('chat_auth_token', username);
+            mySender = username;
+            insertLoginLog('manual');
+            document.getElementById('auth-overlay').classList.remove('show');
+            showToast('欢迎回来，' + username, 'success', 2000);
+            await loadMyRooms();
+            // 有待进入的链接房间则优先进入；电脑端直接进最近房间；手机端进"我的房间"列表页
+            if (pendingUrlRoom) {
+                const target = pendingUrlRoom;
+                pendingUrlRoom = '';
+                showRoomLoading();
+                await window.joinRoom(target);
+            } else if (isDesktopLayout() && myRoomsCache.length) {
+                showRoomLoading();
+                window.switchToRoom(myRoomsCache[0]);
+            } else {
+                showRoomListView();
+            }
+        } catch (e) {
+            console.error('登录失败:', e);
+            errEl.textContent = '登录失败，请检查网络';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '登 录';
+        }
+    };
+
+    window.doRegister = async function() {
+        const username = document.getElementById('reg-username').value.trim();
+        const password = document.getElementById('reg-password').value.trim();
+        const password2 = document.getElementById('reg-password2').value.trim();
+        const errEl = document.getElementById('reg-error');
+        const btn = document.getElementById('auth-register-btn');
+        errEl.textContent = '';
+
+        if (!username || !password) { errEl.textContent = '请输入用户名和密码'; return; }
+        if (username.length < 2 || username.length > 20) { errEl.textContent = '用户名长度需要 2-20 个字符'; return; }
+        if (!/^[a-zA-Z0-9_\u4e00-\u9fff]+$/.test(username)) { errEl.textContent = '用户名只能包含字母、数字、下划线和中文'; return; }
+        if (password.length < 4) { errEl.textContent = '密码至少需要 4 个字符'; return; }
+        if (password !== password2) { errEl.textContent = '两次输入的密码不一致'; return; }
+
+        btn.disabled = true;
+        btn.textContent = '注册中…';
+        const passwordHash = await sha256Hex(password + username);
+        try {
+            const { data: existing } = await supabaseClient
+                .from('users')
+                .select('username')
+                .eq('username', username)
+                .single();
+            if (existing) { errEl.textContent = '该用户名已被注册'; return; }
+
+            const { error } = await supabaseClient
+                .from('users')
+                .insert([{ username, password: passwordHash }]);
+            if (error) { errEl.textContent = '注册失败，请稍后重试'; console.error('注册失败:', error); return; }
+
+            showToast('注册成功！请登录', 'success', 2000);
+            document.getElementById('auth-username').value = username;
+            document.getElementById('auth-password').value = '';
+            window.showLogin();
+        } catch (e) {
+            console.error('注册失败:', e);
+            errEl.textContent = '注册失败，请检查网络';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '注 册';
+        }
+    };
+
+    window.doLogout = function() {
+        localStorage.removeItem('chat_logged_user');
+        localStorage.removeItem('chat_auth_token');
+        localStorage.removeItem('chat_last_room');
+        localStorage.removeItem('chat_auth_expiry');
+        location.reload();
+    };
+
+    let myRoomsCache = [];
+    async function loadMyRooms() {
+        const user = getLoggedInUser();
+        if (!user || !supabaseClient) { myRoomsCache = []; return; }
+        try {
+            const { data, error } = await supabaseClient
+                .from('room_members')
+                .select('room_code')
+                .eq('user_name', user)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            myRoomsCache = [...new Set((data || []).map(r => r.room_code))];
+        } catch (e) {
+            console.warn('加载我的房间失败:', e);
+        }
     }
 
     window.updateRoomName = async function() {
@@ -5373,7 +6122,6 @@
     };
 
     window.leaveRoom = function() {
-        if(!confirm("确定要退出当前房间吗？")) return;
         isLeavingRoom = true;
         if (roomSubscription) { roomSubscription.unsubscribe(); roomSubscription = null; }
         stopPolling(true);
@@ -5390,12 +6138,8 @@
         document.getElementById('chat-box').innerHTML = '';
         setRoomTitle('正在加载...');
         document.getElementById('online-count').innerText = '在线 0 人';
-        document.getElementById('login-area').style.display = 'flex';
-        document.getElementById('chat-container').style.display = 'none';
-        var savedName = localStorage.getItem('chat_auth_token');
-        if (savedName) document.getElementById('username').value = savedName;
-        document.getElementById('room-input').value = '';
-        document.getElementById('room-input').focus();
+        backToLoginArea();
+        loadMyRooms();
     };
 
     window.closeUpdateModal = function() {
@@ -5414,112 +6158,6 @@
     function isMobileDevice() {
         return isIOS() || isAndroid();
     }
-
-    function isStandalone() {
-        return window.matchMedia('(display-mode: standalone)').matches
-            || window.matchMedia('(display-mode: fullscreen)').matches
-            || (navigator.standalone !== undefined && navigator.standalone);
-    }
-
-    function shouldShowInstallPopup() {
-        if (isStandalone()) return false;
-        if (localStorage.getItem('install_popup_dismissed') === '1') return false;
-        if (isIOS()) return true;
-        if (isAndroid() && deferredPrompt) return true;
-        return false;
-    }
-
-    window.showInstallPopup = function() {
-        var popup = document.getElementById('install-popup');
-        var title = document.getElementById('install-popup-title');
-        var desc = document.getElementById('install-popup-desc');
-        var steps = document.getElementById('install-popup-steps');
-        var btn = document.getElementById('install-popup-btn');
-        var icon = document.getElementById('install-popup-icon');
-        var noremind = document.getElementById('install-popup-noremind');
-
-        if (isAndroid()) {
-            if (icon) icon.textContent = '🤖';
-            if (title) title.textContent = '安装到桌面，体验更好';
-            if (desc) desc.textContent = '安装后可使用后台通知、全屏聊天';
-            if (steps) {
-                steps.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
-                    + '<span style="background:var(--btn-color);color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">1</span>'
-                    + '<span style="font-size:13px;">点击 Chrome 右上角 <strong>⋮</strong> 菜单</span></div>'
-                    + '<div style="display:flex;align-items:center;gap:8px;">'
-                    + '<span style="background:var(--btn-color);color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">2</span>'
-                    + '<span style="font-size:13px;">选择 <strong>「添加到主屏幕」</strong></span></div>';
-            }
-            if (btn) {
-                btn.textContent = '一键安装';
-                btn.onclick = function() { window.doInstallPWA(); };
-            }
-            if (noremind) noremind.style.display = 'block';
-        } else {
-            if (icon) icon.textContent = '📱';
-            if (title) title.textContent = '添加到主屏幕';
-            if (desc) desc.textContent = '安装后即可开启后台通知，收到消息时即使关闭浏览器也能收到提醒';
-            if (steps) {
-                steps.innerHTML = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
-                    + '<span style="background:var(--btn-color);color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">1</span>'
-                    + '<span style="font-size:13px;">点击 Safari 底部 <strong style="font-size:16px;">↑</strong> 分享按钮</span></div>'
-                    + '<div style="display:flex;align-items:center;gap:8px;">'
-                    + '<span style="background:var(--btn-color);color:white;border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;">2</span>'
-                    + '<span style="font-size:13px;">滑动找到 <strong>「添加到主屏幕」</strong></span></div>';
-            }
-            if (btn) {
-                btn.textContent = '我知道了';
-                btn.onclick = function() { window.dismissInstallPopup(); };
-            }
-            if (noremind) noremind.style.display = 'block';
-        }
-        if (popup) popup.style.display = 'flex';
-    };
-
-    window.dismissInstallPopup = function() {
-        document.getElementById('install-popup').style.display = 'none';
-    };
-
-    window.dismissInstallPopupForever = function() {
-        localStorage.setItem('install_popup_dismissed', '1');
-        document.getElementById('install-popup').style.display = 'none';
-    };
-
-    window.doInstallPWA = async function() {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            var result = await deferredPrompt.userChoice;
-            deferredPrompt = null;
-            if (result.outcome === 'accepted') {
-                localStorage.setItem('pwa_installed', '1');
-                document.getElementById('install-popup').style.display = 'none';
-            }
-        } else if (isIOS()) {
-            window.showInstallPopup();
-        } else {
-            document.getElementById('install-popup').style.display = 'none';
-        }
-    };
-
-    function showInstallBanner() {
-        if (shouldShowInstallPopup()) {
-            window.showInstallPopup();
-        }
-    }
-
-    let deferredPrompt = null;
-
-    window.addEventListener('beforeinstallprompt', function(e) {
-        e.preventDefault();
-        deferredPrompt = e;
-        showInstallBanner();
-    });
-
-    window.addEventListener('appinstalled', function() {
-        deferredPrompt = null;
-        localStorage.setItem('pwa_installed', '1');
-        document.getElementById('install-popup').style.display = 'none';
-    });
 
     // 输入事件：发送 typing 通知 并发送消息
     let typingTimeout = null;
