@@ -864,10 +864,6 @@
         .admin-login-card { background:var(--surface-solid); color:var(--text-main); border:1px solid var(--line); border-radius:16px; padding:24px 20px; width:92%; max-width:360px; box-shadow:0 12px 40px rgba(0,0,0,0.15); }
         .admin-main-view { flex:1; display:flex; flex-direction:column; max-width:1100px; width:100%; margin:0 auto; padding:14px 14px 0; box-sizing:border-box; min-height:0; }
         .admin-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; flex-shrink:0; }
-        .admin-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; flex-shrink:0; }
-        .admin-stat-card { background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; padding:10px 8px; text-align:center; }
-        .admin-stat-num { font-size:20px; font-weight:700; color:var(--btn-color); }
-        .admin-stat-label { font-size:11.5px; color:var(--muted); margin-top:2px; }
         .admin-tabs { display:flex; gap:6px; overflow-x:auto; flex-shrink:0; padding-bottom:10px; }
         .admin-tab { flex-shrink:0; padding:8px 14px; background:var(--panel-soft); color:var(--muted); border:1px solid var(--line); border-radius:20px; font-size:13px; font-weight:600; cursor:pointer; }
         .admin-tab.active { background:var(--btn-bg); color:#fff; border-color:var(--btn-bg); }
@@ -893,8 +889,14 @@
         .admin-load-more { display:block; width:100%; margin-top:10px; padding:10px; background:var(--panel-soft); color:var(--btn-color); border:1px solid var(--line); border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; }
         .admin-empty { text-align:center; color:var(--muted); font-size:13px; padding:30px 0; }
         .admin-error { text-align:center; color:#dc2626; font-size:13px; padding:20px 0; }
+        .admin-op { padding:6px 12px; background:var(--panel-soft); color:var(--btn-color); border:1px solid var(--line); border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
+        .admin-op.danger { color:#dc2626; }
+        .admin-op:disabled { opacity:.6; cursor:wait; }
+        .admin-subhead { display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:14px; color:var(--text-main); flex-wrap:wrap; }
+        .admin-back-btn { padding:6px 12px; background:var(--panel-soft); color:var(--btn-color); border:1px solid var(--line); border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; }
+        .admin-pw-form { display:flex; gap:6px; margin-top:8px; }
+        .admin-pw-form input { flex:1; min-width:0; padding:7px 10px; margin:0; border:1px solid var(--input-border); border-radius:8px; font-size:12.5px; background:var(--input-bg); color:var(--text-main); outline:none; }
         @media (max-width:600px) {
-            .admin-stats { grid-template-columns:repeat(2,1fr); }
             .admin-main-view { padding:10px 10px 0; }
         }
 
@@ -932,8 +934,8 @@
         .mrv-badge { width:44px; height:44px; border-radius:12px; flex-shrink:0; color:#fff; font-weight:700; font-size:17px; display:flex; align-items:center; justify-content:center; }
         .mrv-item-text { flex:1; min-width:0; }
         .mrv-item-text b { display:block; font-size:15px; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .mrv-item-text small { font-size:12px; color:var(--muted); }
-        .mrv-arrow { color:var(--muted); font-size:15px; }
+        .mrv-item-text small { display:block; font-size:12.5px; color:var(--muted); margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .mrv-item-time { flex-shrink:0; align-self:flex-start; font-size:11px; color:var(--muted); margin-top:3px; }
         .mrv-empty { text-align:center; color:var(--muted); font-size:13px; padding:28px 12px; line-height:2; background:var(--surface-solid); border:1px dashed var(--surface-border); border-radius:14px; margin:4px 2px 0; }
         .mrv-add { display:flex; gap:8px; padding:2px 14px 10px; flex-shrink:0; }
         .mrv-add input { flex:1; min-width:0; margin:0; }
@@ -1668,6 +1670,7 @@
                     <div class="mrv-me"><b id="mrv-username"></b><span>● 在线</span></div>
                 </div>
                 <div class="mrv-menu">
+                    <a class="mrv-menu-item" id="mrv-apk-download" download="Harry的聊天室.apk"><span class="mmi-icon">📲</span><span>下载安卓 App</span><span class="mmi-arrow">↓</span></a>
                     <button class="mrv-menu-item" onclick="window.openGlobalSettings()"><span class="mmi-icon">⚙</span><span>全局设置</span><span class="mmi-arrow">›</span></button>
                     <button class="mrv-menu-item mmi-danger" onclick="window.doLogout()"><span class="mmi-icon">🚪</span><span>退出登录</span><span class="mmi-arrow">›</span></button>
                 </div>
@@ -1987,22 +1990,18 @@
     <!-- 面板主体 -->
     <div id="admin-main-view" class="admin-main-view" style="display:none;">
         <div class="admin-header">
-            <h3 style="margin:0;font-size:17px;">🛠 后台管理</h3>
+            <h3 style="margin:0;font-size:17px;">后台管理</h3>
             <div style="display:flex;gap:8px;">
-                <button onclick="window.adminRefreshStats()" style="padding:6px 12px;background:var(--panel-soft);color:var(--btn-color);border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;">刷新</button>
+                <button onclick="window.adminReload()" style="padding:6px 12px;background:var(--panel-soft);color:var(--btn-color);border:1px solid var(--line);border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;">刷新</button>
                 <button onclick="window.adminLogout()" style="padding:6px 12px;background:var(--panel-soft);color:var(--muted);border:1px solid var(--line);border-radius:8px;font-size:12.5px;cursor:pointer;">退出</button>
                 <button onclick="window.closeAdminPanel()" style="padding:6px 12px;background:transparent;color:var(--muted);border:none;font-size:18px;cursor:pointer;">✕</button>
             </div>
         </div>
-        <div id="admin-stats" class="admin-stats"></div>
         <div class="admin-tabs">
             <button class="admin-tab active" data-tab="rooms" onclick="window.adminSwitchTab('rooms')">房间</button>
-            <button class="admin-tab" data-tab="messages" onclick="window.adminSwitchTab('messages')">消息</button>
             <button class="admin-tab" data-tab="users" onclick="window.adminSwitchTab('users')">用户</button>
+            <button class="admin-tab" data-tab="messages" onclick="window.adminSwitchTab('messages')">消息</button>
             <button class="admin-tab" data-tab="login-logs" onclick="window.adminSwitchTab('login-logs')">登录日志</button>
-            <button class="admin-tab" data-tab="members" onclick="window.adminSwitchTab('members')">成员</button>
-            <button class="admin-tab" data-tab="requests" onclick="window.adminSwitchTab('requests')">加入申请</button>
-            <button class="admin-tab" data-tab="logs" onclick="window.adminSwitchTab('logs')">加入日志</button>
         </div>
         <div id="admin-tab-body" class="admin-tab-body"></div>
     </div>
@@ -2130,6 +2129,66 @@
             setInterval(() => reg.update().catch(() => {}), 60000);
         }).catch((e) => console.warn('[sw] 注册失败:', e.message));
     }
+
+    // ===== 安卓 APK（Capacitor 原生壳）：后台收到新消息弹系统通知，点击直达房间 =====
+    const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    let localNotifySeq = 0;
+    function getLocalNotifyPlugin() {
+        return (isNativeApp && window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications) || null;
+    }
+    function notifyIncomingMessage(sender, content, mediaType) {
+        const Ln = getLocalNotifyPlugin();
+        if (!Ln || !document.hidden) return; // 正在看聊天时不弹（App 被杀后收不到属本地通知边界）
+        let body = String(content || '');
+        if (!body && mediaType) body = mediaType === 'image' ? '[图片]' : (mediaType === 'audio' ? '[语音]' : '[文件]');
+        if (body.length > 80) body = body.slice(0, 80) + '…';
+        let roomName = currentRoomCode;
+        try {
+            if (Array.isArray(sidebarRoomsData) && sidebarRoomsData.length) {
+                const hit = sidebarRoomsData.find(r => r.code === currentRoomCode);
+                if (hit && hit.name) roomName = hit.name;
+            }
+        } catch (e) { /* 忽略 */ }
+        Ln.schedule({
+            notifications: [{
+                id: (Date.now() + (localNotifySeq++)) % 2147483647,
+                title: roomName ? `${sender} · ${roomName}` : String(sender || '新消息'),
+                body: body || '发来一条新消息',
+                extra: { roomCode: currentRoomCode }
+            }]
+        }).catch(e => console.warn('本地通知失败:', e));
+    }
+    async function setupNativeNotifications() {
+        const Ln = getLocalNotifyPlugin();
+        if (!Ln) return;
+        try {
+            const cur = await Ln.checkPermissions();
+            if (cur && cur.display !== 'granted') await Ln.requestPermissions();
+        } catch (e) { console.warn('通知权限请求失败:', e); }
+        try {
+            Ln.addListener('localNotificationActionPerformed', (action) => {
+                const roomCode = action && action.notification && action.notification.data && action.notification.data.roomCode;
+                if (!roomCode || !getLoggedInUser()) return;
+                if (currentRoomCode === roomCode) return;
+                document.getElementById('auth-overlay').classList.remove('show');
+                if (currentRoomCode) {
+                    window.switchToRoom(roomCode);
+                } else {
+                    showRoomLoading();
+                    window.joinRoom(roomCode);
+                }
+            });
+        } catch (e) { console.warn('通知点击监听失败:', e); }
+    }
+    setupNativeNotifications();
+
+    // 安卓 APK 下载入口：文件与 index.html 同目录（部署时一起上传），版本号跟随 CHAT_APP_VERSION；在原生 App 内隐藏
+    (function initApkDownloadLink() {
+        const apkLink = document.getElementById('mrv-apk-download');
+        if (!apkLink) return;
+        if (isNativeApp) { apkLink.style.display = 'none'; return; }
+        apkLink.href = 'harry-chat-v' + CHAT_APP_VERSION + '.apk';
+    })();
 
     function showRoomLoading() {
         document.getElementById('login-area').style.display = 'none';
@@ -2295,44 +2354,99 @@
         if (row.style.display === 'flex') document.getElementById('mrv-room-input').focus();
     };
 
+    /** 微信式消息预览文案：媒体消息显示类型标记 */
+    function mrvPreviewText(m) {
+        let body = String(m.content || '');
+        if (!body && m.media_type) body = m.media_type === 'image' ? '[图片]' : (m.media_type === 'audio' ? '[语音]' : '[文件]');
+        return body || '';
+    }
+
+    /** 微信式时间戳：今天显示 HH:MM，昨天显示"昨天"，今年显示 M/D，更早显示 Y/M/D */
+    function mrvFmtTime(ts) {
+        const d = new Date(ts);
+        if (isNaN(d)) return '';
+        const now = new Date();
+        const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+        if (d.toDateString() === now.toDateString()) return hm;
+        if (d.toDateString() === yesterday.toDateString()) return '昨天';
+        if (now.getFullYear() === d.getFullYear()) return `${d.getMonth() + 1}/${d.getDate()}`;
+        return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+    }
+
+    /** 手机端房间列表：微信式 —— 最新一条消息预览 + 时间，按最新消息时间倒序 */
     async function renderMobileRoomList() {
         const listEl = document.getElementById('mrv-list');
         if (!listEl) return;
         const user = getLoggedInUser();
         if (!user || !supabaseClient) return;
-        listEl.innerHTML = '<div class="mrv-empty">加载中…</div>';
+        if (!listEl.dataset.ready) listEl.innerHTML = '<div class="mrv-empty">加载中…</div>';
         try {
             const { data, error } = await supabaseClient
                 .from('room_members')
-                .select('room_code')
+                .select('room_code,created_at')
                 .eq('user_name', user)
                 .order('created_at', { ascending: false });
             if (error) throw error;
-            const codes = [...new Set((data || []).map(r => r.room_code))];
+            const joined = data || [];
+            const codes = [...new Set(joined.map(r => r.room_code))];
             if (!codes.length) {
                 listEl.innerHTML = '<div class="mrv-empty">还没有房间<br>在下方输入房间代码加入或创建</div>';
+                listEl.dataset.ready = '1';
                 return;
             }
-            const nameMap = {}; const countMap = {};
+            const nameMap = {};
             try {
-                const [roomsRes, membersRes] = await Promise.all([
-                    supabaseClient.from('rooms').select('room_code,room_name').in('room_code', codes),
-                    supabaseClient.from('room_members').select('room_code').in('room_code', codes)
-                ]);
+                const roomsRes = await supabaseClient.from('rooms').select('room_code,room_name').in('room_code', codes);
                 (roomsRes.data || []).forEach(r => { if (r.room_name) nameMap[r.room_code] = r.room_name; });
-                (membersRes.data || []).forEach(m => { countMap[m.room_code] = (countMap[m.room_code] || 0) + 1; });
-            } catch (e) { /* 表不可用时忽略 */ }
-            listEl.innerHTML = codes.map(c => `
+            } catch (e) { /* rooms 表不可用时忽略 */ }
+            // 每个房间取最新一条消息
+            const latest = {};
+            await Promise.all(codes.map(c =>
+                supabaseClient.from('messages').select('sender,content,media_type,created_at')
+                    .eq('room_code', c).order('created_at', { ascending: false }).limit(1)
+                    .then(res => { if (res.data && res.data[0]) latest[c] = res.data[0]; })
+                    .catch(() => {})
+            ));
+            // 排序：有消息的按最新消息时间倒序；没消息的按加入时间倒序排在后面
+            const joinedAt = {};
+            joined.forEach(r => { if (!(r.room_code in joinedAt)) joinedAt[r.room_code] = r.created_at; });
+            const sorted = codes.slice().sort((a, b) => {
+                const ta = latest[a] ? new Date(latest[a].created_at).getTime() : 0;
+                const tb = latest[b] ? new Date(latest[b].created_at).getTime() : 0;
+                if (ta !== tb) return tb - ta;
+                return new Date(joinedAt[b] || 0) - new Date(joinedAt[a] || 0);
+            });
+            const html = sorted.map(c => {
+                const m = latest[c];
+                const preview = m ? `${m.sender}: ${mrvPreviewText(m)}` : `房间 ${c}`;
+                const time = m ? mrvFmtTime(m.created_at) : '';
+                return `
                 <div class="mrv-item" onclick="window.mrvEnter('${escapeHtml(c).replace(/'/g, '&#39;')}')">
                     <span class="mrv-badge" style="background:${hashGradient(c)}">${escapeHtml((nameMap[c] || c).slice(0, 1).toUpperCase())}</span>
-                    <span class="mrv-item-text"><b>${escapeHtml(nameMap[c] || c)}</b><small>${countMap[c] ? countMap[c] + ' 名成员 · ' : ''}${escapeHtml(c)}</small></span>
-                    <span class="mrv-arrow">›</span>
-                </div>`).join('');
+                    <span class="mrv-item-text"><b>${escapeHtml(nameMap[c] || c)}</b><small>${escapeHtml(preview)}</small></span>
+                    ${time ? `<span class="mrv-item-time">${time}</span>` : ''}
+                </div>`;
+            }).join('');
+            // 数据没变化就不重绘（避免刷新时闪烁）
+            if (listEl.dataset.ready && listEl.dataset.sig === html) return;
+            listEl.dataset.sig = html;
+            listEl.innerHTML = html;
+            listEl.dataset.ready = '1';
         } catch (e) {
             console.warn('手机房间列表加载失败:', e);
-            listEl.innerHTML = '<div class="mrv-empty">加载失败，请下拉刷新重试</div>';
+            if (!listEl.dataset.ready) listEl.innerHTML = '<div class="mrv-empty">加载失败，请下拉刷新重试</div>';
         }
     }
+
+    // 主页可见时每 15 秒静默刷新列表（微信式：停在消息页也能看到新消息预览）
+    setInterval(() => {
+        if (document.hidden) return;
+        const area = document.getElementById('login-area');
+        if (area && area.style.display !== 'none' && area.classList.contains('show-room-view') && getLoggedInUser()) {
+            renderMobileRoomList();
+        }
+    }, 15000);
 
     window.mrvEnter = function(code) {
         code = String(code || '').trim();
@@ -4772,6 +4886,10 @@
     };
 
     function appendMessageToUI(id, sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false, skipAvatarRefresh = false, fileName = null, fileSize = null) {
+        // 安卓 APK：后台收到别人的新消息 → 弹系统通知
+        if (isNew && !insertAtTop && sender && sender !== mySender && isNativeApp) {
+            notifyIncomingMessage(sender, content, mediaType);
+        }
         const chatBox = document.getElementById('chat-box');
         if (isNew && id && Array.from(chatBox.querySelectorAll('.msg-wrapper[data-msg-id]')).some((item) => item.dataset.msgId === String(id))) return;
         const wrapper = document.createElement('div');
@@ -5457,6 +5575,7 @@
     let adminMsgSearch = '';
     let adminMsgPage = 0;
     let adminRoomsCache = [];
+    let adminUsersCache = [];
     let adminLoading = false;
 
     function adminEsc(s) {
@@ -5520,33 +5639,11 @@
     };
 
     function adminEnterMain() {
-        window.adminRefreshStats();
-        adminSwitchTab(adminTab);
+        window.adminSwitchTab(adminTab);
     }
 
-    window.adminRefreshStats = async function() {
-        if (!supabaseClient) return;
-        const stat = document.getElementById('admin-stats');
-        stat.innerHTML = '<div class="admin-stat-card"><div class="admin-stat-num">…</div><div class="admin-stat-label">加载中</div></div>'.repeat(4);
-        try {
-            const [rooms, msgs, members, pending] = await Promise.all([
-                supabaseClient.from('rooms').select('*', { count: 'exact', head: true }),
-                supabaseClient.from('messages').select('*', { count: 'exact', head: true }),
-                supabaseClient.from('room_members').select('*', { count: 'exact', head: true }),
-                supabaseClient.from('join_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending')
-            ]);
-            const cards = [
-                ['房间总数', rooms.count],
-                ['消息总数', msgs.count],
-                ['固定成员', members.count],
-                ['待审申请', pending.count]
-            ];
-            stat.innerHTML = cards.map(([label, num]) =>
-                `<div class="admin-stat-card"><div class="admin-stat-num">${adminEsc(num ?? 0)}</div><div class="admin-stat-label">${label}</div></div>`
-            ).join('');
-        } catch (e) {
-            stat.innerHTML = '<div class="admin-error">统计加载失败：' + adminEsc(e.message || e) + '</div>';
-        }
+    window.adminReload = function() {
+        window.adminSwitchTab(adminTab);
     };
 
     window.adminSwitchTab = function(tab) {
@@ -5558,12 +5655,9 @@
         else if (tab === 'messages') adminInitMessagesTab();
         else if (tab === 'users') adminRenderUsers();
         else if (tab === 'login-logs') adminRenderLoginLogs();
-        else if (tab === 'members') adminRenderMembers();
-        else if (tab === 'requests') adminRenderRequests();
-        else if (tab === 'logs') adminRenderLogs();
     };
 
-    /** 房间列表：房间 + 成员数 + 消息数 */
+    /** 房间列表：房间 + 成员数 + 成员管理入口（踢出） */
     async function adminRenderRooms() {
         const body = document.getElementById('admin-tab-body');
         try {
@@ -5573,12 +5667,10 @@
             const { data: members } = await supabaseClient.from('room_members').select('room_code,user_name');
             const memberCount = {};
             (members || []).forEach(m => { memberCount[m.room_code] = (memberCount[m.room_code] || 0) + 1; });
-            const counts = await Promise.all(adminRoomsCache.map(r =>
-                supabaseClient.from('messages').select('id', { count: 'exact', head: true }).eq('room_code', r.room_code)
-            ));
-            body.innerHTML = '<table class="admin-table"><thead><tr><th>房间号</th><th>房间名称</th><th>成员数</th><th>消息数</th></tr></thead><tbody>' +
-                adminRoomsCache.map((r, i) =>
-                    `<tr><td><b>${adminEsc(r.room_code)}</b></td><td>${adminEsc(r.room_name || '-')}</td><td>${memberCount[r.room_code] || 0}</td><td>${counts[i].count ?? 0}</td></tr>`
+            body.innerHTML = '<table class="admin-table"><thead><tr><th>房间号</th><th>房间名称</th><th>成员数</th><th>操作</th></tr></thead><tbody>' +
+                adminRoomsCache.map(r =>
+                    `<tr><td><b>${adminEsc(r.room_code)}</b></td><td>${adminEsc(r.room_name || '-')}</td><td>${memberCount[r.room_code] || 0}</td>` +
+                    `<td><button class="admin-op" onclick="window.adminOpenRoomMembers('${adminEsc(r.room_code).replace(/'/g, '&#39;')}')">成员管理</button></td></tr>`
                 ).join('') +
                 '</tbody></table>';
             if (!adminRoomsCache.length) body.innerHTML = '<div class="admin-empty">暂无房间</div>';
@@ -5586,6 +5678,53 @@
             body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
         }
     }
+
+    /** 房间成员管理：查看成员 + 踢出 */
+    window.adminOpenRoomMembers = async function(code) {
+        const body = document.getElementById('admin-tab-body');
+        body.innerHTML =
+            `<div class="admin-subhead"><button class="admin-back-btn" onclick="window.adminSwitchTab('rooms')">‹ 返回房间列表</button><span><b>${adminEsc(code)}</b> 的成员</span></div>` +
+            '<div id="admin-mem-list"><div class="admin-empty">加载中…</div></div>';
+        try {
+            const { data, error } = await supabaseClient.from('room_members').select('user_name,created_at').eq('room_code', code).order('created_at');
+            if (error) throw error;
+            const rows = data || [];
+            document.getElementById('admin-mem-list').innerHTML = rows.length
+                ? '<table class="admin-table"><thead><tr><th>成员</th><th>加入时间</th><th>操作</th></tr></thead><tbody>' +
+                  rows.map(m =>
+                      `<tr><td><b>${adminEsc(m.user_name)}</b></td><td>${adminFmtTime(m.created_at)}</td>` +
+                      `<td><button class="admin-op danger" data-code="${adminEsc(code)}" data-user="${adminEsc(m.user_name)}" onclick="window.adminKickMember(this)">踢出</button></td></tr>`
+                  ).join('') +
+                  '</tbody></table>'
+                : '<div class="admin-empty">该房间暂无成员</div>';
+        } catch (e) {
+            document.getElementById('admin-mem-list').innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
+        }
+    };
+
+    /** 踢出成员（两步确认，防误触） */
+    window.adminKickMember = function(btn) {
+        if (btn.dataset.armed !== '1') {
+            btn.dataset.armed = '1';
+            btn.textContent = '确认踢出?';
+            setTimeout(() => {
+                if (btn.isConnected && btn.dataset.armed === '1') { btn.dataset.armed = ''; btn.textContent = '踢出'; }
+            }, 3000);
+            return;
+        }
+        const code = btn.dataset.code, user = btn.dataset.user;
+        btn.disabled = true; btn.textContent = '踢出中…';
+        supabaseClient.from('room_members').delete().eq('room_code', code).eq('user_name', user)
+            .then(({ error }) => {
+                if (error) {
+                    showToast('踢出失败：' + (error.message || ''), 'error');
+                    btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '踢出';
+                    return;
+                }
+                showToast(`已将 ${user} 移出房间 ${code}`, 'success');
+                window.adminOpenRoomMembers(code);
+            });
+    };
 
     /** 消息浏览：选房间 + 搜索 + 分页 */
     function adminInitMessagesTab() {
@@ -5651,68 +5790,14 @@
         adminLoading = false;
     }
 
-    /** 固定成员 */
-    async function adminRenderMembers() {
-        const body = document.getElementById('admin-tab-body');
-        try {
-            const { data, error } = await supabaseClient.from('room_members').select('*').order('room_code').order('created_at');
-            if (error) throw error;
-            const rows = data || [];
-            body.innerHTML = rows.length
-                ? '<table class="admin-table"><thead><tr><th>房间号</th><th>成员</th><th>加入时间</th></tr></thead><tbody>' +
-                  rows.map(m => `<tr><td><b>${adminEsc(m.room_code)}</b></td><td>${adminEsc(m.user_name)}</td><td>${adminFmtTime(m.created_at)}</td></tr>`).join('') +
-                  '</tbody></table>'
-                : '<div class="admin-empty">暂无成员数据</div>';
-        } catch (e) {
-            body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
-        }
-    }
-
-    /** 加入申请 */
-    async function adminRenderRequests() {
-        const body = document.getElementById('admin-tab-body');
-        try {
-            const { data, error } = await supabaseClient.from('join_requests').select('*').order('created_at', { ascending: false }).limit(200);
-            if (error) throw error;
-            const rows = data || [];
-            const chip = s => s === 'approved' ? '<span class="admin-chip ok">已通过</span>'
-                : s === 'rejected' ? '<span class="admin-chip rejected">已拒绝</span>'
-                : '<span class="admin-chip pending">待审核</span>';
-            body.innerHTML = rows.length
-                ? '<table class="admin-table"><thead><tr><th>房间号</th><th>申请人</th><th>状态</th><th>申请时间</th><th>处理时间</th></tr></thead><tbody>' +
-                  rows.map(r => `<tr><td><b>${adminEsc(r.room_code)}</b></td><td>${adminEsc(r.user_name)}</td><td>${chip(r.status)}</td><td>${adminFmtTime(r.created_at)}</td><td>${adminFmtTime(r.resolved_at)}</td></tr>`).join('') +
-                  '</tbody></table>'
-                : '<div class="admin-empty">暂无申请记录</div>';
-        } catch (e) {
-            body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
-        }
-    }
-
-    /** 加入日志 */
-    async function adminRenderLogs() {
-        const body = document.getElementById('admin-tab-body');
-        try {
-            const { data, error } = await supabaseClient.from('join_logs').select('*').order('created_at', { ascending: false }).limit(200);
-            if (error) throw error;
-            const rows = data || [];
-            const shortUA = ua => { ua = String(ua || ''); return ua.length > 46 ? ua.slice(0, 46) + '…' : ua; };
-            body.innerHTML = rows.length
-                ? '<table class="admin-table"><thead><tr><th>时间</th><th>房间</th><th>用户</th><th>方式</th><th>设备</th></tr></thead><tbody>' +
-                  rows.map(l => `<tr><td>${adminFmtTime(l.created_at)}</td><td><b>${adminEsc(l.room_code)}</b></td><td>${adminEsc(l.user_name)}</td><td>${l.join_type === 'auto' ? '自动' : '手动'}</td><td title="${adminEsc(l.user_agent)}">${adminEsc(shortUA(l.user_agent))}</td></tr>`).join('') +
-                  '</tbody></table>'
-                : '<div class="admin-empty">暂无日志</div>';
-        } catch (e) {
-            body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
-        }
-    }
-
-    /** 用户列表（卡片式：头像 + 用户名 + 注册时间 + 最近登录） */
+    /** 用户列表（卡片式：头像 + 用户名 + 注册/登录信息 + 改密码） */
     async function adminRenderUsers() {
         const body = document.getElementById('admin-tab-body');
         try {
             const { data: users, error } = await supabaseClient.from('users').select('*').order('created_at', { ascending: true });
             if (error) throw error;
             const rows = users || [];
+            adminUsersCache = rows;
             if (!rows.length) { body.innerHTML = '<div class="admin-empty">暂无注册用户</div>'; return; }
             // 聚合最近登录时间和登录次数
             const loginMap = {};
@@ -5726,7 +5811,7 @@
             // 头像颜色按用户名 hash 选
             const palette = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6'];
             const colorOf = name => palette[Math.abs([].reduce.call(String(name), (a, c) => a + c.charCodeAt(0) * 31, 7)) % palette.length];
-            body.innerHTML = rows.map(u => {
+            body.innerHTML = rows.map((u, i) => {
                 const lm = loginMap[u.username];
                 const avatar = u.avatar_url
                     ? `<img class="admin-user-avatar" src="${adminEsc(u.avatar_url)}" alt="" onerror="this.style.display='none'">`
@@ -5735,15 +5820,52 @@
                     ${avatar}
                     <div class="admin-user-info">
                         <div class="admin-user-name">${adminEsc(u.username)}</div>
-                        <div class="admin-user-meta">注册：${adminFmtTime(u.created_at)}</div>
-                        <div class="admin-user-meta">最近登录：${lm ? adminFmtTime(lm.last) : '暂无记录'}${lm ? ' · ' + lm.count + ' 次' : ''}</div>
+                        <div class="admin-user-meta">注册：${adminFmtTime(u.created_at)} · 最近登录：${lm ? adminFmtTime(lm.last) + ' · ' + lm.count + ' 次' : '暂无记录'}</div>
+                        <div class="admin-pw-form" id="admin-pw-${i}" style="display:none;">
+                            <input type="text" id="admin-pw-input-${i}" placeholder="输入新密码（至少4位）" autocomplete="off">
+                            <button class="admin-op" onclick="window.adminSavePassword(${i})">保存</button>
+                        </div>
                     </div>
+                    <button class="admin-op" onclick="window.adminTogglePwForm(${i})">改密码</button>
                 </div>`;
             }).join('');
         } catch (e) {
             body.innerHTML = '<div class="admin-error">加载失败：' + adminEsc(e.message || e) + '</div>';
         }
     }
+
+    /** 改密码：展开/收起表单 */
+    window.adminTogglePwForm = function(i) {
+        const form = document.getElementById('admin-pw-' + i);
+        if (!form) return;
+        const show = form.style.display === 'none';
+        // 收起其他已展开的表单
+        document.querySelectorAll('.admin-pw-form').forEach(f => { f.style.display = 'none'; });
+        if (show) {
+            form.style.display = 'flex';
+            const input = document.getElementById('admin-pw-input-' + i);
+            if (input) { input.value = ''; setTimeout(() => input.focus(), 60); }
+        }
+    };
+
+    /** 保存新密码：users.password = sha256(新密码 + 用户名)，与登录/注册算法一致 */
+    window.adminSavePassword = async function(i) {
+        const u = adminUsersCache[i];
+        if (!u) return;
+        const input = document.getElementById('admin-pw-input-' + i);
+        const pwd = (input && input.value || '').trim();
+        if (pwd.length < 4) return showToast('新密码至少 4 位', 'error');
+        try {
+            const hash = await sha256Hex(pwd + u.username);
+            const { error } = await supabaseClient.from('users').update({ password: hash }).eq('username', u.username);
+            if (error) throw error;
+            showToast(`已修改 ${u.username} 的密码，下次登录生效`, 'success');
+            const form = document.getElementById('admin-pw-' + i);
+            if (form) form.style.display = 'none';
+        } catch (e) {
+            showToast('修改失败：' + (e.message || e), 'error');
+        }
+    };
 
     /** 登录日志（手动 + 自动） */
     async function adminRenderLoginLogs() {
