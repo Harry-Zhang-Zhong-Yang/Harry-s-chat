@@ -899,6 +899,23 @@
         @media (max-width:600px) {
             .admin-main-view { padding:10px 10px 0; }
         }
+        /* 后台管理 · 手机端专用布局（表格变卡片、竖排工具栏、加大触控） */
+        @media (max-width:767px) {
+            .admin-tab { padding:10px 18px; font-size:14px; }
+            .admin-tab-body { padding:8px; }
+            .admin-toolbar { flex-direction:column; align-items:stretch; }
+            .admin-toolbar select, .admin-toolbar input, .admin-toolbar button { width:100%; box-sizing:border-box; }
+            .admin-toolbar button { padding:10px; font-size:13.5px; }
+            .admin-table thead { display:none; }
+            .admin-table, .admin-table tbody { display:block; width:100%; }
+            .admin-table tr { display:block; background:var(--panel-soft); border:1px solid var(--line); border-radius:12px; padding:8px 12px; margin-bottom:8px; }
+            .admin-table td { display:flex; align-items:baseline; gap:8px; border-bottom:none; padding:5px 0; font-size:13.5px; }
+            .admin-table td::before { content:attr(data-label); flex-shrink:0; min-width:58px; color:var(--muted); font-size:12px; font-weight:600; }
+            .admin-op { padding:8px 14px; font-size:13px; }
+            .admin-back-btn { padding:8px 14px; font-size:13px; }
+            .admin-load-more { padding:12px; font-size:13.5px; }
+            .admin-user-name { font-size:15px; }
+        }
 
         /* ========== 登录/注册（账号系统） ========== */
         .auth-overlay { position:fixed; inset:0; z-index:2500; background:var(--app-bg); display:none; align-items:center; justify-content:center; padding:20px; }
@@ -955,6 +972,9 @@
         .mrv-menu-item span:nth-child(2) { flex:1; }
         .mmi-arrow { color:var(--muted); }
         .mmi-danger { color:#ef4444; }
+        a.mrv-menu-item { text-decoration:none; color:var(--text-main); -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
+        a.mrv-menu-item:active { background:var(--chip-bg); }
+        @media (hover:hover) { a.mrv-menu-item:hover { background:var(--chip-bg); } }
         /* 底部导航栏 */
         .mrv-tabbar { flex-shrink:0; display:flex; border-top:1px solid var(--line); background:var(--surface-solid); padding-bottom:env(safe-area-inset-bottom, 0px); }
         .mrv-tab { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:7px 0 6px; border:none; background:transparent; color:var(--muted); font-size:11px; cursor:pointer; }
@@ -5669,8 +5689,8 @@
             (members || []).forEach(m => { memberCount[m.room_code] = (memberCount[m.room_code] || 0) + 1; });
             body.innerHTML = '<table class="admin-table"><thead><tr><th>房间号</th><th>房间名称</th><th>成员数</th><th>操作</th></tr></thead><tbody>' +
                 adminRoomsCache.map(r =>
-                    `<tr><td><b>${adminEsc(r.room_code)}</b></td><td>${adminEsc(r.room_name || '-')}</td><td>${memberCount[r.room_code] || 0}</td>` +
-                    `<td><button class="admin-op" onclick="window.adminOpenRoomMembers('${adminEsc(r.room_code).replace(/'/g, '&#39;')}')">成员管理</button></td></tr>`
+                    `<tr><td data-label="房间号"><b>${adminEsc(r.room_code)}</b></td><td data-label="名称">${adminEsc(r.room_name || '-')}</td><td data-label="成员">${memberCount[r.room_code] || 0} 人</td>` +
+                    `<td data-label="管理"><button class="admin-op" onclick="window.adminOpenRoomMembers('${adminEsc(r.room_code).replace(/'/g, '&#39;')}')">成员管理</button></td></tr>`
                 ).join('') +
                 '</tbody></table>';
             if (!adminRoomsCache.length) body.innerHTML = '<div class="admin-empty">暂无房间</div>';
@@ -5692,8 +5712,8 @@
             document.getElementById('admin-mem-list').innerHTML = rows.length
                 ? '<table class="admin-table"><thead><tr><th>成员</th><th>加入时间</th><th>操作</th></tr></thead><tbody>' +
                   rows.map(m =>
-                      `<tr><td><b>${adminEsc(m.user_name)}</b></td><td>${adminFmtTime(m.created_at)}</td>` +
-                      `<td><button class="admin-op danger" data-code="${adminEsc(code)}" data-user="${adminEsc(m.user_name)}" onclick="window.adminKickMember(this)">踢出</button></td></tr>`
+                      `<tr><td data-label="成员"><b>${adminEsc(m.user_name)}</b></td><td data-label="加入于">${adminFmtTime(m.created_at)}</td>` +
+                      `<td data-label="管理"><button class="admin-op danger" data-code="${adminEsc(code)}" data-user="${adminEsc(m.user_name)}" onclick="window.adminKickMember(this)">踢出</button></td></tr>`
                   ).join('') +
                   '</tbody></table>'
                 : '<div class="admin-empty">该房间暂无成员</div>';
@@ -5877,7 +5897,7 @@
             const shortUA = ua => { ua = String(ua || ''); return ua.length > 46 ? ua.slice(0, 46) + '…' : ua; };
             body.innerHTML = rows.length
                 ? '<table class="admin-table"><thead><tr><th>时间</th><th>用户</th><th>方式</th><th>设备</th></tr></thead><tbody>' +
-                  rows.map(l => `<tr><td>${adminFmtTime(l.created_at)}</td><td><b>${adminEsc(l.username)}</b></td><td>${l.login_type === 'auto' ? '<span class="admin-chip">自动</span>' : '<span class="admin-chip ok">手动</span>'}</td><td title="${adminEsc(l.user_agent)}">${adminEsc(shortUA(l.user_agent))}</td></tr>`).join('') +
+                  rows.map(l => `<tr><td data-label="时间">${adminFmtTime(l.created_at)}</td><td data-label="用户"><b>${adminEsc(l.username)}</b></td><td data-label="方式">${l.login_type === 'auto' ? '<span class="admin-chip">自动</span>' : '<span class="admin-chip ok">手动</span>'}</td><td data-label="设备" title="${adminEsc(l.user_agent)}">${adminEsc(shortUA(l.user_agent))}</td></tr>`).join('') +
                   '</tbody></table>'
                 : '<div class="admin-empty">暂无登录日志</div>';
         } catch (e) {
