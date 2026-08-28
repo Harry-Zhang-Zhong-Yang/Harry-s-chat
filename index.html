@@ -2201,16 +2201,15 @@
     }
     setupNativeNotifications();
 
-    // 下载安卓 APK：原生 <a download>（浏览器下载管理器接管，断点续传最稳）+ 时间戳破 SW 坏缓存 + 点击 toast 提示
+    // 下载安卓 APK：jsDelivr CDN（国内有节点，比 GitHub Pages 直连稳定）+ 原生 <a download>（浏览器下载管理器接管，断点续传）
     (function initApkDownloadLink() {
         const a = document.getElementById('mrv-apk-download');
         if (!a) return;
         if (isNativeApp) { a.style.display = 'none'; return; }
-        const base = 'harry-chat-v' + CHAT_APP_VERSION + '.apk';
+        // jsDelivr CDN 托管在 GitHub 仓库的 APK，跨域请求不经过 SW，无缓存截断问题
+        const base = 'https://cdn.jsdelivr.net/gh/Harry-Zhang-Zhong-Yang/Harry-s-chat@main/Harry%E7%9A%84%E8%81%8A%E5%A4%A9%E5%AE%A4-v' + CHAT_APP_VERSION + '.apk';
         a.href = base;
         a.addEventListener('click', () => {
-            // 每次点击带新时间戳：让旧 SW 的坏缓存 miss，强制走网络拉完整 APK（旧 SW 不 bypass .apk，靠参数破缓存）
-            a.href = base + '?t=' + Date.now();
             showToast('正在下载安卓 App，请等待1-2分钟，在通知栏可查看进度', 'info', 4000);
         });
     })();
