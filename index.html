@@ -917,10 +917,15 @@
         .admin-back-btn { padding:6px 12px; background:var(--panel-soft); color:var(--btn-color); border:1px solid var(--line); border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; }
         .admin-pw-form { display:flex; gap:6px; margin-top:8px; }
         .admin-pw-form input { flex:1; min-width:0; padding:7px 10px; margin:0; border:1px solid var(--input-border); border-radius:8px; font-size:12.5px; background:var(--input-bg); color:var(--text-main); outline:none; }
+        /* 手机端头部（桌面端隐藏） */
+        .admin-mobile-header { display:none; }
+        .admin-mobile-actions button { padding:6px 10px; margin-left:6px; border:1px solid var(--line); border-radius:8px; background:var(--panel-soft); color:var(--text-main); font-size:12px; font-weight:600; cursor:pointer; }
+        .admin-mobile-actions button.danger { color:#dc2626; }
         /* 手机端（<768px）：隐藏侧栏，显示底部 tabbar + 表格变卡片 */
         @media (max-width:767px) {
             .admin-main-view { flex-direction:column; }
             .admin-sidebar { display:none; }
+            .admin-mobile-header { display:flex; align-items:center; justify-content:space-between; padding:8px 4px; font-size:14px; font-weight:700; color:var(--text-main); border-bottom:1px solid var(--line); margin-bottom:8px; }
             .admin-tabbar { display:flex; }
             .admin-content { flex:1; padding:10px 8px 0; overflow:hidden; }
             .admin-tab-body { padding:8px; }
@@ -1714,7 +1719,8 @@
                 </div>
                 <div class="mrv-menu">
                     <a class="mrv-menu-item" id="mrv-apk-download" download="Harry的聊天室.apk"><span class="mmi-icon">📲</span><span>下载安卓 App</span><span class="mmi-arrow">↓</span></a>
-                    <button class="mrv-menu-item" onclick="window.openGlobalSettings()"><span class="mmi-icon">⚙</span><span>全局设置</span><span class="mmi-arrow">›</span></button>
+                    <button class="mrv-menu-item" onclick="window.openGlobalSettings()"><span class="mmi-icon">⚙</span><span>设置</span><span class="mmi-arrow">›</span></button>
+                    <button class="mrv-menu-item" onclick="window.openAdminPanel()"><span class="mmi-icon">🔐</span><span>后台管理</span><span class="mmi-arrow">›</span></button>
                     <button class="mrv-menu-item mmi-danger" onclick="window.doLogout()"><span class="mmi-icon">🚪</span><span>退出登录</span><span class="mmi-arrow">›</span></button>
                 </div>
             </div>
@@ -1781,7 +1787,7 @@
         <input type="text" id="sidebar-search" class="sidebar-search" placeholder="搜索房间" autocomplete="off" oninput="window.filterSidebarRooms(this.value)">
     </div>
     <div id="sidebar-room-list" class="sidebar-room-list"></div>
-    <button class="sidebar-settings" onclick="window.openGlobalSettings()" title="全局设置">
+    <button class="sidebar-settings" onclick="window.openGlobalSettings()" title="设置">
         <span class="ss-icon">⚙</span><span>设置</span>
     </button>
 </aside>
@@ -1933,7 +1939,7 @@
         </div>
         <div class="settings-section">
             <div class="settings-section-title">更多</div>
-            <div class="settings-row-item"><button class="settings-row-button" onclick="window.openGlobalSettings()">全局设置（外观 / 账号 / 性能）</button></div>
+            <div class="settings-row-item"><button class="settings-row-button" onclick="window.openGlobalSettings()">设置（外观 / 账号 / 性能）</button></div>
         </div>
     </div>
 </div>
@@ -2009,7 +2015,6 @@
         </div>
         <div class="settings-section">
             <div class="settings-section-title">其他</div>
-            <div class="settings-row-item"><button class="settings-row-button" onclick="window.openAdminPanel()">后台管理</button></div>
             <div class="settings-row-item"><button class="settings-row-button" id="settings-logout-btn" style="color:#dc2626;font-weight:600;" onclick="window.doLogout()">退出登录</button></div>
         </div>
         <input type="file" id="avatar-upload-input" accept="image/*" style="display:none;" onchange="window.handleAvatarUpload(event)">
@@ -2051,6 +2056,13 @@
         </aside>
         <!-- 主内容区 -->
         <main class="admin-content">
+            <div class="admin-mobile-header">
+                <span>后台管理</span>
+                <div class="admin-mobile-actions">
+                    <button onclick="window.adminReload()">🔄 刷新</button>
+                    <button onclick="window.adminLogout()" class="danger">🚪 退出</button>
+                </div>
+            </div>
             <div id="admin-tab-body" class="admin-tab-body"></div>
         </main>
         <!-- 手机端底部 tabbar（<768px） -->
@@ -5685,16 +5697,15 @@
 
     window.openAdminPanel = function() {
         document.getElementById('settings-modal').style.display = 'none';
+        // 每次打开都强制重新输密码（不信任任何缓存）
+        sessionStorage.removeItem('harry_admin_ok');
         const modal = document.getElementById('admin-modal');
         modal.classList.add('show');
-        const logged = sessionStorage.getItem('harry_admin_ok') === '1';
-        document.getElementById('admin-login-view').style.display = logged ? 'none' : 'flex';
-        document.getElementById('admin-main-view').style.display = logged ? 'flex' : 'none';
-        if (logged) { adminEnterMain(); } else {
-            const pwd = document.getElementById('admin-pwd-input');
-            pwd.value = '';
-            setTimeout(() => pwd.focus(), 100);
-        }
+        document.getElementById('admin-login-view').style.display = 'flex';
+        document.getElementById('admin-main-view').style.display = 'none';
+        const pwd = document.getElementById('admin-pwd-input');
+        pwd.value = '';
+        setTimeout(() => pwd.focus(), 100);
     };
 
     window.closeAdminPanel = function() {
