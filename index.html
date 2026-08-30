@@ -20,7 +20,17 @@
         mask-position: center;
         background-color: currentColor;
       }
+      /* 防裸HTML闪烁：主样式表在文档末尾，弱网下浏览器会先渲染出无样式内容。
+         启动期先隐藏页面，主样式解析完成后（文末脚本）恢复显示；8秒兜底强制显示 */
+      html.app-boot body { visibility: hidden !important; }
     </style>
+    <script>
+      (function () {
+        var d = document.documentElement;
+        d.classList.add('app-boot');
+        setTimeout(function () { d.classList.remove('app-boot'); }, 8000);
+      })();
+    </script>
 </head>
 <body id="app-body">
 
@@ -6735,5 +6745,9 @@
         }
 
     </style>
+    <script>
+        // 主样式已解析完成，解除启动期隐藏（见 head 中的 app-boot 遮罩）
+        document.documentElement.classList.remove('app-boot');
+    </script>
 </body>
 </html>
