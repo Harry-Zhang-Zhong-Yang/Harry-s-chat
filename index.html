@@ -43,17 +43,19 @@
         <button class="update-close-btn" onclick="window.closeUpdateModal()" aria-label="关闭更新公告">&times;</button>
         <h2 style="margin-bottom:15px;">✨ Harry的聊天室更新</h2>
         <p style="text-align:left; margin:0 0 20px 0; background:var(--panel-soft); padding:15px; border-radius:12px; font-size:14px;">
+        • 🖼️ 批量发送图片：在附件面板点「图片」可一次选多张，会自动按顺序压缩上传发送。<br>
+        • ⬇️ 批量下载图片：图片查看器右上角新增下载按钮，可下载当前图片或一键下载本房间所有图片。<br>
         • 🎨 全新外观：「石墨极简」「奶油纸感」双主题，可在设置中切换。<br>
         • 💬 输入框支持 @ 提及补全，输入 @ 即可快速点名在线成员。<br>
-        • 🖼️ 图片查看器升级：支持滚轮/双击缩放、拖动平移、双指捏合。<br>
-        • 🏷️ 头像统一单色设计，整体更简洁高级。<br>
-        • 新房间新增欢迎卡片，消息排版更紧凑。
+        • 🖼️ 图片查看器支持滚轮/双击缩放、拖动平移、双指捏合。
         </p>
         <button onclick="window.closeUpdateModal()">我知道了</button>
     </div>
 </div>
 <div id="image-lightbox" onclick="closeImageLightbox(event)">
-    <button type="button" aria-label="关闭图片预览">×</button>
+    <button type="button" id="lightbox-download-btn" class="lightbox-action-btn" aria-label="下载当前图片" title="下载当前图片">⬇</button>
+    <button type="button" id="lightbox-download-all-btn" class="lightbox-action-btn" aria-label="批量下载本房间图片" title="批量下载本房间图片">⬇⬇</button>
+    <button type="button" class="lightbox-close-btn" aria-label="关闭图片预览">×</button>
     <img id="image-lightbox-img" alt="图片预览">
     <div class="lightbox-hint">滚轮 / 双击缩放 · 拖动查看细节</div>
 </div>
@@ -275,7 +277,7 @@
         </div>
  
         <!-- 隐藏的文件选择器 -->
-        <input type="file" id="file-input" accept="image/*,audio/*" style="display:none;" onchange="window.handleFileSelect(event)">
+        <input type="file" id="file-input" accept="image/*,audio/*" multiple style="display:none;" onchange="window.handleFileSelect(event)">
         <input type="file" id="file-input-generic" style="display:none;" onchange="window.handleGenericFileSelect(event)">
     </div>
 </div>
@@ -461,7 +463,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "3.3.1";
+    const CHAT_APP_VERSION = "3.4.0";
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -496,19 +498,20 @@
             container.id = 'toast-container';
             document.body.appendChild(container);
         }
-        if (container.children.length >= 3) return;
+        if (container.children.length >= 3) return null;
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         toast.innerText = message;
         container.appendChild(toast);
         if (duration === 0) {
-            setTimeout(() => toast.remove(), 5000);
-            return;
+            // 不自动消失，由调用方手动移除
+            return toast;
         }
         setTimeout(() => {
             toast.classList.add('out');
             toast.addEventListener('animationend', () => toast.remove());
         }, duration);
+        return toast;
     }
 
     let currentRoomCode = "";
@@ -1089,7 +1092,7 @@
         });
 
         // ===== 图片查看器：缩放 / 平移 =====
-        const lightboxState = { scale: 1, x: 0, y: 0, pointers: new Map(), lastDist: 0, dragging: false, lastTap: 0 };
+        const lightboxState = { scale: 1, x: 0, y: 0, pointers: new Map(), lastDist: 0, dragging: false, lastTap: 0, currentUrl: '' };
         const lightboxEl = () => document.getElementById('image-lightbox');
         const lightboxImgEl = () => document.getElementById('image-lightbox-img');
 
@@ -1122,11 +1125,101 @@
             else zoomLightboxAt(2.5, cx, cy);
         }
 
+        // 从 URL 提取文件名（兜底用时间戳）
+        function urlToFileName(url, fallbackName) {
+            try {
+                const u = new URL(url, window.location.href);
+                const base = u.pathname.split('/').pop();
+                if (base && /\.[a-zA-Z0-9]{2,5}$/.test(base)) return decodeURIComponent(base);
+            } catch (e) { /* ignore */ }
+            if (fallbackName) return fallbackName;
+            return `image_${Date.now()}.jpg`;
+        }
+
+        // 下载单张图片：fetch blob -> a[download]
+        async function downloadImage(url, suggestedName) {
+            if (!url) return false;
+            try {
+                const resp = await fetch(url, { mode: 'cors', cache: 'no-cache' });
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const blob = await resp.blob();
+                const fileName = urlToFileName(url, suggestedName);
+                const objectUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = objectUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+                return true;
+            } catch (e) {
+                console.error('downloadImage 失败:', e);
+                // CORS 失败兜底：直接打开链接（浏览器自行决定是否下载）
+                try {
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = urlToFileName(url, suggestedName);
+                    a.target = '_blank';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    return true;
+                } catch (e2) {
+                    console.error('downloadImage fallback 失败:', e2);
+                    return false;
+                }
+            }
+        }
+
+        // 批量下载当前房间所有图片（从 messagesCache 提取）
+        async function downloadAllRoomImages() {
+            if (!Array.isArray(messagesCache) || messagesCache.length === 0) {
+                showToast('当前房间暂无图片可下载', 'info');
+                return;
+            }
+            // 倒序收集图片消息（最新在前），过滤掉已撤回/删除
+            const images = messagesCache
+                .filter(m => m && m.media_type === 'image' && m.media_url && !m.is_recalled && !m.is_deleted)
+                .map(m => ({ url: m.media_url, sender: m.sender || 'user', created_at: m.created_at }))
+                .reverse();
+            if (images.length === 0) {
+                showToast('当前房间暂无图片可下载', 'info');
+                return;
+            }
+            const total = images.length;
+            const progressToast = showToast(`批量下载中... 0/${total}（请允许浏览器多次下载）`, 'info', 0);
+            const updateProgress = (cur) => {
+                if (progressToast) progressToast.innerText = `批量下载中... ${cur}/${total}（请允许浏览器多次下载）`;
+            };
+            let success = 0;
+            let failed = 0;
+            for (let i = 0; i < total; i++) {
+                updateProgress(i);
+                const item = images[i];
+                // 给文件名带上序号 + 发送者 + 时间，避免重名
+                const ts = item.created_at ? new Date(item.created_at).toISOString().replace(/[:.]/g, '-').slice(0, 19) : Date.now();
+                const safeSender = (item.sender || 'user').replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]/g, '_').slice(0, 16);
+                const idx = String(i + 1).padStart(3, '0');
+                const ok2 = await downloadImage(item.url, `${idx}_${safeSender}_${ts}.jpg`);
+                if (ok2) success++; else failed++;
+                // 间隔避免浏览器拦截
+                if (i < total - 1) await new Promise(r => setTimeout(r, 350));
+            }
+            if (progressToast) progressToast.remove();
+            if (failed === 0) {
+                showToast(`已下载 ${success} 张图片`, 'success');
+            } else {
+                showToast(`下载完成：成功 ${success} 张，失败 ${failed} 张`, 'info', 4000);
+            }
+        }
+
         function openImageLightbox(url) {
             const lightbox = lightboxEl();
             const image = lightboxImgEl();
             if (!lightbox || !image || !url) return;
             resetLightboxTransform();
+            lightboxState.currentUrl = url;
             image.src = url;
             image.onerror = () => { showToast('图片加载失败', 'error'); closeImageLightbox(); };
             lightbox.classList.add('visible');
@@ -1250,6 +1343,29 @@
         });
         window.openImageLightbox = openImageLightbox;
         window.closeImageLightbox = closeImageLightbox;
+        window.downloadCurrentLightboxImage = async function(event) {
+            if (event) { event.stopPropagation(); }
+            const url = lightboxState.currentUrl;
+            if (!url) { showToast('没有可下载的图片', 'info'); return; }
+            const btn = document.getElementById('lightbox-download-btn');
+            if (btn) { btn.style.opacity = '0.5'; btn.style.pointerEvents = 'none'; }
+            const ok = await downloadImage(url);
+            if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
+            showToast(ok ? '图片已开始下载' : '下载失败，可能是跨域限制', ok ? 'success' : 'error');
+        };
+        window.downloadAllRoomImages = async function(event) {
+            if (event) { event.stopPropagation(); }
+            await downloadAllRoomImages();
+        };
+        // 绑定 lightbox 内按钮事件（关闭按钮用类选择器，避开 download 按钮）
+        (function bindLightboxButtons() {
+            const dl = document.getElementById('lightbox-download-btn');
+            const dlAll = document.getElementById('lightbox-download-all-btn');
+            const close = document.querySelector('#image-lightbox .lightbox-close-btn');
+            if (dl) dl.addEventListener('click', (e) => { e.stopPropagation(); window.downloadCurrentLightboxImage(); });
+            if (dlAll) dlAll.addEventListener('click', (e) => { e.stopPropagation(); window.downloadAllRoomImages(); });
+            if (close) close.addEventListener('click', (e) => { e.stopPropagation(); closeImageLightbox(); });
+        })();
 
         // 清理旧版本残留的自定义背景数据
         try {
@@ -2442,76 +2558,199 @@
         if (attachPanel && !attachPanel.contains(event.target) && event.target.id !== 'add-btn') attachPanel.classList.remove('visible');
     });
 
+    // 上传单个媒体文件到 Supabase 存储桶，返回公开 URL
+    async function uploadMediaToStorage(file) {
+        const fileExt = (file.name.split('.').pop() || 'bin').toLowerCase();
+        const fileName = `media_${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
+        const filePath = `chat_media/${fileName}`;
+        const { error } = await supabaseClient
+            .storage
+            .from('chat_media')
+            .upload(filePath, file);
+        if (error) throw error;
+        const { data: publicData } = await supabaseClient
+            .storage
+            .from('chat_media')
+            .getPublicUrl(filePath);
+        return publicData.publicUrl;
+    }
+
+    // 直接把单条媒体消息写入数据库（不依赖输入框/回复/全局 pendingMedia）
+    async function insertMediaMessage(url, type, fileMeta) {
+        const now = beijingISOString();
+        const tempId = 'temp_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        let finalContent = '';
+        if (type === 'file' && fileMeta) {
+            const meta = encodeURIComponent(JSON.stringify(fileMeta));
+            finalContent = `\n\n[文件元数据:${meta}]`;
+        }
+        appendMessageToUI(tempId, mySender, finalContent, true, now, url, type, false, false, fileMeta ? fileMeta.fileName : null, fileMeta ? fileMeta.fileSize : null);
+        const tempEl = document.querySelector(`[data-msg-id="${tempId}"]`);
+        if (tempEl) {
+            tempEl.dataset.sending = 'true';
+            const statusEl = document.createElement('span');
+            statusEl.className = 'msg-send-status sending';
+            statusEl.innerText = '发送中...';
+            tempEl.appendChild(statusEl);
+        }
+        requestAnimationFrame(scrollToBottomInstant);
+        [50, 150, 300].forEach((d) => setTimeout(scrollToBottomInstant, d));
+        try {
+            const { data, error } = await supabaseClient
+                .from('messages')
+                .insert([{
+                    room_code: currentRoomCode,
+                    content: finalContent,
+                    sender: mySender,
+                    media_url: url,
+                    media_type: type,
+                    created_at: now
+                }])
+                .select('id')
+                .single();
+            if (error) throw error;
+            if (tempEl && data && data.id) {
+                tempEl.dataset.msgId = String(data.id);
+                tempEl.dataset.sending = 'false';
+                const idx = messagesCache.findIndex(m => String(m.id) === tempId);
+                if (idx >= 0) messagesCache[idx].id = data.id;
+                const statusEl = tempEl.querySelector('.msg-send-status');
+                if (statusEl) {
+                    statusEl.className = 'msg-send-status sent';
+                    statusEl.innerText = '已发送';
+                    setTimeout(() => { if (statusEl && statusEl.parentNode) statusEl.style.display = 'none'; }, 3000);
+                }
+            }
+        } catch (e) {
+            console.error('insertMediaMessage:', e);
+            updateMessageStatus(tempId, 'failed', '发送失败，点击重试');
+            throw e;
+        }
+    }
+
+    function showStorageError(e) {
+        if (e.message && (e.message.includes('Bucket') || e.message.includes('not found'))) {
+            showToast("存储桶不存在，请在Supabase控制台中创建名为 chat_media 的公开存储桶。", 'error');
+        } else if (e.message && e.message.includes('row-level security')) {
+            showToast("存储桶权限不足，请在Supabase控制台 → Storage → chat_media → 添加公开读取策略。", 'error');
+        } else if (e.message && (e.message.includes('quota') || e.message.includes('exceeded'))) {
+            showToast("存储空间已满，请在Supabase控制台中清理 chat_media 存储桶中的文件。", 'error');
+        } else {
+            showToast("上传失败，请检查网络。", 'error');
+        }
+    }
+
     window.handleFileSelect = async function(event) {
-        let file = event.target.files[0];
-        if (!file) return;
+        const fileList = event.target.files;
+        if (!fileList || fileList.length === 0) return;
+        const files = Array.from(fileList);
 
         const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'audio/mpeg', 'audio/wav', 'audio/webm', 'audio/mp4', 'audio/ogg', 'audio/aac'];
-        if (!allowedTypes.some(t => file.type.startsWith(t.split('/')[0]) || file.type === t)) {
-            showToast('不支持的文件类型，请选择图片或音频文件。', 'error');
+        const isOk = (f) => allowedTypes.some(t => (f.type && f.type.startsWith(t.split('/')[0])) || f.type === t);
+
+        // 不支持的文件直接剔除
+        const validFiles = files.filter(isOk);
+        const invalidCount = files.length - validFiles.length;
+        if (invalidCount > 0) {
+            showToast(`已忽略 ${invalidCount} 个不支持的文件（仅支持图片/音频）。`, 'error');
+        }
+        if (validFiles.length === 0) {
             event.target.value = '';
             return;
         }
 
-        if (file.type && file.type.startsWith('image/')) {
-            try {
-                const compressed = await compressImageFile(file, 1200, 0.75);
-                if (compressed && compressed.size > 100 && compressed.size < file.size) {
-                    file = compressed;
-                }
-            } catch (e) { console.warn('image compression failed', e); }
-        }
+        const hasAudio = validFiles.some(f => f.type.startsWith('audio/') || /\.(mp3|wav|webm|m4a|ogg|aac|flac)$/i.test(f.name));
+        const imageFiles = validFiles.filter(f => f.type && f.type.startsWith('image/'));
 
-        if (file.size > 15 * 1024 * 1024) {
-            return showToast("文件太大啦！请选择小于15MB的文件。", 'error');
-        }
-
-        try {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `media_${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
-            const filePath = `chat_media/${fileName}`;
-
-            const { data, error } = await supabaseClient
-                .storage
-                .from('chat_media')
-                .upload(filePath, file);
-
-            if (error) throw error;
-
-            const { data: publicData } = await supabaseClient
-                .storage
-                .from('chat_media')
-                .getPublicUrl(filePath);
-
-            const mediaUrl = publicData.publicUrl;
-
-            fetch(mediaUrl, { method: 'HEAD', cache: 'no-cache' })
-                .then(r => { if (!r.ok) throw new Error('not ok'); })
-                .catch(() => {
-                    showToast("图片上传成功但无法公开访问！请在Supabase → SQL Editor执行: CREATE POLICY \"public_read\" ON storage.objects FOR SELECT USING (bucket_id='chat_media');", 'error', 6000);
-                });
-
-            const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|webm|m4a|ogg|aac|flac)$/i.test(file.name);
-            pendingMedia = {
-                url: mediaUrl,
-                type: isAudio ? 'audio' : 'image'
-            };
-
-            window.sendMessage();
-        } catch (e) {
-            console.error('文件上传失败:', e);
-            if (e.message && (e.message.includes('Bucket') || e.message.includes('not found'))) {
-                showToast("存储桶不存在，请在Supabase控制台中创建名为 chat_media 的公开存储桶。", 'error');
-            } else if (e.message && e.message.includes('row-level security')) {
-                showToast("存储桶权限不足，请在Supabase控制台 → Storage → chat_media → 添加公开读取策略。", 'error');
-            } else if (e.message && (e.message.includes('quota') || e.message.includes('exceeded'))) {
-                showToast("存储空间已满，请在Supabase控制台中清理 chat_media 存储桶中的文件。", 'error');
-            } else {
-                showToast("上传失败，请检查网络。", 'error');
+        // 单文件：保持原有 sendMessage 流程（支持回复/输入框文本一起发）
+        if (validFiles.length === 1) {
+            let file = validFiles[0];
+            if (file.type.startsWith('image/')) {
+                try {
+                    const compressed = await compressImageFile(file, 1200, 0.75);
+                    if (compressed && compressed.size > 100 && compressed.size < file.size) file = compressed;
+                } catch (e) { console.warn('image compression failed', e); }
             }
-        } finally {
-            event.target.value = '';
+            if (file.size > 15 * 1024 * 1024) {
+                showToast("文件太大啦！请选择小于15MB的文件。", 'error');
+                event.target.value = '';
+                return;
+            }
+            try {
+                const mediaUrl = await uploadMediaToStorage(file);
+                fetch(mediaUrl, { method: 'HEAD', cache: 'no-cache' })
+                    .then(r => { if (!r.ok) throw new Error('not ok'); })
+                    .catch(() => {
+                        showToast("图片上传成功但无法公开访问！请在Supabase → SQL Editor执行: CREATE POLICY \"public_read\" ON storage.objects FOR SELECT USING (bucket_id='chat_media');", 'error', 6000);
+                    });
+                const isAudio = file.type.startsWith('audio/') || /\.(mp3|wav|webm|m4a|ogg|aac|flac)$/i.test(file.name);
+                pendingMedia = { url: mediaUrl, type: isAudio ? 'audio' : 'image' };
+                window.sendMessage();
+            } catch (e) {
+                console.error('文件上传失败:', e);
+                showStorageError(e);
+            } finally {
+                event.target.value = '';
+            }
+            return;
         }
+
+        // 多文件：批量发送（仅支持图片，音频不允许多选）
+        if (hasAudio) {
+            showToast('音频不支持批量发送，请逐张选择。', 'error');
+            event.target.value = '';
+            return;
+        }
+        if (imageFiles.length !== validFiles.length) {
+            showToast('批量发送仅支持图片，已忽略非图片文件。', 'error');
+        }
+        if (imageFiles.length === 0) {
+            event.target.value = '';
+            return;
+        }
+
+        const total = imageFiles.length;
+        let success = 0;
+        let failed = 0;
+        const progressToast = showToast(`批量发送中... 0/${total}`, 'info', 0);
+        const updateProgress = (cur) => {
+            if (progressToast && progressToast.innerText !== undefined) {
+                progressToast.innerText = `批量发送中... ${cur}/${total}`;
+            }
+        };
+
+        for (let i = 0; i < total; i++) {
+            const file = imageFiles[i];
+            updateProgress(i);
+            try {
+                let uploadFile = file;
+                try {
+                    const compressed = await compressImageFile(file, 1200, 0.75);
+                    if (compressed && compressed.size > 100 && compressed.size < file.size) uploadFile = compressed;
+                } catch (e) { /* 压缩失败用原图 */ }
+                if (uploadFile.size > 15 * 1024 * 1024) {
+                    showToast(`第 ${i + 1} 张超过 15MB，已跳过。`, 'error');
+                    failed++;
+                    continue;
+                }
+                const mediaUrl = await uploadMediaToStorage(uploadFile);
+                await insertMediaMessage(mediaUrl, 'image', null);
+                success++;
+            } catch (e) {
+                console.error('批量上传第', i + 1, '张失败:', e);
+                failed++;
+            }
+            // 间隔一下避免发送过快
+            if (i < total - 1) await new Promise(r => setTimeout(r, 120));
+        }
+
+        if (progressToast) progressToast.remove();
+        if (failed === 0) {
+            showToast(`已批量发送 ${success} 张图片`, 'success');
+        } else {
+            showToast(`发送完成：成功 ${success} 张，失败 ${failed} 张`, 'info', 4000);
+        }
+        event.target.value = '';
     };
 
     window.handleGenericFileSelect = async function(event) {
@@ -5876,7 +6115,11 @@
         #image-lightbox img.zoomed { cursor: grab; transition: none; }
         #image-lightbox img.zoomed.dragging { cursor: grabbing; }
         #image-lightbox .lightbox-hint { position: absolute; bottom: max(18px, env(safe-area-inset-bottom, 18px)); left: 50%; transform: translateX(-50%); color: rgba(255,255,255,.72); font-size: 12px; background: rgba(0,0,0,.35); padding: 6px 14px; border-radius: 999px; pointer-events: none; transition: opacity .3s; }
-        #image-lightbox button { position: absolute; top: max(14px, env(safe-area-inset-top, 14px)); right: max(14px, env(safe-area-inset-right, 14px)); width: 44px; height: 44px; padding: 0; margin: 0; border-radius: 50%; background: rgba(255,255,255,.18); font-size: 24px; border: none; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; }
+        #image-lightbox button { position: absolute; top: max(14px, env(safe-area-inset-top, 14px)); width: 44px; height: 44px; padding: 0; margin: 0; border-radius: 50%; background: rgba(255,255,255,.18); font-size: 22px; border: none; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; transition: background .15s; }
+        #image-lightbox button:hover { background: rgba(255,255,255,.32); }
+        #image-lightbox .lightbox-close-btn { right: max(14px, env(safe-area-inset-right, 14px)); font-size: 24px; }
+        #image-lightbox .lightbox-action-btn { right: calc(max(14px, env(safe-area-inset-right, 14px)) + 56px); font-size: 20px; }
+        #image-lightbox #lightbox-download-all-btn { right: calc(max(14px, env(safe-area-inset-right, 14px)) + 112px); font-size: 16px; }
 
         /* --- 设置弹窗 --- */
         #settings-modal {
