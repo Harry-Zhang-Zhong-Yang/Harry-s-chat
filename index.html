@@ -6,6 +6,28 @@
     <title>Harry的聊天室</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+      :root {
+        --safe-top: env(safe-area-inset-top, 0px);
+        --safe-bottom: env(safe-area-inset-bottom, 0px);
+        --toast-shadow: 0 18px 42px rgba(16, 24, 40, 0.18);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--bg, #f5f5f5);
+        color: var(--text-main, #18181b);
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body { overscroll-behavior-y: contain; }
+      button, input, textarea, select {
+        font: inherit;
+      }
+      button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, a:focus-visible {
+        outline: 3px solid rgba(59, 130, 246, 0.35);
+        outline-offset: 2px;
+      }
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       [data-icon] {
@@ -23,6 +45,142 @@
       /* 防裸HTML闪烁：主样式表在文档末尾，弱网下浏览器会先渲染出无样式内容。
          启动期先隐藏页面，主样式解析完成后（文末脚本）恢复显示；8秒兜底强制显示 */
       html.app-boot body { visibility: hidden !important; }
+      #toast-container {
+        position: fixed;
+        left: 50%;
+        bottom: calc(36px + var(--safe-bottom));
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: center;
+        z-index: 100000;
+        pointer-events: none;
+      }
+      .toast {
+        max-width: min(92vw, 360px);
+        background: rgba(17, 24, 39, 0.94);
+        color: #fff;
+        border-radius: 999px;
+        box-shadow: var(--toast-shadow);
+        padding: 10px 16px 10px 18px;
+        font-size: 13px;
+        line-height: 1.4;
+        letter-spacing: 0.02em;
+        animation: toastIn 0.25s ease;
+        pointer-events: auto;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid rgba(255,255,255,0.08);
+      }
+      .toast.out { animation: toastOut 0.22s ease forwards; }
+      .toast-info { background: rgba(31, 41, 55, 0.94); }
+      .toast-success { background: rgba(22, 101, 52, 0.94); }
+      .toast-error { background: rgba(127, 29, 29, 0.94); }
+      .toast-warning { background: rgba(146, 64, 14, 0.94); }
+      .toast-close {
+        border: 0;
+        background: rgba(255,255,255,0.13);
+        color: white;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 12px;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+      }
+      .msg-image-shell {
+        position: relative;
+        display: inline-block;
+        max-width: 100%;
+      }
+      .msg-image-download-btn {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        width: 34px;
+        height: 34px;
+        border: 0;
+        border-radius: 50%;
+        background: rgba(17, 24, 39, 0.8);
+        color: #fff;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.22);
+        opacity: 0;
+        transform: translateY(8px);
+        pointer-events: none;
+        transition: all 0.18s ease;
+        z-index: 3;
+      }
+      .msg-image-download-btn.visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .msg-wrapper.selected {
+        outline: 2px solid rgba(59, 130, 246, 0.8);
+        outline-offset: -2px;
+        background: rgba(59, 130, 246, 0.05);
+        border-radius: 12px;
+      }
+      .message-selection-bar {
+        position: fixed;
+        left: 50%;
+        bottom: calc(18px + var(--safe-bottom));
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 18px;
+        background: rgba(17, 24, 39, 0.96);
+        box-shadow: 0 20px 48px rgba(15, 23, 42, 0.25);
+        color: #fff;
+        z-index: 9999;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+      }
+      .message-selection-bar.hidden {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-50%) translateY(12px);
+      }
+      .message-selection-count {
+        font-size: 13px;
+        color: rgba(255,255,255,0.9);
+        min-width: 72px;
+      }
+      .message-select-pill {
+        border: 0;
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 12px;
+        color: #fff;
+        background: rgba(148, 163, 184, 0.24);
+        cursor: pointer;
+      }
+      .message-select-pill.primary {
+        background: rgba(59, 130, 246, 0.9);
+      }
+      .message-select-pill.danger {
+        background: rgba(239, 68, 68, 0.9);
+      }
+      @media (max-width: 640px) {
+        .message-selection-bar {
+          width: min(94vw, 420px);
+          justify-content: space-between;
+        }
+        .message-select-pill {
+          padding: 8px 10px;
+        }
+      }
     </style>
     <script>
       (function () {
@@ -500,19 +658,78 @@
         }
         if (container.children.length >= 3) return null;
         const toast = document.createElement('div');
-        toast.className = `toast ${type}`;
-        toast.innerText = message;
+        const tone = type === 'success' ? 'toast-success' : type === 'error' ? 'toast-error' : type === 'warning' ? 'toast-warning' : 'toast-info';
+        toast.className = `toast ${tone}`;
+        toast.setAttribute('role', 'status');
+        toast.setAttribute('aria-live', 'polite');
+
+        const text = document.createElement('span');
+        text.textContent = message;
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'toast-close';
+        closeBtn.setAttribute('aria-label', '关闭提示');
+        closeBtn.textContent = '×';
+        closeBtn.addEventListener('click', () => {
+            toast.classList.add('out');
+            setTimeout(() => toast.remove(), 180);
+        });
+
+        toast.appendChild(text);
+        toast.appendChild(closeBtn);
         container.appendChild(toast);
+
         if (duration === 0) {
-            // 不自动消失，由调用方手动移除
             return toast;
         }
-        setTimeout(() => {
+        const hideTimer = setTimeout(() => {
+            if (!toast.isConnected) return;
             toast.classList.add('out');
-            toast.addEventListener('animationend', () => toast.remove());
+            setTimeout(() => toast.remove(), 180);
         }, duration);
+        toast.__toastTimer = hideTimer;
         return toast;
     }
+
+    window.appEnhanceUi = function() {
+        const root = document.documentElement;
+        root.classList.remove('app-boot');
+        const firstInput = () => {
+            const focusable = [
+                document.getElementById('auth-username'),
+                document.getElementById('auth-password'),
+                document.getElementById('reg-username'),
+                document.getElementById('reg-password'),
+                document.getElementById('mrv-room-input'),
+                document.getElementById('join-room-modal-input'),
+                document.getElementById('message-input')
+            ].filter(Boolean)[0];
+            if (focusable && document.activeElement !== focusable) {
+                try { focusable.focus({ preventScroll: true }); } catch (e) {}
+            }
+        };
+        requestAnimationFrame(firstInput);
+
+        document.addEventListener('click', (event) => {
+            const toast = event.target.closest('.toast-close');
+            if (!toast) return;
+            const parent = toast.closest('.toast');
+            if (parent) {
+                parent.classList.add('out');
+                setTimeout(() => parent.remove(), 180);
+            }
+        }, true);
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                const modal = document.getElementById('update-modal');
+                if (modal && modal.style.display !== 'none') {
+                    window.closeUpdateModal && window.closeUpdateModal();
+                }
+            }
+        });
+    };
 
     let currentRoomCode = "";
     let pendingUrlRoom = ""; // 通过链接 ?room=xxx 带入的目标房间（登录后自动继续）
@@ -948,6 +1165,7 @@
         document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
         document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
         document.addEventListener('gestureend', function(e) { e.preventDefault(); });
+        window.appEnhanceUi && window.appEnhanceUi();
         
         const setVH = () => {
             const vh = window.innerHeight * 0.01;
@@ -3665,6 +3883,7 @@
             if (mediaType === 'image') {
                 mediaHtml = (() => {
                                 const __wrapper = document.createElement('div');
+                                __wrapper.className = 'msg-image-shell';
                                 __wrapper.style.display = 'grid';
                                 __wrapper.style.maxWidth = '320px';
                                 const __placeholder = document.createElement('div');
@@ -3704,7 +3923,10 @@
             </div>
         `;
         const messageImage = wrapper.querySelector('.msg-img');
-        if (messageImage) messageImage.onclick = () => openImageLightbox(messageImage.src);
+        if (messageImage) {
+            messageImage.onclick = () => openImageLightbox(messageImage.src);
+            bindImageDownloadButton(messageImage);
+        }
         if (typeof handleGameMessageInUI === 'function') {
             handleGameMessageInUI(wrapper, sender, content);
         }
@@ -3774,6 +3996,203 @@
 
     const chatBoxEl = document.getElementById('chat-box');
     let pressTimer;
+    let selectedMessageIds = new Set();
+    let selectionMode = false;
+    let selectionToolbar = null;
+
+    function ensureSelectionToolbar() {
+        if (selectionToolbar) return selectionToolbar;
+        selectionToolbar = document.createElement('div');
+        selectionToolbar.className = 'message-selection-bar hidden';
+        selectionToolbar.innerHTML = `
+            <span class="message-selection-count" data-role="count">0 项已选</span>
+            <button type="button" class="message-select-pill primary" data-action="download">批量下载</button>
+            <button type="button" class="message-select-pill danger" data-action="delete">批量删除</button>
+            <button type="button" class="message-select-pill" data-action="cancel">取消</button>
+        `;
+        selectionToolbar.addEventListener('click', (event) => {
+            const actionBtn = event.target.closest('[data-action]');
+            if (!actionBtn) return;
+            const action = actionBtn.dataset.action;
+            if (action === 'download') {
+                downloadSelectedMessages();
+            } else if (action === 'delete') {
+                deleteSelectedMessages();
+            } else if (action === 'cancel') {
+                clearSelectionMode();
+            }
+        });
+        document.body.appendChild(selectionToolbar);
+        return selectionToolbar;
+    }
+
+    function updateSelectionToolbar() {
+        const toolbar = ensureSelectionToolbar();
+        const count = selectedMessageIds.size;
+        const countEl = toolbar.querySelector('[data-role="count"]');
+        if (countEl) countEl.textContent = `${count} 项已选`;
+        toolbar.classList.toggle('hidden', count === 0);
+        if (count === 0) {
+            toolbar.style.display = 'none';
+        } else {
+            toolbar.style.display = 'flex';
+        }
+    }
+
+    function clearSelectionMode() {
+        selectionMode = false;
+        selectedMessageIds.forEach((id) => {
+            const wrapper = document.querySelector(`[data-msg-id="${id}"]`);
+            if (wrapper) wrapper.classList.remove('selected');
+        });
+        selectedMessageIds.clear();
+        const toolbar = ensureSelectionToolbar();
+        toolbar.classList.add('hidden');
+        toolbar.style.display = 'none';
+    }
+
+    function enterSelectionMode(messageId) {
+        selectionMode = true;
+        const toolbar = ensureSelectionToolbar();
+        toolbar.style.display = 'flex';
+        toolbar.classList.remove('hidden');
+        if (messageId) {
+            const currentId = String(messageId);
+            const wrapper = document.querySelector(`[data-msg-id="${currentId}"]`);
+            if (wrapper && !wrapper.classList.contains('system-msg')) {
+                selectedMessageIds.add(currentId);
+                wrapper.classList.add('selected');
+            }
+        }
+        updateSelectionToolbar();
+    }
+
+    function toggleMessageSelection(messageId, forceState) {
+        const currentId = String(messageId);
+        const wrapper = document.querySelector(`[data-msg-id="${currentId}"]`);
+        if (!wrapper || wrapper.classList.contains('system-msg')) return;
+        const shouldSelect = typeof forceState === 'boolean' ? forceState : !selectedMessageIds.has(currentId);
+        if (shouldSelect) {
+            selectedMessageIds.add(currentId);
+            wrapper.classList.add('selected');
+        } else {
+            selectedMessageIds.delete(currentId);
+            wrapper.classList.remove('selected');
+        }
+        if (selectedMessageIds.size === 0) {
+            clearSelectionMode();
+            return;
+        }
+        selectionMode = true;
+        updateSelectionToolbar();
+    }
+
+    async function downloadSelectedMessages() {
+        if (!selectedMessageIds.size) {
+            showToast('请先选择要下载的消息', 'info');
+            return;
+        }
+        const ids = [...selectedMessageIds];
+        let total = 0;
+        let success = 0;
+        for (const id of ids) {
+            const wrapper = document.querySelector(`[data-msg-id="${id}"]`);
+            if (!wrapper) continue;
+            const url = wrapper.dataset.mediaUrl || wrapper.querySelector('.msg-img')?.src || wrapper.querySelector('.file-card a')?.href;
+            if (!url) continue;
+            total += 1;
+            const got = await downloadImage(url, wrapper.dataset.fileName || urlToFileName(url, 'message_download'));
+            if (got) success += 1;
+            await new Promise(r => setTimeout(r, 250));
+        }
+        clearSelectionMode();
+        showToast(total ? `已下载 ${success}/${total} 个文件` : '没有可下载的消息', total && success > 0 ? 'success' : 'info');
+    }
+
+    async function deleteSelectedMessages() {
+        if (!selectedMessageIds.size) {
+            showToast('请先选择要删除的消息', 'info');
+            return;
+        }
+        const ids = [...selectedMessageIds];
+        const removable = [];
+        for (const id of ids) {
+            const wrapper = document.querySelector(`[data-msg-id="${id}"]`);
+            if (!wrapper) continue;
+            if (wrapper.dataset.sender === mySender || String(wrapper.dataset.sender || '').trim() === String(mySender || '').trim()) {
+                removable.push(id);
+            }
+        }
+        if (!removable.length) {
+            clearSelectionMode();
+            showToast('只能删除自己的消息', 'info');
+            return;
+        }
+        for (const id of removable) {
+            await recallMessage(id);
+        }
+        clearSelectionMode();
+    }
+
+    function bindImageDownloadButton(img) {
+        if (!img || img.dataset.longPressBound === '1') return;
+        img.dataset.longPressBound = '1';
+        const shell = img.closest('.msg-image-shell');
+        if (!shell) return;
+        const ensureBtn = () => {
+            let btn = shell.querySelector('.msg-image-download-btn');
+            if (!btn) {
+                btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'msg-image-download-btn';
+                btn.title = '下载图片';
+                btn.setAttribute('aria-label', '下载图片');
+                btn.innerHTML = '↓';
+                btn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const src = img.src || img.dataset.src || '';
+                    if (!src) return;
+                    const ok = await downloadImage(src, urlToFileName(src, 'chat_image'));
+                    btn.classList.remove('visible');
+                    showToast(ok ? '图片已开始下载' : '下载失败', ok ? 'success' : 'error');
+                });
+                shell.appendChild(btn);
+            }
+            return btn;
+        };
+        let holdTimer = null;
+        const hideBtn = () => {
+            const btn = shell.querySelector('.msg-image-download-btn');
+            if (btn) btn.classList.remove('visible');
+        };
+        img.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            clearTimeout(holdTimer);
+            holdTimer = setTimeout(() => {
+                const btn = ensureBtn();
+                btn.classList.add('visible');
+            }, 380);
+        });
+        img.addEventListener('pointerup', () => clearTimeout(holdTimer));
+        img.addEventListener('pointerleave', () => {
+            clearTimeout(holdTimer);
+            hideBtn();
+        });
+        img.addEventListener('pointercancel', () => {
+            clearTimeout(holdTimer);
+            hideBtn();
+        });
+        img.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const btn = ensureBtn();
+            btn.classList.add('visible');
+        });
+        img.addEventListener('click', (event) => {
+            if (event.target === img) hideBtn();
+        });
+    }
 
     function scrollToBottomInstant() {
         const chatBox = document.getElementById('chat-box');
@@ -3785,6 +4204,16 @@
         // Deprecated: long press now shows context menu. Keep for compatibility.
         const rect = element.getBoundingClientRect();
         showContextMenu(rect.left + 20, rect.top + 20, element.dataset.msgId, element);
+    }
+
+    function clearSelectionOnOutsideClick(event) {
+        const toolbar = ensureSelectionToolbar();
+        if (!selectionMode) return;
+        const clickedInsideMessage = event.target.closest('.msg-wrapper');
+        const clickedInsideToolbar = event.target.closest('.message-selection-bar');
+        if (!clickedInsideMessage && !clickedInsideToolbar) {
+            clearSelectionMode();
+        }
     }
 
     window.cancelReply = function() {
@@ -3817,6 +4246,10 @@
             menu.appendChild(btn);
             return btn;
         };
+
+        addItem('多选', () => {
+            enterSelectionMode(messageId);
+        });
 
         addItem('回复', () => {
             replyData = {
@@ -3890,7 +4323,14 @@
             lastTouchPos.y = e.touches[0].clientY;
         }
         if (target && !target.classList.contains('system-msg')) {
-            pressTimer = setTimeout(() => showContextMenu(lastTouchPos.x, lastTouchPos.y, target.dataset.msgId, target), 600);
+            pressTimer = setTimeout(() => {
+                if (e.target && e.target.closest('.msg-image-download-btn')) return;
+                if (selectionMode) {
+                    toggleMessageSelection(target.dataset.msgId, true);
+                } else {
+                    enterSelectionMode(target.dataset.msgId);
+                }
+            }, 550);
         }
     }, {passive: true});
 
@@ -3901,6 +4341,14 @@
 
     chatBoxEl.addEventListener('touchend', () => clearTimeout(pressTimer));
     chatBoxEl.addEventListener('touchcancel', () => clearTimeout(pressTimer));
+
+    chatBoxEl.addEventListener('click', (event) => {
+        const wrapper = event.target.closest('.msg-wrapper');
+        if (!wrapper || selectionMode === false) return;
+        const actionLike = event.target.closest('button, .msg-img, .voice-message, .file-card, .reply-quote');
+        if (actionLike) return;
+        toggleMessageSelection(wrapper.dataset.msgId, !selectedMessageIds.has(String(wrapper.dataset.msgId)));
+    });
 
     // 右键（桌面）或 contextmenu 事件：优先在 chatBox 内处理，否则全局捕获
     chatBoxEl.addEventListener('contextmenu', (e) => {
@@ -3933,8 +4381,8 @@
     // 全局点击隐藏上下文菜单
     document.addEventListener('click', (e) => {
         const menu = document.getElementById('msg-context-menu');
-        if (!menu) return;
-        if (!menu.contains(e.target)) menu.style.display = 'none';
+        if (menu && !menu.contains(e.target)) menu.style.display = 'none';
+        clearSelectionOnOutsideClick(e);
     });
 
     // 更新消息（用于处理撤回/编辑）并同步本地缓存
