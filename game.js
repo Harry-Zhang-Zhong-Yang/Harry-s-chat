@@ -1,4 +1,5 @@
 let activeGame = null;
+const gameActionLocks = new Set();
 
 function isMobile() {
     return /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent) || 
@@ -37,10 +38,13 @@ function showGameLoading(gameName, icon) {
 }
 
 window.startGame = async function(gameName, icon) {
+    const lockKey = `game-start:${gameName}:${icon}`;
+    if (gameActionLocks.has(lockKey)) return;
     if (activeGame && activeGame.name === gameName && activeGame.status === 'waiting') {
         showToast(`你已发起了一个${gameName}邀请，请等待对方接受或取消后再试`, 'warning');
         return;
     }
+    gameActionLocks.add(lockKey);
     window.closeGamePanel();
     showGameLoading(gameName, icon);
     
@@ -105,13 +109,17 @@ window.startGame = async function(gameName, icon) {
     }
 
     showToast(`已发送${gameName}邀请`, 'success');
+    setTimeout(() => gameActionLocks.delete(lockKey), 2500);
 };
 
 window.acceptGame = async function(gameId, gameName, icon, host) {
+    const lockKey = `game-accept:${gameId}`;
+    if (gameActionLocks.has(lockKey)) return;
     if (activeGame && activeGame.status === 'playing') {
         showToast('你正在游戏中，请完成当前游戏后再接受新邀请', 'warning');
         return;
     }
+    gameActionLocks.add(lockKey);
     showGameLoading(gameName, icon);
     
     const acceptText = `[GAME_ACCEPT:${gameId}:${mySender}]`;
@@ -155,6 +163,7 @@ window.acceptGame = async function(gameId, gameName, icon, host) {
         updateMessageStatus(tempId, 'failed', '发送失败');
         window.closeGameBoard();
     }
+    setTimeout(() => gameActionLocks.delete(lockKey), 1800);
 };
 
 const MIN_CELL = 16;
