@@ -458,7 +458,7 @@
             <div class="settings-row-item"><button class="settings-row-button" onclick="window.searchMessages()">查找聊天内容</button></div>
             <div class="settings-row-item">
                 <label>消息通知</label>
-                <button class="settings-row-button" id="wx-notify-btn" onclick="showToast('该功能正在开发中，敬请期待', 'info')">配置微信 / QQ 通知</button>
+                <button class="settings-row-button" id="wx-notify-btn" onclick="window.openExternalNotifyPage()">配置站外通知</button>
             </div>
             <div class="settings-row-item"><label>气泡颜色</label><div style="display:flex;align-items:center;gap:8px;"><input type="color" id="color-selector" value="#18181b" onchange="window.saveSettings()"><button class="settings-row-button" style="padding:6px 12px;font-size:12px;" onclick="window.resetBubbleColor()">恢复默认</button></div></div>
             <div class="settings-row-item"><button class="settings-row-button" onclick="window.clearLocalHistory()">清空聊天记录</button></div>
@@ -561,6 +561,95 @@
     </div>
 </div>
 
+<!-- 站外通知页：仿零语 external-notifications，每个用户配置 N 条群机器人渠道 -->
+<div id="external-notify-page">
+    <div class="gsp-header">
+        <button class="gsp-back" onclick="window.closeExternalNotifyPage()" aria-label="返回">‹</button>
+        <span class="gsp-title">站外通知</span>
+    </div>
+    <div class="gsp-body">
+        <div class="settings-section" style="padding:14px 14px 12px;">
+            <div style="font-size:13px;color:var(--muted);line-height:1.55;">
+                将消息推送到 <b>飞书 / 钉钉 / 企业微信 / QQ 官方机器人</b> 等，聊天互动与系统提醒可异步送达站外。
+                <br>接收者使用自己已装好的 IM 即可收到通知，<b>无需注册第三方服务</b>。
+            </div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-section-title">
+                <span>通知渠道</span>
+                <button class="add-channel-btn" onclick="window.openAddChannelModal()">＋ 添加渠道</button>
+            </div>
+            <div id="extn-channels-list" class="extn-channels-list">
+                <!-- 动态渲染渠道卡片 -->
+            </div>
+            <div id="extn-empty-tip" class="extn-empty-tip" style="display:none;">
+                尚未配置渠道
+                <div style="font-size:12px;margin-top:6px;color:var(--muted);">点击右上角"添加渠道"开始，可添加多条（个人群、工作群等）</div>
+            </div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-section-title">使用说明</div>
+            <div class="settings-row-item" style="font-size:12.5px;color:var(--muted);line-height:1.6;border-bottom:0;">
+                1. 在你常用的 IM（飞书/钉钉/企微/QQ）中建一个群，把机器人群机器人加进去，复制 webhook URL<br>
+                2. 在上方添加渠道，选择对应渠道类型，粘贴 URL<br>
+                3. 触发时机：新消息、@提及、新用户申请加入（每个渠道可独立勾选）<br>
+                4. 默认隐藏敏感信息，按需开启"显示对方名称 / 显示消息内容"
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 添加/编辑渠道弹窗 -->
+<div id="extn-channel-modal" class="extn-modal" onclick="if(event.target===this)window.closeChannelModal()">
+    <div class="extn-modal-card" onclick="event.stopPropagation()">
+        <div class="extn-modal-header">
+            <span id="extn-modal-title">添加通知渠道</span>
+            <button class="extn-modal-close" onclick="window.closeChannelModal()" aria-label="关闭">×</button>
+        </div>
+        <div class="extn-modal-body">
+            <div class="extn-field">
+                <label>渠道类型</label>
+                <select id="extn-channel-type">
+                    <option value="feishu">飞书（推荐，零门槛）</option>
+                    <option value="dingtalk">钉钉</option>
+                    <option value="wechat">微信 / 企业微信（群机器人）</option>
+                    <option value="qq">QQ 官方机器人</option>
+                    <option value="custom">自定义 Webhook</option>
+                </select>
+            </div>
+            <div class="extn-field">
+                <label>渠道名称</label>
+                <input type="text" id="extn-channel-name" placeholder="例如：我的飞书通知群" maxlength="40">
+            </div>
+            <div class="extn-field">
+                <label>Webhook URL（HTTPS）</label>
+                <input type="url" id="extn-channel-url" placeholder="https://...">
+                <div class="extn-hint" id="extn-url-hint">粘贴你从 IM 群机器人设置中复制的 webhook 地址</div>
+            </div>
+            <div class="extn-field">
+                <label>订阅事件</label>
+                <div class="extn-checks">
+                    <label class="extn-check"><input type="checkbox" id="extn-evt-newmsg" checked> <span>新消息</span></label>
+                    <label class="extn-check"><input type="checkbox" id="extn-evt-mention" checked> <span>@提及我</span></label>
+                    <label class="extn-check"><input type="checkbox" id="extn-evt-join"> <span>新用户申请加入</span></label>
+                </div>
+            </div>
+            <div class="extn-field">
+                <label>推送隐私</label>
+                <div class="extn-checks">
+                    <label class="extn-check"><input type="checkbox" id="extn-show-sender"> <span>显示对方名称</span></label>
+                    <label class="extn-check"><input type="checkbox" id="extn-show-content"> <span>显示消息内容</span></label>
+                </div>
+                <div class="extn-hint">默认全部关闭，仅推送"[新消息]"等脱敏文案</div>
+            </div>
+        </div>
+        <div class="extn-modal-footer">
+            <button class="extn-btn-secondary" onclick="window.closeChannelModal()">取消</button>
+            <button class="extn-btn-primary" id="extn-save-btn" onclick="window.saveChannel()">保存</button>
+        </div>
+    </div>
+</div>
+
 <div id="admin-modal" class="admin-modal">
     <!-- 密码门 -->
     <div id="admin-login-view" class="admin-login-view" style="display:none;">
@@ -617,7 +706,7 @@
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
 <script>
-    const CHAT_APP_VERSION = "3.4.0";
+    const CHAT_APP_VERSION = "3.5.1";
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -1922,6 +2011,14 @@
                 media_type: 'system_join_request:' + data.id   // 用 media_type 编码 request id，便于渲染投票 UI
             }]);
         } catch (e) { console.warn('[join] broadcast message failed:', e); }
+        // ====== 触发站外通知（新用户申请加入）======
+        try {
+            window.triggerExternalNotify('join_request', {
+                room_code: roomCode,
+                sender: userName,
+                request_id: data.id,
+            });
+        } catch (eJ) { console.warn('[extn] join_request trigger error:', eJ); }
         return { ok: true, requestId: data.id };
     }
 
@@ -3445,6 +3542,35 @@
                         }
                     }
                 }
+                // ====== 触发站外通知（新消息 + @提及）======
+                try {
+                    const sentContent = (finalContent || '')
+                        .replace(/\n\n\[回复元数据:[^\]]+\]/g, '')
+                        .replace(/\n\n\[文件元数据:[^\]]+\]/g, '')
+                        .trim();
+                    // 系统消息（sender === 'system'）不推
+                    if (mySender && mySender !== 'system') {
+                        window.triggerExternalNotify('new_message', {
+                            room_code: currentRoomCode,
+                            sender: mySender,
+                            content: sentContent,
+                        });
+                        // 解析 @xxx 触发 mention 事件
+                        const mentions = sentContent.match(/@([^\s@,，。!?;:\]\[]+)/g) || [];
+                        const seen = new Set();
+                        for (const token of mentions) {
+                            const username = token.slice(1);
+                            if (!username || username === mySender || seen.has(username)) continue;
+                            seen.add(username);
+                            window.triggerExternalNotify('mention', {
+                                room_code: currentRoomCode,
+                                sender: mySender,
+                                content: sentContent,
+                                mention_user: username,
+                            });
+                        }
+                    }
+                } catch (eN) { console.warn('[extn] trigger error:', eN); }
             }
         } catch (e) {
             console.error(e);
@@ -4558,6 +4684,251 @@
         const page = document.getElementById('profile-page');
         if (page) page.style.display = 'none';
     };
+
+    // ============================================
+    // 站外通知（群机器人 webhook）
+    // ============================================
+    const EXTN_EDGE_URL = SUPABASE_URL + '/functions/v1/external-notify';
+    const EXTN_HEADERS = {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+    };
+    const EXTN_TYPES = {
+        feishu:   { icon: '飞', label: '飞书' },
+        dingtalk: { icon: '钉', label: '钉钉' },
+        wechat:   { icon: '微', label: '微信/企微' },
+        qq:       { icon: 'Q',  label: 'QQ 机器人' },
+        custom:   { icon: '⚙', label: '自定义' },
+    };
+    const EXTN_EVENT_LABELS = {
+        new_message: '新消息',
+        mention:     '@提及',
+        join_request:'新申请',
+    };
+    let extnEditingId = null;  // null=新增 / number=编辑
+
+    window.openExternalNotifyPage = async function() {
+        const page = document.getElementById('external-notify-page');
+        if (!page) return;
+        // 关闭其他可能打开的层
+        document.getElementById('settings-modal').style.display = 'none';
+        document.getElementById('global-settings-page').style.display = 'none';
+        page.style.display = 'block';
+        page.scrollTop = 0;
+        await window.extnLoadAndRender();
+    };
+
+    window.closeExternalNotifyPage = function() {
+        const page = document.getElementById('external-notify-page');
+        if (page) page.style.display = 'none';
+    };
+
+    async function extnFetchChannels() {
+        const user = getLoggedInUser();
+        if (!user) return [];
+        const { data, error } = await supabaseClient
+            .from('external_notify_channels')
+            .select('id,user_name,channel_type,name,webhook_url,enabled,events,show_sender,show_content,created_at')
+            .eq('user_name', user)
+            .order('id', { ascending: true });
+        if (error) { console.warn('[extn] load error:', error); return []; }
+        return data || [];
+    }
+
+    window.extnLoadAndRender = async function() {
+        const list = await extnFetchChannels();
+        const container = document.getElementById('extn-channels-list');
+        const empty = document.getElementById('extn-empty-tip');
+        if (!container) return;
+        if (list.length === 0) {
+            container.innerHTML = '';
+            if (empty) empty.style.display = 'block';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+        container.innerHTML = list.map(ch => extnRenderCard(ch)).join('');
+    };
+
+    function extnRenderCard(ch) {
+        const t = EXTN_TYPES[ch.channel_type] || EXTN_TYPES.custom;
+        const url = (ch.webhook_url || '').replace(/(.{32}).+(.{8})/, '$1…$2');
+        const evts = (ch.events || []).map(e => `<span class="extn-evt-tag">${escapeHtml(EXTN_EVENT_LABELS[e] || e)}</span>`).join('');
+        const privacy = [
+            ch.show_sender  ? '<span class="extn-evt-tag">显示名称</span>' : '',
+            ch.show_content ? '<span class="extn-evt-tag">显示内容</span>' : '',
+        ].filter(Boolean).join('') || '<span class="extn-evt-tag">隐私全开</span>';
+        return `
+        <div class="extn-channel-card${ch.enabled ? '' : ' disabled'}" data-ch-id="${ch.id}">
+            <div class="extn-channel-head">
+                <div class="extn-channel-icon ${escapeHtml(ch.channel_type)}">${escapeHtml(t.icon)}</div>
+                <div class="extn-channel-name">${escapeHtml(ch.name)}</div>
+                <label class="extn-channel-toggle">
+                    <input type="checkbox" data-ch-id="${ch.id}" ${ch.enabled ? 'checked' : ''} onchange="window.toggleChannelEnabled(${ch.id}, this.checked)">
+                </label>
+            </div>
+            <div class="extn-channel-meta">
+                <div>${escapeHtml(t.label)} · ${escapeHtml(url)}</div>
+                <div style="margin-top:4px;">订阅：${evts}</div>
+                <div style="margin-top:4px;">隐私：${privacy}</div>
+            </div>
+            <div class="extn-channel-actions">
+                <button class="extn-action-btn" onclick="window.editChannel(${ch.id})">编辑</button>
+                <button class="extn-action-btn" onclick="window.testChannel(${ch.id})">测试</button>
+                <button class="extn-action-btn danger" onclick="window.deleteChannel(${ch.id})">删除</button>
+            </div>
+        </div>`;
+    }
+
+    window.toggleChannelEnabled = async function(id, enabled) {
+        const { error } = await supabaseClient
+            .from('external_notify_channels')
+            .update({ enabled })
+            .eq('id', id);
+        if (error) { showToast('更新失败：' + error.message, 'error'); return; }
+        const card = document.querySelector(`[data-ch-id="${id}"]`);
+        if (card) card.classList.toggle('disabled', !enabled);
+        showToast(enabled ? '已启用' : '已停用', 'success', 1200);
+    };
+
+    window.openAddChannelModal = function() {
+        extnEditingId = null;
+        document.getElementById('extn-modal-title').textContent = '添加通知渠道';
+        document.getElementById('extn-channel-type').value = 'feishu';
+        document.getElementById('extn-channel-name').value = '';
+        document.getElementById('extn-channel-url').value = '';
+        document.getElementById('extn-evt-newmsg').checked = true;
+        document.getElementById('extn-evt-mention').checked = true;
+        document.getElementById('extn-evt-join').checked = false;
+        document.getElementById('extn-show-sender').checked = false;
+        document.getElementById('extn-show-content').checked = false;
+        document.getElementById('extn-channel-modal').classList.add('show');
+        setTimeout(() => document.getElementById('extn-channel-name').focus(), 50);
+    };
+
+    window.closeChannelModal = function() {
+        document.getElementById('extn-channel-modal').classList.remove('show');
+        extnEditingId = null;
+    };
+
+    window.editChannel = async function(id) {
+        const list = await extnFetchChannels();
+        const ch = list.find(x => String(x.id) === String(id));
+        if (!ch) return;
+        extnEditingId = id;
+        document.getElementById('extn-modal-title').textContent = '编辑通知渠道';
+        document.getElementById('extn-channel-type').value = ch.channel_type;
+        document.getElementById('extn-channel-name').value = ch.name || '';
+        document.getElementById('extn-channel-url').value = ch.webhook_url || '';
+        const evs = new Set(ch.events || []);
+        document.getElementById('extn-evt-newmsg').checked = evs.has('new_message');
+        document.getElementById('extn-evt-mention').checked = evs.has('mention');
+        document.getElementById('extn-evt-join').checked = evs.has('join_request');
+        document.getElementById('extn-show-sender').checked = !!ch.show_sender;
+        document.getElementById('extn-show-content').checked = !!ch.show_content;
+        document.getElementById('extn-channel-modal').classList.add('show');
+    };
+
+    window.saveChannel = async function() {
+        const user = getLoggedInUser();
+        if (!user) { showToast('请先登录', 'error'); return; }
+        const btn = document.getElementById('extn-save-btn');
+        const channel_type = document.getElementById('extn-channel-type').value;
+        const name = document.getElementById('extn-channel-name').value.trim();
+        const webhook_url = document.getElementById('extn-channel-url').value.trim();
+        const events = [];
+        if (document.getElementById('extn-evt-newmsg').checked) events.push('new_message');
+        if (document.getElementById('extn-evt-mention').checked) events.push('mention');
+        if (document.getElementById('extn-evt-join').checked) events.push('join_request');
+        const show_sender = document.getElementById('extn-show-sender').checked;
+        const show_content = document.getElementById('extn-show-content').checked;
+        if (!name) { showToast('请填写渠道名称', 'error'); return; }
+        if (!webhook_url) { showToast('请填写 Webhook URL', 'error'); return; }
+        if (!/^https:\/\//i.test(webhook_url)) { showToast('Webhook URL 必须以 https:// 开头', 'error'); return; }
+        if (events.length === 0) { showToast('至少勾选一个订阅事件', 'error'); return; }
+        btn.disabled = true; btn.textContent = '保存中...';
+        try {
+            if (extnEditingId) {
+                const { error } = await supabaseClient
+                    .from('external_notify_channels')
+                    .update({ channel_type, name, webhook_url, events, show_sender, show_content })
+                    .eq('id', extnEditingId);
+                if (error) throw error;
+                showToast('已保存', 'success', 1200);
+            } else {
+                const { error } = await supabaseClient
+                    .from('external_notify_channels')
+                    .insert([{ user_name: user, channel_type, name, webhook_url, events, show_sender, show_content, enabled: true }]);
+                if (error) throw error;
+                showToast('已添加', 'success', 1200);
+            }
+            window.closeChannelModal();
+            await window.extnLoadAndRender();
+        } catch (e) {
+            showToast('保存失败：' + (e.message || ''), 'error', 3500);
+        } finally {
+            btn.disabled = false; btn.textContent = '保存';
+        }
+    };
+
+    window.deleteChannel = async function(id) {
+        if (!confirm('确定删除该通知渠道？')) return;
+        const { error } = await supabaseClient
+            .from('external_notify_channels')
+            .delete()
+            .eq('id', id);
+        if (error) { showToast('删除失败：' + error.message, 'error'); return; }
+        showToast('已删除', 'success', 1200);
+        await window.extnLoadAndRender();
+    };
+
+    /** 测试渠道：往 webhook 推一条带 [测试] 前缀的消息 */
+    window.testChannel = async function(id) {
+        const list = await extnFetchChannels();
+        const ch = list.find(x => String(x.id) === String(id));
+        if (!ch) return;
+        try {
+            const resp = await fetch(EXTN_EDGE_URL, {
+                method: 'POST',
+                headers: EXTN_HEADERS,
+                body: JSON.stringify({
+                    event: 'new_message',
+                    room_code: currentRoomCode || 'test',
+                    sender: mySender || getLoggedInUser() || 'tester',
+                    content: '[测试消息] 站外通知渠道连通性测试，请忽略',
+                }),
+            });
+            // 这里返回的是「给所有房间成员的推送」，不是单渠道的；
+            // 真正测试某渠道是否可达，可让用户去对应 IM 看是否收到（建议在文档中说明）
+            showToast('已提交测试请求，请到对应 IM 查看是否收到', 'info', 3000);
+        } catch (e) {
+            showToast('请求失败：' + e.message, 'error');
+        }
+    };
+
+    /**
+     * 实际触发站外通知（由 sendMessage / submitJoinRequest / 投票完成后调用）
+     * @param {string} event 'new_message' | 'mention' | 'join_request'
+     * @param {object} opts { room_code, sender, content, mention_user?, request_id? }
+     */
+    async function triggerExternalNotify(event, opts) {
+        try {
+            // 仅在浏览器前台时触发；静默失败不影响主流程
+            if (typeof window === 'undefined' || typeof fetch !== 'function') return;
+            const payload = { event, ...opts };
+            const resp = await fetch(EXTN_EDGE_URL, {
+                method: 'POST',
+                headers: EXTN_HEADERS,
+                body: JSON.stringify(payload),
+                // 不阻塞主流程：失败仅记录
+            }).catch(e => ({ ok: false, _err: String(e) }));
+            // 不要 await；fire-and-forget；不打印日志避免噪音
+            return resp;
+        } catch (e) {
+            console.warn('[extn] trigger failed:', e);
+        }
+    }
+    window.triggerExternalNotify = triggerExternalNotify;
 
     // 修改密码（全局设置 > 账号安全）：验证旧密码后更新 users.password
     window.changePassword = async function() {
@@ -6673,6 +7044,57 @@
         /* ========== 全局设置页（全屏覆盖，从聊天设置进入） ========== */
         #global-settings-page { display:none; position:fixed; inset:0; z-index:8000; background:var(--bg, #f4f5fb); overflow-y:auto; overscroll-behavior:contain; }
         #profile-page { display:none; position:fixed; inset:0; z-index:8100; background:var(--bg, #f4f5fb); overflow-y:auto; overscroll-behavior:contain; }
+
+        /* ============== 站外通知页 ============== */
+        #external-notify-page { display:none; position:fixed; inset:0; z-index:8150; background:var(--bg, #f4f5fb); overflow-y:auto; overscroll-behavior:contain; }
+        .extn-channels-list { display:flex; flex-direction:column; gap:8px; }
+        .extn-channel-card { padding:12px 14px; background:var(--surface-solid); border:1px solid var(--line); border-radius:12px; transition:opacity .15s; }
+        .extn-channel-card.disabled { opacity:.5; }
+        .extn-channel-head { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+        .extn-channel-icon { width:34px; height:34px; flex:0 0 34px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:18px; background:var(--chip-bg); }
+        .extn-channel-icon.feishu { background:#e6f4ff; color:#1677ff; }
+        .extn-channel-icon.dingtalk { background:#fff4e6; color:#ff8800; }
+        .extn-channel-icon.wechat { background:#e8f8e8; color:#07c160; }
+        .extn-channel-icon.qq { background:#e6f0ff; color:#1e6cff; }
+        .extn-channel-icon.custom { background:#f0f0f5; color:#52525b; }
+        .extn-channel-name { flex:1; min-width:0; font-size:14px; font-weight:600; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .extn-channel-toggle { flex:0 0 auto; }
+        .extn-channel-toggle input[type="checkbox"] { width:38px; height:22px; appearance:none; -webkit-appearance:none; background:#d4d4d8; border-radius:11px; position:relative; transition:background .15s; cursor:pointer; margin:0; padding:0; }
+        .extn-channel-toggle input[type="checkbox"]::after { content:""; position:absolute; top:2px; left:2px; width:18px; height:18px; background:#fff; border-radius:50%; transition:transform .15s; box-shadow:0 1px 2px rgba(0,0,0,.15); }
+        .extn-channel-toggle input[type="checkbox"]:checked { background:var(--btn-bg, #18181b); }
+        .extn-channel-toggle input[type="checkbox"]:checked::after { transform:translateX(16px); }
+        .extn-channel-meta { font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.5; word-break:break-all; }
+        .extn-channel-meta .extn-evt-tag { display:inline-block; padding:2px 7px; margin-right:4px; background:var(--chip-bg); border-radius:6px; font-size:10.5px; }
+        .extn-channel-actions { margin-top:8px; display:flex; gap:6px; }
+        .extn-action-btn { padding:5px 10px; border:1px solid var(--line); border-radius:7px; background:transparent; color:var(--text-main); font-size:12px; cursor:pointer; }
+        .extn-action-btn:hover { background:var(--chip-bg); }
+        .extn-action-btn.danger { color:#dc2626; border-color:#fecaca; }
+        .extn-action-btn.danger:hover { background:#fef2f2; }
+        .extn-empty-tip { padding:24px 14px; text-align:center; color:var(--muted); font-size:13px; }
+        .add-channel-btn { padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:var(--chip-bg); color:var(--text-main); font-size:12px; cursor:pointer; font-weight:500; }
+        .add-channel-btn:hover { background:var(--btn-bg); color:#fff; border-color:transparent; }
+
+        /* ============== 渠道弹窗 ============== */
+        .extn-modal { display:none; position:fixed; inset:0; z-index:8200; background:rgba(0,0,0,.45); align-items:center; justify-content:center; padding:16px; }
+        .extn-modal.show { display:flex; }
+        .extn-modal-card { width:100%; max-width:440px; max-height:90vh; background:var(--surface-solid); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,.18); }
+        .extn-modal-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid var(--line); font-size:15px; font-weight:600; color:var(--text-main); }
+        .extn-modal-close { width:30px; height:30px; border:none; background:transparent; color:var(--muted); font-size:22px; line-height:1; cursor:pointer; border-radius:8px; }
+        .extn-modal-close:hover { background:var(--chip-bg); }
+        .extn-modal-body { padding:16px 18px; overflow-y:auto; flex:1; }
+        .extn-modal-footer { display:flex; gap:10px; padding:12px 18px; border-top:1px solid var(--line); }
+        .extn-field { margin-bottom:14px; }
+        .extn-field label { display:block; font-size:12.5px; color:var(--muted); margin-bottom:6px; font-weight:500; }
+        .extn-field input[type="text"], .extn-field input[type="url"], .extn-field select { width:100%; box-sizing:border-box; padding:9px 11px; border:1px solid var(--input-border); border-radius:8px; font-size:13px; outline:none; background:var(--input-bg); color:var(--text-main); }
+        .extn-field input:focus, .extn-field select:focus { border-color:var(--btn-bg); }
+        .extn-checks { display:flex; flex-direction:column; gap:8px; }
+        .extn-check { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-main); cursor:pointer; }
+        .extn-check input[type="checkbox"] { width:16px; height:16px; accent-color:var(--btn-color, #18181b); cursor:pointer; }
+        .extn-hint { font-size:11.5px; color:var(--muted); margin-top:4px; line-height:1.5; }
+        .extn-btn-primary { flex:1; height:38px; padding:0; background:var(--btn-bg, #18181b); color:#fff; border:none; border-radius:9px; font-size:13.5px; font-weight:600; cursor:pointer; }
+        .extn-btn-primary:hover { opacity:.9; }
+        .extn-btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+        .extn-btn-secondary { flex:0 0 auto; padding:0 18px; height:38px; background:var(--panel-soft); color:var(--text-main); border:1px solid var(--line); border-radius:9px; font-size:13.5px; cursor:pointer; }
         .gsp-header { position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:10px; padding:14px 18px; background:var(--surface-solid); border-bottom:1px solid var(--line); }
         .gsp-back { width:34px; min-height:34px; height:34px; padding:0; margin:0; border:none; border-radius:9px; background:var(--chip-bg, #f3f4f6); color:var(--text-main); font-size:22px; line-height:1; cursor:pointer; }
         .gsp-back:hover { background:var(--btn-bg); color:#fff; }
