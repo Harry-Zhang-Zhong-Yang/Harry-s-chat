@@ -593,7 +593,9 @@
                 1. 在你常用的 IM（飞书/钉钉/企微/QQ）中建一个群，把机器人群机器人加进去，复制 webhook URL<br>
                 2. 在上方添加渠道，选择对应渠道类型，粘贴 URL<br>
                 3. 触发时机：新消息、@提及、新用户申请加入（每个渠道可独立勾选）<br>
-                4. 默认隐藏敏感信息，按需开启"显示对方名称 / 显示消息内容"
+                4. 默认隐藏敏感信息，按需开启"显示对方名称 / 显示消息内容"<br>
+                5. <b>钉钉机器人</b>：安全设置请选「自定义关键词」并填 <b>通知</b>（推送内容会带 [通知] 前缀，刚好匹配）；切勿选「加签」<br>
+                6. 点「测试」会直接往本渠道推一条测试消息，不依赖房间有无其他成员，并会显示平台返回的具体错误
             </div>
         </div>
     </div>
@@ -4882,11 +4884,15 @@
         await window.extnLoadAndRender();
     };
 
-    /** 测试渠道：往 webhook 推一条带 [测试] 前缀的消息 */
+    /** 测试渠道：直接往该渠道 webhook 推一条测试消息（绕过房间收件人逻辑），并显示平台返回的具体错误 */
     window.testChannel = async function(id) {
         const list = await extnFetchChannels();
         const ch = list.find(x => String(x.id) === String(id));
         if (!ch) return;
+        const btn = document.querySelector(`.extn-channel-card[data-ch-id="${id}"] .extn-action-btn[data-test]`) ||
+                    [...document.querySelectorAll(`.extn-channel-card[data-ch-id="${id}"] .extn-action-btn`)].find(b => b.textContent.includes('测试'));
+        const origText = btn ? btn.textContent : '';
+        if (btn) { btn.disabled = true; btn.textContent = '测试中...'; }
         try {
             const resp = await fetch(EXTN_EDGE_URL, {
                 method: 'POST',
@@ -4895,14 +4901,23 @@
                     event: 'new_message',
                     room_code: currentRoomCode || 'test',
                     sender: mySender || getLoggedInUser() || 'tester',
-                    content: '[测试消息] 站外通知渠道连通性测试，请忽略',
+                    content: '站外通知渠道连通性测试，请忽略',
+                    channel_id: id,   // 测试模式：直接推送到本渠道
                 }),
             });
-            // 这里返回的是「给所有房间成员的推送」，不是单渠道的；
-            // 真正测试某渠道是否可达，可让用户去对应 IM 看是否收到（建议在文档中说明）
-            showToast('已提交测试请求，请到对应 IM 查看是否收到', 'info', 3000);
+            const data = await resp.json().catch(() => ({}));
+            if (data.ok === true) {
+                showToast(`✓ 测试成功，请到${(EXTN_TYPES[ch.channel_type] || {}).label || '对应 IM'}查看`, 'success', 3000);
+            } else {
+                const reason = data.error || (data.response && typeof data.response === 'object'
+                    ? (data.response.errmsg || data.response.msg || JSON.stringify(data.response))
+                    : (data.response ? String(data.response) : `HTTP ${data.status || resp.status}`));
+                showToast(`✗ 测试失败：${reason}`, 'error', 5000);
+            }
         } catch (e) {
-            showToast('请求失败：' + e.message, 'error');
+            showToast('请求失败：' + e.message, 'error', 4000);
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = origText; }
         }
     };
 
