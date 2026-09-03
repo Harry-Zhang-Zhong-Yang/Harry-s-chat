@@ -456,10 +456,6 @@
             <div class="settings-section-title">聊天</div>
             <div class="settings-row-item"><button class="settings-row-button" onclick="window.updateRoomName()">修改房间名称</button></div>
             <div class="settings-row-item"><button class="settings-row-button" onclick="window.searchMessages()">查找聊天内容</button></div>
-            <div class="settings-row-item">
-                <label>消息通知</label>
-                <button class="settings-row-button" id="wx-notify-btn" onclick="window.openExternalNotifyPage()">配置站外通知</button>
-            </div>
             <div class="settings-row-item"><label>气泡颜色</label><div style="display:flex;align-items:center;gap:8px;"><input type="color" id="color-selector" value="#18181b" onchange="window.saveSettings()"><button class="settings-row-button" style="padding:6px 12px;font-size:12px;" onclick="window.resetBubbleColor()">恢复默认</button></div></div>
             <div class="settings-row-item"><button class="settings-row-button" onclick="window.clearLocalHistory()">清空聊天记录</button></div>
         </div>
@@ -489,6 +485,11 @@
         <div class="settings-section">
             <div class="settings-section-title">账号</div>
             <div class="settings-row-item"><button class="settings-row-button" onclick="window.openProfilePage()">个人信息（头像 / 账号 / 密码）</button></div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-section-title">通知</div>
+            <div class="settings-row-item"><button class="settings-row-button" onclick="window.openExternalNotifyPage()">站外通知（钉钉）<span class="mmi-arrow" style="float:right;">›</span></button></div>
+            <div class="settings-row-item" style="font-size:12px;color:var(--muted);padding:6px 0 0;border-bottom:0;">把聊天新消息、@提及、申请加入推送到你的钉钉群</div>
         </div>
         <div class="settings-section">
             <div class="settings-section-title">外观</div>
@@ -569,9 +570,9 @@
     </div>
     <div class="gsp-body">
         <div class="settings-section" style="padding:14px 14px 12px;">
-            <div style="font-size:13px;color:var(--muted);line-height:1.55;">
-                将消息推送到 <b>飞书 / 钉钉 / 企业微信 / QQ 官方机器人</b> 等，聊天互动与系统提醒可异步送达站外。
-                <br>接收者使用自己已装好的 IM 即可收到通知，<b>无需注册第三方服务</b>。
+            <div style="font-size:13px;color:var(--muted);line-height:1.6;">
+                把聊天室的 <b>新消息 / @提及 / 申请加入</b> 推送到你的 <b>钉钉群</b>，离开网页也能收到提醒。
+                <br>每个用户可配置多个钉钉群（个人群、工作群），<b>互不影响</b>。
             </div>
         </div>
         <div class="settings-section">
@@ -588,14 +589,21 @@
             </div>
         </div>
         <div class="settings-section">
-            <div class="settings-section-title">使用说明</div>
-            <div class="settings-row-item" style="font-size:12.5px;color:var(--muted);line-height:1.6;border-bottom:0;">
-                1. 在你常用的 IM（飞书/钉钉/企微/QQ）中建一个群，把机器人群机器人加进去，复制 webhook URL<br>
-                2. 在上方添加渠道，选择对应渠道类型，粘贴 URL<br>
-                3. 触发时机：新消息、@提及、新用户申请加入（每个渠道可独立勾选）<br>
-                4. 默认隐藏敏感信息，按需开启"显示对方名称 / 显示消息内容"<br>
-                5. <b>钉钉机器人</b>：安全设置请选「自定义关键词」并填 <b>通知</b>（推送内容会带 [通知] 前缀，刚好匹配）；切勿选「加签」<br>
-                6. 点「测试」会直接往本渠道推一条测试消息，不依赖房间有无其他成员，并会显示平台返回的具体错误
+            <div class="settings-section-title">配置步骤</div>
+            <div class="extn-step-list">
+                <div class="extn-step"><span class="extn-step-num">1</span><div><b>创建钉钉群机器人</b><div class="extn-step-sub">钉钉群 → 群设置 → 智能群助手 → 添加机器人 → 选「自定义」</div></div></div>
+                <div class="extn-step"><span class="extn-step-num">2</span><div><b>安全设置：选「自定义关键词」填「通知」</b><div class="extn-step-sub">推送内容会带 <code>[通知]</code> 前缀，刚好匹配；切勿选「加签」，否则收不到</div></div></div>
+                <div class="extn-step"><span class="extn-step-num">3</span><div><b>复制 Webhook 地址</b><div class="extn-step-sub">形如 <code>https://oapi.dingtalk.com/robot/send?access_token=...</code></div></div></div>
+                <div class="extn-step"><span class="extn-step-num">4</span><div><b>回到本页点「添加渠道」粘贴</b><div class="extn-step-sub">勾选要推送的事件（新消息 / @提及 / 申请加入），保存后点「测试」验证</div></div></div>
+            </div>
+        </div>
+        <div class="settings-section">
+            <div class="settings-section-title">推送规则与隐私</div>
+            <div class="settings-row-item" style="font-size:12.5px;color:var(--muted);line-height:1.65;border-bottom:0;">
+                • <b>谁会收到</b>：房间内除发送者外的其他成员，且他们各自配了钉钉渠道才会收到；自己发消息不会通知自己<br>
+                • <b>测试按钮</b>：点「测试」会直接往本渠道推一条测试消息，<b>不依赖房间有无其他成员</b>，并显示钉钉返回的具体错误<br>
+                • <b>隐私默认全关</b>：默认只推送「[新消息]」等脱敏文案；按需开启「显示对方名称 / 显示消息内容」<br>
+                • <b>频率限制</b>：钉钉单个机器人每分钟最多 20 条，超出会被限流
             </div>
         </div>
     </div>
@@ -611,22 +619,16 @@
         <div class="extn-modal-body">
             <div class="extn-field">
                 <label>渠道类型</label>
-                <select id="extn-channel-type">
-                    <option value="feishu">飞书（推荐，零门槛）</option>
-                    <option value="dingtalk">钉钉</option>
-                    <option value="wechat">微信 / 企业微信（群机器人）</option>
-                    <option value="qq">QQ 官方机器人</option>
-                    <option value="custom">自定义 Webhook</option>
-                </select>
+                <div class="extn-static-type">钉钉群机器人</div>
             </div>
             <div class="extn-field">
                 <label>渠道名称</label>
-                <input type="text" id="extn-channel-name" placeholder="例如：我的飞书通知群" maxlength="40">
+                <input type="text" id="extn-channel-name" placeholder="例如：我的钉钉通知群" maxlength="40">
             </div>
             <div class="extn-field">
                 <label>Webhook URL（HTTPS）</label>
-                <input type="url" id="extn-channel-url" placeholder="https://...">
-                <div class="extn-hint" id="extn-url-hint">粘贴你从 IM 群机器人设置中复制的 webhook 地址</div>
+                <input type="url" id="extn-channel-url" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">
+                <div class="extn-hint" id="extn-url-hint">钉钉群 → 群设置 → 智能群助手 → 添加机器人 → 自定义 → 复制 Webhook 地址</div>
             </div>
             <div class="extn-field">
                 <label>订阅事件</label>
@@ -646,7 +648,6 @@
             </div>
         </div>
         <div class="extn-modal-footer">
-            <button class="extn-btn-secondary" onclick="window.closeChannelModal()">取消</button>
             <button class="extn-btn-primary" id="extn-save-btn" onclick="window.saveChannel()">保存</button>
         </div>
     </div>
@@ -4795,8 +4796,7 @@
 
     window.openAddChannelModal = function() {
         extnEditingId = null;
-        document.getElementById('extn-modal-title').textContent = '添加通知渠道';
-        document.getElementById('extn-channel-type').value = 'feishu';
+        document.getElementById('extn-modal-title').textContent = '添加钉钉通知渠道';
         document.getElementById('extn-channel-name').value = '';
         document.getElementById('extn-channel-url').value = '';
         document.getElementById('extn-evt-newmsg').checked = true;
@@ -4818,8 +4818,7 @@
         const ch = list.find(x => String(x.id) === String(id));
         if (!ch) return;
         extnEditingId = id;
-        document.getElementById('extn-modal-title').textContent = '编辑通知渠道';
-        document.getElementById('extn-channel-type').value = ch.channel_type;
+        document.getElementById('extn-modal-title').textContent = '编辑钉钉通知渠道';
         document.getElementById('extn-channel-name').value = ch.name || '';
         document.getElementById('extn-channel-url').value = ch.webhook_url || '';
         const evs = new Set(ch.events || []);
@@ -4835,7 +4834,7 @@
         const user = getLoggedInUser();
         if (!user) { showToast('请先登录', 'error'); return; }
         const btn = document.getElementById('extn-save-btn');
-        const channel_type = document.getElementById('extn-channel-type').value;
+        const channel_type = 'dingtalk';   // 仅支持钉钉
         const name = document.getElementById('extn-channel-name').value.trim();
         const webhook_url = document.getElementById('extn-channel-url').value.trim();
         const events = [];
@@ -7110,6 +7109,14 @@
         .extn-btn-primary:hover { opacity:.9; }
         .extn-btn-primary:disabled { opacity:.5; cursor:not-allowed; }
         .extn-btn-secondary { flex:0 0 auto; padding:0 18px; height:38px; background:var(--panel-soft); color:var(--text-main); border:1px solid var(--line); border-radius:9px; font-size:13.5px; cursor:pointer; }
+        .extn-static-type { padding:9px 11px; border:1px solid var(--input-border); border-radius:8px; font-size:13px; background:var(--chip-bg); color:var(--text-main); display:flex; align-items:center; gap:6px; }
+        .extn-static-type::before { content:'钉'; width:20px; height:20px; flex:0 0 20px; border-radius:5px; background:#ff8800; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+        .extn-step-list { display:flex; flex-direction:column; gap:12px; padding:4px 2px; }
+        .extn-step { display:flex; gap:10px; align-items:flex-start; }
+        .extn-step-num { flex:0 0 22px; width:22px; height:22px; border-radius:50%; background:var(--btn-bg, #18181b); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; margin-top:1px; }
+        .extn-step > div { flex:1; min-width:0; font-size:13px; color:var(--text-main); line-height:1.5; }
+        .extn-step-sub { font-size:12px; color:var(--muted); margin-top:3px; line-height:1.55; }
+        .extn-step code, .extn-hint code, .extn-step-sub code { background:var(--chip-bg); padding:1px 5px; border-radius:4px; font-size:11.5px; color:var(--text-main); word-break:break-all; }
         .gsp-header { position:sticky; top:0; z-index:2; display:flex; align-items:center; gap:10px; padding:14px 18px; background:var(--surface-solid); border-bottom:1px solid var(--line); }
         .gsp-back { width:34px; min-height:34px; height:34px; padding:0; margin:0; border:none; border-radius:9px; background:var(--chip-bg, #f3f4f6); color:var(--text-main); font-size:22px; line-height:1; cursor:pointer; }
         .gsp-back:hover { background:var(--btn-bg); color:#fff; }
