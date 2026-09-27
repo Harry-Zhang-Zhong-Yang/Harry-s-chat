@@ -1717,6 +1717,8 @@
             const el = document.getElementById(id);
             if (el) el.style.display = '';
         });
+        const restoreInput = document.getElementById('message-input');
+        if (restoreInput) restoreInput.placeholder = '输入消息并按回车...';
     }
 
     function startContinuation(token) {
@@ -1737,6 +1739,19 @@
         noMoreHistory = false;
         lastKnownMessageId = null;
         document.getElementById('chat-box').innerHTML = '';
+        // 会话说明卡片（仅本地渲染，不入库）
+        const hintCard = document.createElement('div');
+        hintCard.className = 'msg-wrapper system-msg-wrapper';
+        hintCard.innerHTML = `<div class="system-msg-card">
+            <b>🔒 独立会话</b><br>
+            · 这里与房间消息完全隔离，仅进入者可见<br>
+            · 消息保留 2 天，到期自动删除<br>
+            · 会话 2 小时后过期，重新发送暗号可再次进入<br>
+            · <b>修改暗号</b>：发送 <b>改暗号 新暗号</b>（例：改暗号 星星123）
+        </div>`;
+        document.getElementById('chat-box').appendChild(hintCard);
+        const mi = document.getElementById('message-input');
+        if (mi) mi.placeholder = '输入消息…发送「改暗号 新暗号」可修改暗号';
         ['voice-btn', 'add-btn', 'settings-btn', 'online-count'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.style.display = 'none';
@@ -1782,7 +1797,8 @@
         isFetchingHistory = true;
         const chatBox = document.getElementById('chat-box');
         if (isInitial) {
-            chatBox.innerHTML = '';
+            // 独立会话首次加载：保留提示卡片，不清空
+            if (!continuationToken) chatBox.innerHTML = '';
             messagesCache = [];
             continuationCursor = 0;
             continuationOldestCursor = 0;
@@ -4063,6 +4079,15 @@
         const chatBox = document.getElementById('chat-box');
         if (isNew && id && Array.from(chatBox.querySelectorAll('.msg-wrapper[data-msg-id]')).some((item) => item.dataset.msgId === String(id))) return;
         const wrapper = document.createElement('div');
+        // 系统提示（仅独立会话内出现）：居中卡片样式
+        if (sender === 'system') {
+            wrapper.className = 'msg-wrapper system-msg-wrapper';
+            if (id) wrapper.dataset.msgId = id;
+            wrapper.innerHTML = `<div class="system-msg-card">${content}</div>`;
+            chatBox.appendChild(wrapper);
+            if (isNew) requestAnimationFrame(scrollToBottomInstant);
+            return;
+        }
         wrapper.className = `msg-wrapper ${sender === mySender ? 'right' : 'left'}`;
         if (id) wrapper.dataset.msgId = id;
         wrapper.dataset.sender = sender;
@@ -6485,6 +6510,13 @@
         #chat-box::-webkit-scrollbar { width: 5px; }
         #chat-box::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 10px; }
         #chat-box > *:last-child { margin-bottom: 0; }
+        .system-msg-wrapper { max-width: 88%; align-self: center; }
+        .system-msg-card {
+            background: var(--chip-bg); color: var(--muted); border: 1px solid var(--line);
+            border-radius: 12px; padding: 10px 14px; font-size: 12.5px; line-height: 1.75;
+            text-align: left; word-break: break-word;
+        }
+        .system-msg-card b { color: var(--text-main); }
         .msg-wrapper { max-width: min(75%, 720px); position: relative; animation: msgIn 0.2s ease-out; will-change: transform, opacity; contain: layout style; }
         .message-row { display:flex; align-items:flex-start; gap:8px; }
         .right .message-row { flex-direction:row-reverse; }
