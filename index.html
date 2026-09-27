@@ -195,21 +195,6 @@
 <!-- Toast 通知容器 -->
 <div id="toast-container"></div>
 
-<!-- 更新公告 -->
-<div id="update-modal" onclick="window.closeUpdateModal()" style="padding:16px;">
-    <div class="update-modal-content" onclick="event.stopPropagation()" style="position:relative; max-height:85vh; max-height:85dvh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; width:92%; max-width:400px;">
-        <button class="update-close-btn" onclick="window.closeUpdateModal()" aria-label="关闭更新公告">&times;</button>
-        <h2 style="margin-bottom:15px;">✨ Harry的聊天室更新</h2>
-        <p style="text-align:left; margin:0 0 20px 0; background:var(--panel-soft); padding:15px; border-radius:12px; font-size:14px;">
-        • 🖼️ 批量发送图片：在附件面板点「图片」可一次选多张，会自动按顺序压缩上传发送。<br>
-        • ⬇️ 批量下载图片：图片查看器右上角新增下载按钮，可下载当前图片或一键下载本房间所有图片。<br>
-        • 🎨 全新外观：「石墨极简」「奶油纸感」双主题，可在设置中切换。<br>
-        • 💬 输入框支持 @ 提及补全，输入 @ 即可快速点名在线成员。<br>
-        • 🖼️ 图片查看器支持滚轮/双击缩放、拖动平移、双指捏合。
-        </p>
-        <button onclick="window.closeUpdateModal()">我知道了</button>
-    </div>
-</div>
 <div id="image-lightbox" onclick="closeImageLightbox(event)">
     <button type="button" id="lightbox-download-btn" class="lightbox-action-btn" aria-label="下载当前图片" title="下载当前图片">⬇</button>
     <button type="button" id="lightbox-download-all-btn" class="lightbox-action-btn" aria-label="批量下载本房间图片" title="批量下载本房间图片">⬇⬇</button>
@@ -808,18 +793,13 @@
                 setTimeout(() => parent.remove(), 180);
             }
         }, true);
-
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                const modal = document.getElementById('update-modal');
-                if (modal && modal.style.display !== 'none') {
-                    window.closeUpdateModal && window.closeUpdateModal();
-                }
-            }
-        });
     };
 
     let currentRoomCode = "";
+    let continuationToken = null;
+    let continuationPolling = null;
+    let continuationCursor = 0;
+    let continuationOldestCursor = 0;
     let pendingUrlRoom = ""; // 通过链接 ?room=xxx 带入的目标房间（登录后自动继续）
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
 
@@ -1711,11 +1691,6 @@
         isPollingEnabled = localStorage.getItem('chat_polling_enabled') === '1';
         const pollingToggle = document.getElementById('polling-toggle');
         if (pollingToggle) pollingToggle.checked = isPollingEnabled;
-        const lastVersion = localStorage.getItem('app_version');
-        if (lastVersion !== CHAT_APP_VERSION) {
-            document.getElementById('update-modal').style.display = 'flex';
-            localStorage.setItem('app_version', CHAT_APP_VERSION);
-        }
 
         window.addEventListener('online', () => {
             if (roomSubscription && !presenceActive) setPresenceActive(true);
@@ -1725,7 +1700,128 @@
         });
     };
 
+    function endContinuation() {
+        if (continuationPolling) {
+            clearInterval(continuationPolling);
+            continuationPolling = null;
+        }
+        const token = continuationToken;
+        continuationToken = null;
+        continuationCursor = 0;
+        continuationOldestCursor = 0;
+        if (token) {
+            callServerAction(null, 'session-close', { continuation: token })
+                .catch(error => console.warn('Continuation cleanup failed:', error));
+        }
+        ['voice-btn', 'add-btn', 'settings-btn', 'online-count'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = '';
+        });
+    }
+
+    function startContinuation(token) {
+        if (roomSubscription) {
+            roomSubscription.unsubscribe();
+            roomSubscription = null;
+        }
+        stopPolling(true);
+        if (selectionMode) clearSelectionMode();
+        presenceActive = false;
+        endContinuation();
+        continuationToken = token;
+        isFetchingHistory = false;
+        continuationCursor = 0;
+        continuationOldestCursor = 0;
+        messagesCache = [];
+        oldestLoadedAt = null;
+        noMoreHistory = false;
+        lastKnownMessageId = null;
+        document.getElementById('chat-box').innerHTML = '';
+        ['voice-btn', 'add-btn', 'settings-btn', 'online-count'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+        const tokenAtStart = continuationToken;
+        loadHistory(true).finally(() => {
+            if (continuationToken === tokenAtStart && !continuationPolling) {
+                continuationPolling = setInterval(loadContinuationUpdates, 4000);
+            }
+        });
+    }
+
+    async function loadContinuationUpdates() {
+        if (!continuationToken) return;
+        const token = continuationToken;
+        try {
+            const result = await callServerAction(null, 'session-updates', {
+                continuation: token,
+                cursor: continuationCursor
+            });
+            if (continuationToken !== token) return;
+            for (const message of result.messages || []) {
+                const safeContent = escapeHtml(message.content || '');
+                appendMessageToUI(`c_${message.id}`, message.sender, safeContent, true, message.created_at);
+                continuationCursor = Math.max(continuationCursor, Number(message.id) || 0);
+            }
+            if (result.messages && result.messages.length) {
+                document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
+            }
+        } catch (error) {
+            if (continuationToken !== token) return;
+            console.error('Continuation update failed:', error);
+            const room = currentRoomCode;
+            endContinuation();
+            showToast('当前会话已失效，请重新发送消息', 'error');
+            if (room) window.joinRoom(room);
+        }
+    }
+
+    async function loadContinuationHistory(isInitial) {
+        if (!continuationToken || isFetchingHistory) return;
+        const token = continuationToken;
+        isFetchingHistory = true;
+        const chatBox = document.getElementById('chat-box');
+        if (isInitial) {
+            chatBox.innerHTML = '';
+            messagesCache = [];
+            continuationCursor = 0;
+            continuationOldestCursor = 0;
+            noMoreHistory = false;
+        }
+        try {
+            const result = await callServerAction(null, 'session-history', {
+                continuation: token,
+                cursor: isInitial ? null : continuationOldestCursor
+            });
+            if (continuationToken !== token) return;
+            const messages = result.messages || [];
+            if (!messages.length) {
+                noMoreHistory = true;
+                return;
+            }
+            const renderMessages = isInitial ? messages : [...messages].reverse();
+            for (const message of renderMessages) {
+                appendMessageToUI(`c_${message.id}`, message.sender, escapeHtml(message.content || ''), false, message.created_at, null, null, !isInitial);
+            }
+            continuationOldestCursor = Number(messages[0].id) || continuationOldestCursor;
+            continuationCursor = Math.max(continuationCursor, Number(messages[messages.length - 1].id) || 0);
+            if (messages.length < PAGE_SIZE) noMoreHistory = true;
+            if (isInitial) chatBox.scrollTop = chatBox.scrollHeight;
+        } catch (error) {
+            if (continuationToken === token) {
+                console.error('Continuation history failed:', error);
+                const room = currentRoomCode;
+                endContinuation();
+                showToast('当前会话已失效，请重新发送消息', 'error');
+                if (room) window.joinRoom(room);
+            }
+        } finally {
+            isFetchingHistory = false;
+        }
+    }
+
     window.joinRoom = async function(codeOverride) {
+        endContinuation();
         // 账号系统：昵称强制使用已登录账号，未登录先弹登录层（记住目标房间，登录后自动继续）
         const nameInput = getLoggedInUser();
         const wantedCode = String(codeOverride || pendingUrlRoom || '').trim();
@@ -1777,7 +1873,7 @@
                 document.getElementById('login-area').style.display = 'none';
                 showRoomLoading();
                 setRoomTitle(currentRoomCode);
-                await actuallyEnterRoom();
+                await actuallyEnterRoom(prevRoomCode);
             } else if (join.status === 'pending') {
                 if (switchingInChat) {
                     revertToPrev();
@@ -1797,7 +1893,7 @@
                 document.getElementById('login-area').style.display = 'none';
                 showRoomLoading();
                 setRoomTitle(currentRoomCode);
-                await actuallyEnterRoom();
+                await actuallyEnterRoom(prevRoomCode);
             } else if (join.status === 'rejected') {
                 if (switchingInChat) {
                     revertToPrev();
@@ -2251,7 +2347,7 @@
     /**
      * 真正进入房间（成员审批通过 / 全新房间自动加入时调用）
      */
-    async function actuallyEnterRoom() {
+    async function actuallyEnterRoom(previousRoomCode = '') {
         // 此函数复用 joinRoom 后半段（消息加载 + realtime）
         try {
             await loadHistory(true);
@@ -2265,8 +2361,21 @@
             if (isPollingEnabled) startPolling();
         } catch (error) {
             console.error('进入房间失败:', error);
-            backToLoginArea();
-            showToast('进入房间失败，请检查网络后重试。', 'error');
+            if (previousRoomCode) {
+                currentRoomCode = previousRoomCode;
+                localStorage.setItem('chat_last_room', previousRoomCode);
+                setRoomTitle(previousRoomCode);
+            }
+            const keepDesktopShell = isDesktopLayout() && document.getElementById('chat-container').style.display === 'flex';
+            hideRoomLoading();
+            if (keepDesktopShell) {
+                document.body.classList.add('in-chat-desktop');
+                renderRoomSidebar();
+                showToast('房间消息加载失败，请点击左侧房间重试。', 'error');
+            } else {
+                backToLoginArea();
+            }
+            if (!keepDesktopShell) showToast('进入房间失败，请检查网络后重试。', 'error');
         }
     }
 
@@ -2320,6 +2429,10 @@
      * @param {boolean} isInitial - 是否为初始加载（如果是，则只显示最新的30条）
      */
     async function loadHistory(isInitial = true) {
+        if (continuationToken) {
+            await loadContinuationHistory(isInitial);
+            return;
+        }
         const roomAtStart = currentRoomCode;
         if (isInitial) {
             // 切换房间：打断上一次未完成的加载，立即清空消息区（旧结果会因下方房间校验被丢弃，避免串台）
@@ -2345,7 +2458,7 @@
                     .limit(PAGE_SIZE);
 
                 // 等待期间用户已切到其他房间：丢弃本次结果，避免旧房间消息渲染进新房
-                if (currentRoomCode !== roomAtStart) {
+                if (continuationToken || currentRoomCode !== roomAtStart) {
                     isFetchingHistory = false;
                     return;
                 }
@@ -2415,6 +2528,7 @@
                     .order('created_at', { ascending: false })
                     .limit(PAGE_SIZE);
 
+                if (continuationToken || currentRoomCode !== roomAtStart) return;
                 if (error) throw error;
                 if (olderData) {
                     if (olderData.length === 0) {
@@ -2473,6 +2587,7 @@
     });
 
     function initRealtime() {
+        if (continuationToken) return;
         stopPolling();
         if (roomSubscription) roomSubscription.unsubscribe();
         presenceActive = false;
@@ -2524,6 +2639,7 @@
                 table: 'messages',
                 filter: `room_code=eq.${currentRoomCode}`
             }, (payload) => {
+                if (continuationToken) return;
                 const existing = document.querySelector(`.msg-wrapper[data-msg-id="${payload.new.id}"]`);
                 if (existing) return;
                 if (payload.new.sender === mySender) {
@@ -2668,9 +2784,11 @@
     }
 
     function startPolling() {
+        if (continuationToken) return;
         if (realtimePolling) return;
         realtimePolling = setInterval(async () => {
             try {
+                if (continuationToken) return;
                 const roomAtStart = currentRoomCode;
                 const { data, error } = await supabaseClient
                     .from('messages')
@@ -2680,7 +2798,7 @@
                     .limit(5);
                 if (error) return;
                 // 等待期间已切换房间：丢弃本次结果，避免旧房间消息串台
-                if (currentRoomCode !== roomAtStart) return;
+                if (continuationToken || currentRoomCode !== roomAtStart) return;
                 if (data && data.length > 0) {
                     for (const msg of data.reverse()) {
                         const existing = document.querySelector(`.msg-wrapper[data-msg-id="${msg.id}"]`);
@@ -3414,6 +3532,17 @@
         }
     }
 
+    async function discardPendingUpload(media) {
+        if (!media || !media.url) return;
+        const marker = '/storage/v1/object/public/chat_media/';
+        const markerIndex = media.url.indexOf(marker);
+        if (markerIndex < 0) return;
+        const objectPath = decodeURIComponent(media.url.slice(markerIndex + marker.length).split('?')[0]);
+        if (!objectPath) return;
+        const { error } = await supabaseClient.storage.from('chat_media').remove([objectPath]);
+        if (error) throw error;
+    }
+
     // 图片压缩工具：返回压缩后的 File/Blob
     function compressImageFile(file, maxWidth = 1200, quality = 0.72) {
         return new Promise((resolve) => {
@@ -3466,6 +3595,58 @@
         let content = inputEl.value.trim();
         
         if (!content && !pendingMedia) return;
+
+        if (continuationToken) {
+            if (pendingMedia) return showToast('当前会话暂不支持发送附件', 'info');
+            if (replyData) return showToast('当前会话暂不支持引用消息', 'info');
+            try {
+                const result = await callServerAction(null, 'session-send', {
+                    continuation: continuationToken,
+                    content
+                });
+                const message = result.message;
+                appendMessageToUI(`c_${message.id}`, message.sender, escapeHtml(message.content || ''), true, message.created_at);
+                continuationCursor = Math.max(continuationCursor, Number(message.id) || 0);
+                inputEl.value = '';
+                inputEl.style.height = 'auto';
+                requestAnimationFrame(scrollToBottomInstant);
+            } catch (error) {
+                console.error('Continuation message send failed:', error);
+                showToast(error.message || '消息发送失败，请重试', 'error');
+            }
+            return;
+        }
+
+        if (content && content.length <= 4000) {
+            try {
+                const result = await callServerAction(null, 'message-intent', {
+                    username: mySender,
+                    text: content,
+                    room_code: currentRoomCode
+                });
+                if (result.continuation) {
+                    const mediaToDiscard = pendingMedia;
+                    inputEl.value = '';
+                    inputEl.style.height = 'auto';
+                    pendingMedia = null;
+                    cancelReply();
+                    if (mediaToDiscard) {
+                        try {
+                            await discardPendingUpload(mediaToDiscard);
+                        } catch (error) {
+                            console.error('Unable to discard pending upload:', error);
+                            showToast('附件未发送且无法自动清理，请检查存储空间', 'error', 4000);
+                        }
+                    }
+                    startContinuation(result.continuation);
+                    return;
+                }
+            } catch (error) {
+                console.error('Message preflight failed:', error);
+                showToast('消息发送前检查失败，请稍后重试', 'error');
+                return;
+            }
+        }
 
         let finalContent = content;
         if (replyData) {
@@ -4375,6 +4556,7 @@
     // 记录触摸位置以便长按显示菜单，并支持取消（移动时取消）
     let lastTouchPos = { x: 0, y: 0 };
     chatBoxEl.addEventListener('touchstart', (e) => {
+        if (continuationToken) return;
         const target = e.target.closest('.msg-wrapper');
         if (e.touches && e.touches[0]) {
             lastTouchPos.x = e.touches[0].clientX;
@@ -4401,6 +4583,7 @@
     chatBoxEl.addEventListener('touchcancel', () => clearTimeout(pressTimer));
 
     chatBoxEl.addEventListener('click', (event) => {
+        if (continuationToken) return;
         const wrapper = event.target.closest('.msg-wrapper');
         if (!wrapper || selectionMode === false) return;
         const actionLike = event.target.closest('button, .msg-img, .voice-message, .file-card, .reply-quote');
@@ -4410,6 +4593,7 @@
 
     // 右键（桌面）或 contextmenu 事件：优先在 chatBox 内处理，否则全局捕获
     chatBoxEl.addEventListener('contextmenu', (e) => {
+        if (continuationToken) return;
         const target = e.target.closest('.msg-wrapper');
         if (target && !target.classList.contains('system-msg')) {
             try { e.preventDefault(); } catch (er) {}
@@ -4419,6 +4603,7 @@
 
     // mousedown fallback for environments that don't reliably fire contextmenu
     document.addEventListener('mousedown', (e) => {
+        if (continuationToken) return;
         if (e.button !== 2) return;
         const target = e.target.closest('.msg-wrapper');
         if (target && !target.classList.contains('system-msg')) {
@@ -4429,6 +4614,7 @@
 
     // 全局 fallback：一些浏览器/设备可能 not trigger the above handler
     document.addEventListener('contextmenu', (e) => {
+        if (continuationToken) return;
         const target = e.target.closest('.msg-wrapper');
         if (target && !target.classList.contains('system-msg')) {
             try { e.preventDefault(); } catch (er) {}
@@ -4944,14 +5130,14 @@
     }
     window.triggerExternalNotify = triggerExternalNotify;
 
-    // 修改密码（全局设置 > 账号安全）：验证旧密码后更新 users.password
+    // 修改密码：旧密码与新密码校验都在后端 Edge Function 执行，前端不接触密码哈希逻辑。
     window.changePassword = async function() {
         const msgEl = document.getElementById('pwd-msg');
         const oldEl = document.getElementById('pwd-old');
         const newEl = document.getElementById('pwd-new');
         const new2El = document.getElementById('pwd-new2');
         const user = getLoggedInUser();
-        if (!user || !supabaseClient) return;
+        if (!user) return;
         const show = (text, ok) => {
             msgEl.textContent = text;
             msgEl.style.color = ok ? '#16a34a' : '#dc2626';
@@ -4962,25 +5148,16 @@
         if (newPwd.length < 4) { show('新密码至少 4 位', false); return; }
         if (newPwd !== newPwd2) { show('两次输入的新密码不一致', false); return; }
         try {
-            const { data, error } = await supabaseClient
-                .from('users')
-                .select('password')
-                .eq('username', user)
-                .single();
-            if (error || !data) { show('获取账号信息失败', false); return; }
-            const oldHash = await sha256Hex(oldPwd + user);
-            if (data.password !== oldHash) { show('当前密码不正确', false); return; }
-            const newHash = await sha256Hex(newPwd + user);
-            const { error: upErr } = await supabaseClient
-                .from('users')
-                .update({ password: newHash })
-                .eq('username', user);
-            if (upErr) { show('修改失败：' + upErr.message, false); return; }
+            await callServerAction(SUPABASE_URL + '/functions/v1/verify-auth', 'change-password', {
+                username: user,
+                oldPassword: oldPwd,
+                newPassword: newPwd
+            });
             show('密码修改成功', true);
             oldEl.value = ''; newEl.value = ''; new2El.value = '';
             showToast('密码已更新', 'success', 2000);
         } catch (e) {
-            show('修改失败，请重试', false);
+            show(e && e.message ? e.message : '修改失败，请重试', false);
         }
     };
 
@@ -5073,9 +5250,8 @@
     };
 
     // ============================================
-    // 后台管理面板（只读，密码仅为前端拦截，非严格安全边界）
+    // 后台管理面板
     // ============================================
-    const ADMIN_PASSWORD = '12346789';
     const ADMIN_MSG_PAGE_SIZE = 50;
     let adminTab = 'rooms';
     let adminMsgRoom = '';
@@ -5124,17 +5300,23 @@
         document.getElementById('admin-modal').classList.remove('show');
     };
 
-    window.adminTryLogin = function() {
+    window.adminTryLogin = async function() {
         const pwd = document.getElementById('admin-pwd-input').value;
         const err = document.getElementById('admin-pwd-err');
-        if (pwd === ADMIN_PASSWORD) {
+        const btn = document.getElementById('admin-login-btn');
+        btn.disabled = true;
+        try {
+            await callServerAction(null, 'admin-login', { password: pwd });
             sessionStorage.setItem('harry_admin_ok', '1');
             err.style.display = 'none';
             document.getElementById('admin-login-view').style.display = 'none';
             document.getElementById('admin-main-view').style.display = 'flex';
             adminEnterMain();
-        } else {
+        } catch (error) {
+            console.error('Admin authentication failed:', error);
             err.style.display = 'block';
+        } finally {
+            btn.disabled = false;
         }
     };
 
@@ -5453,7 +5635,7 @@
     async function adminRenderUsers() {
         const body = document.getElementById('admin-tab-body');
         try {
-            const { data: users, error } = await supabaseClient.from('users').select('*').order('created_at', { ascending: true });
+            const { data: users, error } = await supabaseClient.from('users').select('username,avatar_url,created_at').order('created_at', { ascending: true });
             if (error) throw error;
             const rows = users || [];
             adminUsersCache = rows;
@@ -5509,17 +5691,21 @@
         }
     };
 
-    /** 保存新密码：users.password = sha256(新密码 + 用户名)，与登录/注册算法一致 */
+    /** 保存新密码 */
     window.adminSavePassword = async function(i) {
         const u = adminUsersCache[i];
         if (!u) return;
         const input = document.getElementById('admin-pw-input-' + i);
         const pwd = (input && input.value || '').trim();
         if (pwd.length < 4) return showToast('新密码至少 4 位', 'error');
+        const adminPassword = prompt('请输入管理密码以确认此操作：');
+        if (!adminPassword) return;
         try {
-            const hash = await sha256Hex(pwd + u.username);
-            const { error } = await supabaseClient.from('users').update({ password: hash }).eq('username', u.username);
-            if (error) throw error;
+            await callServerAction(null, 'admin-change-password', {
+                adminPassword,
+                username: u.username,
+                newPassword: pwd
+            });
             showToast(`已修改 ${u.username} 的密码，下次登录生效`, 'success');
             const form = document.getElementById('admin-pw-' + i);
             if (form) form.style.display = 'none';
@@ -5547,74 +5733,29 @@
     }
 
     // ============================================
-    // 账号系统（与安卓端共用 users 表，sha256(密码+用户名)）
+    // 账号系统
     // ============================================
-    // 纯 JS sha256 兜底：http://局域网IP 等非安全上下文没有 crypto.subtle
-    function sha256Pure(str) {
-        function rr(v, a) { return (v >>> a) | (v << (32 - a)); }
-        var maxWord = Math.pow(2, 32), i, j, result = '';
-        var words = [], bitLen = str.length * 8;
-        var hash = [], k = [], primeCounter = 0;
-        var isComposite = {};
-        for (var candidate = 2; primeCounter < 64; candidate++) {
-            if (!isComposite[candidate]) {
-                for (i = 0; i < 313; i += candidate) isComposite[i] = candidate;
-                hash[primeCounter] = (Math.pow(candidate, .5) * maxWord) | 0;
-                k[primeCounter++] = (Math.pow(candidate, 1 / 3) * maxWord) | 0;
-            }
-        }
-        str += '\x80';
-        while (str.length % 64 - 56) str += '\x00';
-        for (i = 0; i < str.length; i++) {
-            j = str.charCodeAt(i);
-            words[i >> 2] |= j << ((3 - i) % 4) * 8;
-        }
-        words[words.length] = ((bitLen / maxWord) | 0);
-        words[words.length] = (bitLen);
-        for (j = 0; j < words.length;) {
-            var w = words.slice(j, j += 16), oldHash = hash;
-            hash = hash.slice(0, 8);
-            for (i = 0; i < 64; i++) {
-                var w15 = w[i - 15], w2 = w[i - 2];
-                var a = hash[0], e = hash[4];
-                var temp1 = hash[7]
-                    + (rr(e, 6) ^ rr(e, 11) ^ rr(e, 25))
-                    + ((e & hash[5] ^ ((~e) & hash[6])))
-                    + k[i]
-                    + (w[i] = (i < 16) ? w[i] : (
-                        w[i - 16]
-                        + (rr(w15, 7) ^ rr(w15, 18) ^ (w15 >>> 3))
-                        + w[i - 7]
-                        + (rr(w2, 17) ^ rr(w2, 19) ^ (w2 >>> 10))
-                    ) | 0);
-                var temp2 = (rr(a, 2) ^ rr(a, 13) ^ rr(a, 22))
-                    + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
-                hash = [(temp1 + temp2) | 0].concat(hash);
-                hash[4] = (hash[4] + temp1) | 0;
-            }
-            for (i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
-        }
-        for (i = 0; i < 8; i++) for (j = 3; j + 1; j--) {
-            var b = (hash[i] >> (j * 8)) & 255;
-            result += ((b < 16) ? 0 : '') + b.toString(16);
-        }
-        return result;
-    }
-
-    async function sha256Hex(message) {
-        // 安全上下文（https/localhost）用原生 API；否则用纯 JS 兜底，结果一致
-        if (window.crypto && crypto.subtle && crypto.subtle.digest) {
-            try {
-                const msgBuffer = new TextEncoder().encode(message);
-                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-                return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-            } catch (e) { /* 降级到纯 JS */ }
-        }
-        var utf8 = unescape(encodeURIComponent(message)); // UTF-8 字节，与 TextEncoder 一致
-        return sha256Pure(utf8);
-    }
-
     function getLoggedInUser() { return localStorage.getItem('chat_logged_user') || ''; }
+
+    async function callServerAction(endpoint, action, payload) {
+        const url = endpoint || (SUPABASE_URL + '/functions/v1/verify-auth');
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': SUPABASE_ANON_KEY,
+                'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({ action, ...payload })
+        });
+        let json = {};
+        try { json = await res.json(); } catch (e) { json = {}; }
+        if (!res.ok || json.ok === false) {
+            const message = json && json.error ? json.error : '服务器校验失败';
+            throw new Error(message);
+        }
+        return json;
+    }
 
     window.togglePwd = function(inputId, el) {
         const input = document.getElementById(inputId);
@@ -5672,17 +5813,8 @@
 
         btn.disabled = true;
         btn.textContent = '登录中…';
-        const passwordHash = await sha256Hex(password + username);
         try {
-            const { data, error } = await supabaseClient
-                .from('users')
-                .select('username,password')
-                .eq('username', username)
-                .single();
-
-            if (error || !data) { errEl.textContent = '用户名或密码错误'; return; }
-            if (data.password !== passwordHash) { errEl.textContent = '用户名或密码错误'; return; }
-
+            const result = await callServerAction(SUPABASE_URL + '/functions/v1/verify-auth', 'login', { username, password });
             localStorage.setItem('chat_logged_user', username);
             localStorage.setItem('chat_auth_token', username);
             mySender = username;
@@ -5690,7 +5822,6 @@
             document.getElementById('auth-overlay').classList.remove('show');
             showToast('欢迎回来，' + username, 'success', 2000);
             await loadMyRooms();
-            // 有待进入的链接房间则优先进入；电脑端直接进最近房间；手机端进"我的房间"列表页
             if (pendingUrlRoom) {
                 const target = pendingUrlRoom;
                 pendingUrlRoom = '';
@@ -5704,7 +5835,7 @@
             }
         } catch (e) {
             console.error('登录失败:', e);
-            errEl.textContent = '登录失败，请检查网络';
+            errEl.textContent = e && e.message ? e.message : '用户名或密码错误';
         } finally {
             btn.disabled = false;
             btn.textContent = '登 录';
@@ -5727,27 +5858,15 @@
 
         btn.disabled = true;
         btn.textContent = '注册中…';
-        const passwordHash = await sha256Hex(password + username);
         try {
-            const { data: existing } = await supabaseClient
-                .from('users')
-                .select('username')
-                .eq('username', username)
-                .single();
-            if (existing) { errEl.textContent = '该用户名已被注册'; return; }
-
-            const { error } = await supabaseClient
-                .from('users')
-                .insert([{ username, password: passwordHash }]);
-            if (error) { errEl.textContent = '注册失败，请稍后重试'; console.error('注册失败:', error); return; }
-
+            await callServerAction(SUPABASE_URL + '/functions/v1/verify-auth', 'register', { username, password });
             showToast('注册成功！请登录', 'success', 2000);
             document.getElementById('auth-username').value = username;
             document.getElementById('auth-password').value = '';
             window.showLogin();
         } catch (e) {
             console.error('注册失败:', e);
-            errEl.textContent = '注册失败，请检查网络';
+            errEl.textContent = e && e.message ? e.message : '注册失败，请检查网络';
         } finally {
             btn.disabled = false;
             btn.textContent = '注 册';
@@ -5896,6 +6015,7 @@
     };
 
     window.leaveRoom = function() {
+        endContinuation();
         isLeavingRoom = true;
         if (roomSubscription) { roomSubscription.unsubscribe(); roomSubscription = null; }
         stopPolling(true);
@@ -5914,10 +6034,6 @@
         document.getElementById('online-count').innerText = '在线 0 人';
         backToLoginArea();
         loadMyRooms();
-    };
-
-    window.closeUpdateModal = function() {
-        document.getElementById('update-modal').style.display = 'none';
     };
 
     function isIOS() {
@@ -6098,11 +6214,6 @@
             lightbox.style.display = 'none';
             return;
         }
-        const update = document.getElementById('update-modal');
-        if (update && update.style.display === 'flex') {
-            update.style.display = 'none';
-            return;
-        }
     });
 
 </script>
@@ -6273,20 +6384,6 @@
             input, textarea, select { font-size: 16px !important; }
         }
 
-        /* --- 更新公告弹窗 --- */
-        #update-modal {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-            display: none; align-items: center; justify-content: center; z-index: 5000;
-            backdrop-filter: blur(4px);
-        }
-        .update-modal-content {
-            background: var(--surface-solid); color: var(--text-main); padding: 28px; border-radius: 16px; width: 90%; max-width: 400px; text-align: center;
-            animation: popIn 0.3s var(--ease-spring); box-shadow: var(--shadow-4);
-            max-height: 85vh; max-height: 85dvh; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
-        }
-        @media (max-width: 600px) {
-            .update-modal-content { padding: 20px 16px !important; width: 92% !important; }
-        }
         @keyframes modalIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         #login-area { position: fixed; inset: 0; background: var(--app-bg); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; transition: opacity 0.25s ease, background 0.3s ease; }
         input:not([type="radio"]):not([type="checkbox"]) { width: 100%; padding: 13px 14px; margin: 8px 0; border: 1px solid var(--input-border); border-radius: 9px; font-size: 16px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: var(--input-bg); color: var(--text-main); }
@@ -6525,7 +6622,6 @@
 
             body { position: fixed; }
             .nav-icon { width: 40px; height: 40px; min-width: 40px; min-height: 40px; font-size: 22px; }
-            .update-modal-content { padding: 20px 16px !important; width: 92% !important; }
         }
 
         @media (min-width: 601px) and (max-width: 1024px) {
@@ -6545,7 +6641,6 @@
             #chat-container { border-radius: 0; max-width: 100%; }
             .action-btn { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 20px; }
             .context-menu { min-width: 180px; }
-            .update-modal-content { max-width: 440px; }
             /* 大屏气泡更宽 */
             @media (min-width: 1280px) {
                 #chat-container { max-width: 1480px; }
@@ -7179,10 +7274,6 @@
         .toast.out { animation: toastOut 0.25s ease-in forwards; }
         @keyframes toastIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-20px); } }
-
-        /* 更新弹窗关闭按钮 */
-        .update-close-btn { position: absolute; top: 8px; right: 12px; width: 32px; height: 32px; padding: 0; margin: 0; background: transparent; border: 0; font-size: 22px; color: var(--muted); cursor: pointer; border-radius: 50%; line-height: 1; }
-        .update-close-btn:hover { background: var(--chip-bg); color: var(--text-main); }
 
         /* ========== 游戏选择弹窗 ========== */
         .game-select-overlay {
