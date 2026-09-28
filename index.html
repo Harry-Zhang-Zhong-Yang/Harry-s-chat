@@ -1732,6 +1732,9 @@
     }
 
     function startContinuation(token) {
+        // 保存刚派生的加密密钥（endContinuation 会清空它）
+        const savedKey = continuationCryptoKey;
+        const savedPhrase = continuationPhrase;
         if (roomSubscription) {
             roomSubscription.unsubscribe();
             roomSubscription = null;
@@ -1740,6 +1743,8 @@
         if (selectionMode) clearSelectionMode();
         presenceActive = false;
         endContinuation();
+        continuationCryptoKey = savedKey;
+        continuationPhrase = savedPhrase;
         continuationToken = token;
         isFetchingHistory = false;
         continuationCursor = 0;
