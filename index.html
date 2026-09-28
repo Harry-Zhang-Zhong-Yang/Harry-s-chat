@@ -3723,7 +3723,7 @@
                     try {
                         continuationCryptoKey = await deriveCryptoKey(content);
                     } catch (e) {
-                        console.error('Unable to derive crypto key:', e);
+                        console.error('[暗房加密] deriveCryptoKey 失败:', e?.message || e, 'phrase类型:', typeof content, 'phrase值:', content ? content.slice(0, 20) : '空');
                         continuationCryptoKey = null;
                     }
                     startContinuation(result.continuation);
