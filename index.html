@@ -798,8 +798,11 @@
     let currentRoomCode = "";
     let continuationToken = null;
     let continuationPolling = null;
+    let continuationWarningTimer = null;
     let continuationCursor = 0;
     let continuationOldestCursor = 0;
+    let continuationPhrase = null; // 当前暗房的暗号（仅内存，用于派生加密密钥）
+    let continuationCryptoKey = null; // 由暗号派生的 AES-256-GCM 密钥
     let pendingUrlRoom = ""; // 通过链接 ?room=xxx 带入的目标房间（登录后自动继续）
     let mySender = "用户_" + Math.floor(Math.random() * 1000);
 
@@ -1705,10 +1708,16 @@
             clearInterval(continuationPolling);
             continuationPolling = null;
         }
+        if (continuationWarningTimer) {
+            clearTimeout(continuationWarningTimer);
+            continuationWarningTimer = null;
+        }
         const token = continuationToken;
         continuationToken = null;
         continuationCursor = 0;
         continuationOldestCursor = 0;
+        continuationPhrase = null;
+        continuationCryptoKey = null;
         if (token) {
             callServerAction(null, 'session-close', { continuation: token })
                 .catch(error => console.warn('Continuation cleanup failed:', error));
@@ -1719,6 +1728,7 @@
         });
         const restoreInput = document.getElementById('message-input');
         if (restoreInput) restoreInput.placeholder = '输入消息并按回车...';
+        document.body.classList.remove('in-hidden-room');
     }
 
     function startContinuation(token) {
@@ -1739,15 +1749,21 @@
         noMoreHistory = false;
         lastKnownMessageId = null;
         document.getElementById('chat-box').innerHTML = '';
+        document.body.classList.add('in-hidden-room');
+        // 端到端加密需要 crypto.subtle（仅安全上下文 HTTPS/localhost 可用）
+        if (!continuationCryptoKey || !window.crypto || !crypto.subtle) {
+            showToast('⚠️ 当前环境不支持加密，消息将以明文发送', 'error', 6000);
+        }
         // 会话说明卡片（仅本地渲染，不入库）
         const hintCard = document.createElement('div');
         hintCard.className = 'msg-wrapper system-msg-wrapper';
         hintCard.innerHTML = `<div class="system-msg-card">
-            <b>🔒 独立会话</b><br>
+            <b>🔒 独立会话（端到端加密）</b><br>
+            · 消息端到端加密，数据库仅存密文<br>
             · 这里与房间消息完全隔离，仅进入者可见<br>
             · 消息保留 2 天，到期自动删除<br>
-            · 会话 2 小时后过期，重新发送暗号可再次进入<br>
-            · <b>修改暗号</b>：发送 <b>改暗号 新暗号</b>（例：改暗号 星星123）
+            · 会话 10 分钟后过期，重新发送暗号可再次进入<br>
+            · <b>修改暗号</b>：发送 <b>改暗号 新暗号</b>（改暗号会清空历史消息）
         </div>`;
         document.getElementById('chat-box').appendChild(hintCard);
         const mi = document.getElementById('message-input');
@@ -1757,6 +1773,13 @@
             if (el) el.style.display = 'none';
         });
         const tokenAtStart = continuationToken;
+        // 会话剩 2 分钟时弹出预警
+        if (continuationWarningTimer) clearTimeout(continuationWarningTimer);
+        continuationWarningTimer = setTimeout(() => {
+            if (continuationToken === tokenAtStart) {
+                showToast('⏰ 会话还有 2 分钟过期，发送暗号可续期', 'info', 8000);
+            }
+        }, 8 * 60 * 1000);
         loadHistory(true).finally(() => {
             if (continuationToken === tokenAtStart && !continuationPolling) {
                 continuationPolling = setInterval(loadContinuationUpdates, 4000);
@@ -1774,8 +1797,15 @@
             });
             if (continuationToken !== token) return;
             for (const message of result.messages || []) {
-                const safeContent = escapeHtml(message.content || '');
-                appendMessageToUI(`c_${message.id}`, message.sender, safeContent, true, message.created_at);
+                let displayText = message.content || '';
+                if (message.sender !== 'system' && displayText.startsWith('enc:') && continuationCryptoKey) {
+                    try {
+                        displayText = await decryptText(continuationCryptoKey, displayText);
+                    } catch (e) {
+                        displayText = '[无法解密的消息]';
+                    }
+                }
+                appendMessageToUI(`c_${message.id}`, message.sender, escapeHtml(displayText), true, message.created_at);
                 continuationCursor = Math.max(continuationCursor, Number(message.id) || 0);
             }
             if (result.messages && result.messages.length) {
@@ -1817,7 +1847,16 @@
             }
             const renderMessages = isInitial ? messages : [...messages].reverse();
             for (const message of renderMessages) {
-                appendMessageToUI(`c_${message.id}`, message.sender, escapeHtml(message.content || ''), false, message.created_at, null, null, !isInitial);
+                let displayText = message.content || '';
+                // 系统消息不加密；普通消息尝试解密（兼容旧明文）
+                if (message.sender !== 'system' && displayText.startsWith('enc:') && continuationCryptoKey) {
+                    try {
+                        displayText = await decryptText(continuationCryptoKey, displayText);
+                    } catch (e) {
+                        displayText = '[无法解密的消息]';
+                    }
+                }
+                appendMessageToUI(`c_${message.id}`, message.sender, escapeHtml(displayText), false, message.created_at, null, null, !isInitial);
             }
             continuationOldestCursor = Number(messages[0].id) || continuationOldestCursor;
             continuationCursor = Math.max(continuationCursor, Number(messages[messages.length - 1].id) || 0);
@@ -3616,12 +3655,36 @@
             if (pendingMedia) return showToast('当前会话暂不支持发送附件', 'info');
             if (replyData) return showToast('当前会话暂不支持引用消息', 'info');
             try {
+                // 端到端加密：暗号指令不加密（后端需要识别），普通消息加密后发送
+                let payload = content;
+                const isPhraseCmd = /^改暗号(?:[\s\u3000]+|$)/.test(content);
+                let pendingNewPhrase = null;
+                if (isPhraseCmd) {
+                    const m = content.match(/^改暗号(?:[\s\u3000]+(.+))?$/);
+                    pendingNewPhrase = (m && m[1]) ? m[1].trim() : null;
+                }
+                if (!isPhraseCmd && continuationCryptoKey) {
+                    payload = await encryptText(continuationCryptoKey, content);
+                }
                 const result = await callServerAction(null, 'session-send', {
                     continuation: continuationToken,
-                    content
+                    content: payload
                 });
                 const message = result.message;
-                appendMessageToUI(`c_${message.id}`, message.sender, escapeHtml(message.content || ''), true, message.created_at);
+                // 改暗号成功后，更新本地暗号和密钥
+                if (isPhraseCmd && pendingNewPhrase) {
+                    continuationPhrase = pendingNewPhrase;
+                    try {
+                        continuationCryptoKey = await deriveCryptoKey(pendingNewPhrase);
+                    } catch (e) {
+                        console.error('Unable to derive new crypto key:', e);
+                    }
+                }
+                // 自己发的消息：直接显示原文（不展示密文）
+                const displayContent = isPhraseCmd
+                    ? escapeHtml(message.content || '')
+                    : escapeHtml(content);
+                appendMessageToUI(`c_${message.id}`, message.sender, displayContent, true, message.created_at);
                 continuationCursor = Math.max(continuationCursor, Number(message.id) || 0);
                 inputEl.value = '';
                 inputEl.style.height = 'auto';
@@ -3653,6 +3716,14 @@
                             console.error('Unable to discard pending upload:', error);
                             showToast('附件未发送且无法自动清理，请检查存储空间', 'error', 4000);
                         }
+                    }
+                    // 保存暗号（仅内存）并派生加密密钥
+                    continuationPhrase = content;
+                    try {
+                        continuationCryptoKey = await deriveCryptoKey(content);
+                    } catch (e) {
+                        console.error('Unable to derive crypto key:', e);
+                        continuationCryptoKey = null;
                     }
                     startContinuation(result.continuation);
                     return;
@@ -3786,6 +3857,46 @@
 
     function escapeHtml(value) {
         return String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+
+    // ===== 暗房端到端加密（AES-256-GCM，密钥由暗号 PBKDF2 派生）=====
+    function bufToB64(buf) {
+        let binary = '';
+        const bytes = new Uint8Array(buf);
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+        return btoa(binary);
+    }
+    function b64ToBuf(b64) {
+        const binary = atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes;
+    }
+    async function deriveCryptoKey(phrase) {
+        const enc = new TextEncoder();
+        const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(phrase), 'PBKDF2', false, ['deriveKey']);
+        return crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt: enc.encode('harry-hidden-room'), iterations: 120000, hash: 'SHA-256' },
+            keyMaterial,
+            { name: 'AES-GCM', length: 256 },
+            false,
+            ['encrypt', 'decrypt']
+        );
+    }
+    async function encryptText(key, plaintext) {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const enc = new TextEncoder();
+        const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plaintext));
+        return 'enc:' + bufToB64(iv) + ':' + bufToB64(ciphertext);
+    }
+    async function decryptText(key, payload) {
+        // payload format: "enc:<iv_b64>:<ciphertext_b64>"
+        const parts = payload.split(':');
+        if (parts.length !== 3 || parts[0] !== 'enc') return payload;
+        const iv = b64ToBuf(parts[1]);
+        const ciphertext = b64ToBuf(parts[2]);
+        const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+        return new TextDecoder().decode(plaintext);
     }
 
     function updateMessageStatus(msgId, status, label) {
@@ -6468,6 +6579,50 @@
         #room-loading .spinner { width: 36px; height: 36px; border: 3px solid var(--line); border-top-color: var(--btn-color); border-radius: 50%; animation: spin 0.7s linear infinite; }
         .loading-spinner { width:28px; height:28px; border:3px solid var(--line); border-top-color:var(--btn-color); border-radius:50%; animation:spin .8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ===== 暗房模式视觉区分 ===== */
+        body.in-hidden-room #chat-bg {
+            background: linear-gradient(160deg, #1a1a1f 0%, #252530 50%, #1e1e26 100%);
+        }
+        body.in-hidden-room #chat-bg::before {
+            background: radial-gradient(800px 400px at 50% -10%, rgba(120,120,160,0.12), transparent 60%);
+        }
+        body.in-hidden-room #nav-bar {
+            background: rgba(30, 30, 38, 0.92);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        body.in-hidden-room #room-title::before {
+            content: '🔒 ';
+        }
+        body.in-hidden-room #message-input {
+            background: rgba(40, 40, 50, 0.9);
+            color: #e4e4e7;
+            border-color: rgba(255,255,255,0.1);
+        }
+        body.in-hidden-room #message-input::placeholder {
+            color: rgba(228,228,231,0.4);
+        }
+        body.in-hidden-room #input-area {
+            background: rgba(30, 30, 38, 0.92);
+            border-top: 1px solid rgba(255,255,255,0.06);
+        }
+        body.in-hidden-room .msg-wrapper.right .message-bubble {
+            background: linear-gradient(180deg, #4f46e5 0%, #4338ca 100%) !important;
+            color: #fff !important;
+        }
+        body.in-hidden-room .msg-wrapper.left .message-bubble {
+            background: rgba(55, 55, 70, 0.95) !important;
+            color: #e4e4e7 !important;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        body.in-hidden-room .system-msg-card {
+            background: rgba(255,255,255,0.06) !important;
+            color: rgba(228,228,231,0.7) !important;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        body.in-hidden-room .system-msg-card b {
+            color: #e4e4e7 !important;
+        }
 
         #nav-bar {
             position: relative;
