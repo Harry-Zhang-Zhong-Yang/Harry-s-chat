@@ -1751,8 +1751,9 @@
         document.getElementById('chat-box').innerHTML = '';
         document.body.classList.add('in-hidden-room');
         // 端到端加密需要 crypto.subtle（仅安全上下文 HTTPS/localhost 可用）
-        if (!continuationCryptoKey || !window.crypto || !crypto.subtle) {
-            showToast('⚠️ 当前环境不支持加密，消息将以明文发送', 'error', 6000);
+        if (!continuationCryptoKey) {
+            console.error('[暗房加密] 密钥派生失败，crypto.subtle 可用:', !!window.crypto?.subtle, 'location.protocol:', location.protocol);
+            showToast('⚠️ 当前环境不支持加密（需 HTTPS），消息将以明文发送', 'error', 8000);
         }
         // 会话说明卡片（仅本地渲染，不入库）
         const hintCard = document.createElement('div');
@@ -6151,7 +6152,13 @@
     };
 
     window.leaveRoom = function() {
-        endContinuation();
+        // 如果在暗房里，退出暗房回到正常房间，不退出整个房间
+        if (continuationToken) {
+            endContinuation();
+            showRoomLoading();
+            window.joinRoom(currentRoomCode);
+            return;
+        }
         isLeavingRoom = true;
         if (roomSubscription) { roomSubscription.unsubscribe(); roomSubscription = null; }
         stopPolling(true);
