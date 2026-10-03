@@ -2,9 +2,12 @@ let activeGame = null;
 const gameActionLocks = new Set();
 
 function isMobile() {
-    return /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent) || 
-           ('ontouchstart' in window && window.innerWidth < 768) ||
-           window.matchMedia('(pointer: coarse)').matches;
+    const ua = navigator.userAgent || '';
+    const mobileUA = /Android|iPhone|iPad|iPod|Mobile|Windows Phone|webOS/i.test(ua);
+    return mobileUA && (
+        window.matchMedia('(pointer: coarse)').matches ||
+        window.matchMedia('(max-width: 768px)').matches
+    );
 }
 
 function isIOS() {
