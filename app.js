@@ -1,10 +1,21 @@
-    const CHAT_APP_VERSION = "3.5.2";
-    const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co'; 
+    const CHAT_APP_VERSION = "3.5.3";
+    // ===== Supabase API 入口配置 =====
+    // 默认直连官方地址（海外节点，国内部分网络不可达）。
+    // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
+    // const SUPABASE_URL = 'https://your-proxy.onrender.com';
+    const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
     let supabaseClient;
+    // 防滥用密钥：仅当 SUPABASE_URL 指向反代（非官方域名）时才随请求带上，
+    // 直连官方地址时不带，避免多余的自定义头被 Supabase 的 CORS 拒绝。
+    const PROXY_KEY = 'harry-chat-2026';
+    const USING_PROXY = SUPABASE_URL.indexOf('supabase.co') === -1;
+    const PROXY_HEADERS = USING_PROXY ? { 'X-Proxy-Key': PROXY_KEY } : {};
     try {
-        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            global: { headers: PROXY_HEADERS }
+        });
     } catch (e) { console.error("Supabase 初始化失败:", e); }
 
     function beijingISOString(date) {
@@ -5192,15 +5203,30 @@
 
     async function callServerAction(endpoint, action, payload) {
         const url = endpoint || (SUPABASE_URL + '/functions/v1/verify-auth');
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': SUPABASE_ANON_KEY,
-                'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
-            },
-            body: JSON.stringify({ action, ...payload })
-        });
+        // 国内网络访问 Supabase 官方入口可能长时间挂起，加 15 秒超时避免界面永久卡在"登录中…"
+        let controller = null, timedOut = false;
+        if (typeof AbortController !== 'undefined') {
+            controller = new AbortController();
+            setTimeout(() => { timedOut = true; controller.abort(); }, 15000);
+        }
+        let res;
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: Object.assign({
+                    'Content-Type': 'application/json',
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+                }, PROXY_HEADERS),
+                body: JSON.stringify({ action, ...payload }),
+                signal: controller ? controller.signal : undefined
+            });
+        } catch (e) {
+            if (timedOut || (e && e.name === 'AbortError')) {
+                throw new Error('网络连接超时，请检查网络后重试');
+            }
+            throw new Error('网络请求失败，请检查网络连接');
+        }
         let json = {};
         try { json = await res.json(); } catch (e) { json = {}; }
         if (!res.ok || json.ok === false) {

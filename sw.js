@@ -1,9 +1,10 @@
-const CACHE_NAME = 'harrys-chat-v61';
+const CACHE_NAME = 'harrys-chat-v63';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
     '/style.css',
     '/app.js',
+    '/supabase.min.js',
     '/manifest.json',
     '/game.js'
 ];

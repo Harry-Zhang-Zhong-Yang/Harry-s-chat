@@ -1,0 +1,15 @@
+# Render Blueprint：在 Render 网页端 New + → Blueprint 选仓库即可一键部署
+services:
+  - type: web
+    name: harry-chat-proxy
+    runtime: node
+    plan: free
+    region: singapore        # 新加坡，国内访问延迟相对最低
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: SUPABASE_TARGET
+        value: https://nryaxymneqyakeykulzq.supabase.co
+      - key: PROXY_KEY
+        value: harry-chat-2026

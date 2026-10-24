@@ -1,0 +1,15 @@
+{
+  "name": "supabase-cn-proxy",
+  "version": "1.0.0",
+  "description": "Supabase API reverse proxy for mainland China users (HTTP + WebSocket)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
