@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.5.5";
+    const CHAT_APP_VERSION = "3.5.6";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -1246,9 +1246,7 @@
                 // 成员 / 全新房间：直接进入
                 if (join.status === 'new_room') {
                     // 全新房间，自动加入为第一个成员
-                    await supabaseClient.from('room_members')
-                        .upsert([{ room_code: currentRoomCode, user_name: mySender }],
-                            { onConflict: 'room_code,user_name' });
+                    await ensureMembership(currentRoomCode, mySender);
                 }
                 stopJoinWaitWatcher();
                 hideApplyScreen();
@@ -1269,9 +1267,7 @@
                     join.approveCount || 0, join.totalMembers);
             } else if (join.status === 'approved') {
                 // 之前已被批准但可能未自动写入成员 → 补一下
-                await supabaseClient.from('room_members')
-                    .upsert([{ room_code: currentRoomCode, user_name: mySender }],
-                        { onConflict: 'room_code,user_name' });
+                await ensureMembership(currentRoomCode, mySender);
                 document.getElementById('login-area').style.display = 'none';
                 showRoomLoading();
                 setRoomTitle(currentRoomCode);
@@ -1402,6 +1398,47 @@
         return !!data;
     }
 
+    /**
+     * 确保用户是某房间的成员。
+     * 之前所有 upsert 都没检查 error，写失败会静默发生：
+     * 用户能进房间但没成员身份 → 房间列表看不到、再次进入被要求申请。
+     */
+    async function ensureMembership(roomCode, userName) {
+        try {
+            const { error } = await supabaseClient
+                .from('room_members')
+                .upsert([{ room_code: roomCode, user_name: userName }],
+                    { onConflict: 'room_code,user_name' });
+            if (error) {
+                console.error('[members] upsert failed:', error);
+                showToast('成员写入失败：' + (error.message || error.code || ''), 'error', 3500);
+                return false;
+            }
+            return true;
+        } catch (e) {
+            console.error('[members] upsert error:', e);
+            showToast('成员写入失败，请检查网络', 'error', 3000);
+            return false;
+        }
+    }
+
+    /** 已是成员时清理残留的 pending 申请，避免被误判为「审核中」 */
+    async function cleanupStaleRequests(roomCode, userName) {
+        try {
+            const { data } = await supabaseClient
+                .from('join_requests')
+                .select('id')
+                .eq('room_code', roomCode)
+                .eq('user_name', userName)
+                .eq('status', 'pending');
+            if (!data || !data.length) return;
+            await supabaseClient
+                .from('join_requests')
+                .update({ status: 'approved', resolved_at: new Date().toISOString() })
+                .in('id', data.map(r => r.id));
+        } catch (e) { console.warn('[join] 清理残留申请失败:', e); }
+    }
+
     /** 查询某房间某用户的最新加入申请状态（pending 优先，其次按时间倒序） */
     async function getLatestJoinRequest(roomCode, userName) {
         const { data, error } = await supabaseClient
@@ -1441,7 +1478,11 @@
      */
     async function evaluateJoinStatus(roomCode, userName) {
         const isMember = await checkRoomMembership(roomCode, userName);
-        if (isMember) return { status: 'member' };
+        if (isMember) {
+            // 已是成员：清掉可能残留的 pending 申请，避免 UI 误判为「审核中」
+            cleanupStaleRequests(roomCode, userName);
+            return { status: 'member' };
+        }
         const totalMembers = await getRoomMemberCount(roomCode);
         if (totalMembers === 0) return { status: 'new_room', totalMembers: 0 };
         const req = await getLatestJoinRequest(roomCode, userName);
@@ -1780,6 +1821,13 @@
             logJoinRoom('manual');
             setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
+            // 兜底：只要成功进房就确保成员关系存在，并立刻刷新「我的房间」缓存与列表。
+            // 修复：建房后没发消息就退出 → 列表不显示该房间、再次进入被要求申请。
+            ensureMembership(currentRoomCode, mySender).then(async (ok) => {
+                if (!ok) return;
+                await loadMyRooms();
+                if (isDesktopLayout()) renderRoomSidebar();
+            }).catch(e => console.warn('[members] ensure failed:', e));
             initRealtime();
             realtimeReady.catch(() => startPolling());
             if (isPollingEnabled) startPolling();
