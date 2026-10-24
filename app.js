@@ -2,7 +2,9 @@
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
-    // const SUPABASE_URL = 'https://your-proxy.onrender.com';
+    //   Netlify（免信用卡，国内可达）：const SUPABASE_URL = 'https://xxx.netlify.app/sb';
+    //   Render（需信用卡）         ：const SUPABASE_URL = 'https://xxx.onrender.com';
+    // 只要地址里不含 supabase.co，前端就自动进入「反代模式」（带 X-Proxy-Key 头 + 跳过 WebSocket）。
     const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
@@ -1578,37 +1580,44 @@
      * @param initialApproveCount 初始已同意票数
      * @param totalMembers 房间总成员数
      */
-    function renderWaitingScreen(roomCode, userName, requestId, initialApproveCount, totalMembers) {
-        function paint(approveCount, memberCount) {
-            const need = votesNeeded(memberCount);
-            const have = Math.min(approveCount, need);
-            const pct = Math.min(100, Math.round(have / need * 100));
-            const remaining = Math.max(0, need - approveCount);
-            const html = `
-                <div class="apply-icon">⏳</div>
-                <h3>正在等待房间「${escapeHtml(roomCode)}」的成员审批</h3>
-                <p>共 <b>${memberCount}</b> 名现有成员，需要超过 1/2（即 <b>${need}</b> 票）同意才能通过。</p>
-                <div class="apply-progress">
-                    <div class="apply-progress-row">
-                        <span>当前进度</span>
-                        <span>${approveCount} / ${need}</span>
-                    </div>
-                    <div class="apply-bar"><div class="apply-bar-fill" style="width:${pct}%;"></div></div>
-                    <div class="apply-detail">
-                        ${remaining > 0
-                            ? '还差 <b>' + remaining + '</b> 票同意'
-                            : '🎉 票数已满足，正在进入房间…'}
-                    </div>
+    function paintWaitingScreen(roomCode, approveCount, memberCount) {
+        const need = votesNeeded(memberCount);
+        const have = Math.min(approveCount, need);
+        const pct = Math.min(100, Math.round(have / need * 100));
+        const remaining = Math.max(0, need - approveCount);
+        const html = `
+            <div class="apply-icon">⏳</div>
+            <h3>正在等待房间「${escapeHtml(roomCode)}」的成员审批</h3>
+            <p>共 <b>${memberCount}</b> 名现有成员，需要超过 1/2（即 <b>${need}</b> 票）同意才能通过。</p>
+            <div class="apply-progress">
+                <div class="apply-progress-row">
+                    <span>当前进度</span>
+                    <span>${approveCount} / ${need}</span>
                 </div>
-                <p style="font-size:12px;color:var(--muted);margin-top:6px;">
-                    不用刷新页面，审批通过后会自动进入。
-                </p>
-                <button class="apply-back" onclick="window.cancelJoinWait()">取消申请</button>
-            `;
-            document.getElementById('apply-card-content').innerHTML = html;
+                <div class="apply-bar"><div class="apply-bar-fill" style="width:${pct}%;"></div></div>
+                <div class="apply-detail">
+                    ${remaining > 0
+                        ? '还差 <b>' + remaining + '</b> 票同意'
+                        : '🎉 票数已满足，正在进入房间…'}
+                </div>
+            </div>
+            <p style="font-size:12px;color:var(--muted);margin-top:6px;">
+                不用刷新页面，审批通过后会自动进入。
+            </p>
+            <button class="apply-back" onclick="window.cancelJoinWait()">取消申请</button>
+        `;
+        const content = document.getElementById('apply-card-content');
+        if (content) content.innerHTML = html;
+    }
+
+    function renderWaitingScreen(roomCode, userName, requestId, initialApproveCount, totalMembers) {
+        paintWaitingScreen(roomCode, initialApproveCount, totalMembers);
+        // 反代模式（不支持 WebSocket）用轮询替代 Realtime 订阅，保证国内用户审批流程可用
+        if (USING_PROXY) {
+            startJoinWaitPolling(roomCode, userName, requestId, totalMembers);
+            return;
         }
-        paint(initialApproveCount, totalMembers);
-        // 订阅 join_requests 和 join_votes
+        // 订阅 join_requests 和 join_votes（直连官方地址时走实时）
         if (window.__joinWaitChannel) {
             try { supabaseClient.removeChannel(window.__joinWaitChannel); } catch (e) {}
         }
@@ -1634,11 +1643,46 @@
         window.__joinWaitChannel = channel;
     }
 
+    function stopJoinWaitPolling() {
+        if (window.__joinWaitTimer) {
+            clearInterval(window.__joinWaitTimer);
+            window.__joinWaitTimer = null;
+        }
+    }
+
     function stopJoinWaitWatcher() {
         if (window.__joinWaitChannel) {
             try { supabaseClient.removeChannel(window.__joinWaitChannel); } catch (e) {}
             window.__joinWaitChannel = null;
         }
+        stopJoinWaitPolling();
+    }
+
+    // 反代模式下替代 Realtime 的审批轮询：每 2.5 秒查一次申请状态与票数
+    function startJoinWaitPolling(roomCode, userName, requestId, totalMembers) {
+        stopJoinWaitPolling();
+        window.__joinWaitTimer = setInterval(async () => {
+            try {
+                const { data: req } = await supabaseClient
+                    .from('join_requests')
+                    .select('status')
+                    .eq('id', requestId)
+                    .single();
+                if (req && req.status === 'approved') {
+                    await supabaseClient.from('room_members')
+                        .upsert([{ room_code: roomCode, user_name: userName }], { onConflict: 'room_code,user_name' });
+                    stopJoinWaitPolling();
+                    hideApplyScreen();
+                    showToast('🎉 你已通过审批，欢迎加入房间！', 'success', 3000);
+                    actuallyEnterRoom();
+                    return;
+                }
+                const votes = await getJoinVotes(requestId);
+                const approveCount = votes.filter(v => v.vote === 'approve').length;
+                const mc = await getRoomMemberCount(roomCode);
+                paintWaitingScreen(roomCode, approveCount, mc);
+            } catch (e) { console.warn('[join] 轮询失败:', e); }
+        }, 2500);
     }
 
     window.cancelJoinWait = async function() {
@@ -1965,6 +2009,13 @@
 
     function initRealtime() {
         if (continuationToken) return;
+        // 反代模式（如 Netlify 边缘反代）不支持 WebSocket，
+        // 直接走轮询兜底，避免白等 10 秒实时连接超时。
+        if (USING_PROXY) {
+            console.info('[proxy] 跳过 Realtime，使用轮询模式');
+            startPolling();
+            return;
+        }
         stopPolling();
         if (roomSubscription) roomSubscription.unsubscribe();
         presenceActive = false;

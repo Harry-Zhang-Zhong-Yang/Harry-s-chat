@@ -1,0 +1,28 @@
+# Harry's Chat — Supabase 国内反代（免信用卡方案）
+#
+# 为什么用 Netlify 而不是 Render：
+#   - Render 免费版部署强制要求绑定信用卡，你没有卡；
+#   - 我们实测 netlify.app 在国内可直连（而 Supabase 官方域名被墙）；
+#   - Netlify 免费版（Starter）部署无需信用卡。
+#
+# 部署步骤（见 supabase-proxy/README.md 的「Netlify 免信用卡方案」一节）：
+#   1. 在 https://app.netlify.com 用 GitHub 登录，New site from Git → 选本仓库；
+#   2. Base directory 填：netlify-proxy
+#   3. Build command 留空，Publish directory 留空（会自动用本文件的 publish）；
+#   4. Deploy。部署后得到地址 https://<随机名>.netlify.app
+#   5. 把 web/app.js 第 6 行改成：
+#        const SUPABASE_URL = 'https://<随机名>.netlify.app/sb';
+#      推送即可让国内用户免 VPN 使用。
+
+[build]
+  publish = "public"
+
+# 把所有 /sb/* 请求在服务端转发到 Supabase（浏览器不再直连被墙的官方域名）。
+# status = 200 + force = true 表示「反向代理（重写）」，对浏览器透明、不暴露真实地址。
+# 注意：Netlify 边缘反代不支持 WebSocket，因此 Realtime 实时推送会降级为前端轮询
+#（app.js 已内置轮询兜底 + 代理模式专用轮询），不影响登录与聊天。
+[[redirects]]
+  from = "/sb/*"
+  to = "https://nryaxymneqyakeykulzq.supabase.co/:splat"
+  status = 200
+  force = true

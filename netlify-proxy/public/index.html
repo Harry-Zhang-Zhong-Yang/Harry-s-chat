@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Harry's Chat 反代</title>
+  <style>
+    body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+           background: #0f1220; color: #e6e8ef; display: flex; min-height: 100vh;
+           align-items: center; justify-content: center; margin: 0; }
+    .card { max-width: 520px; padding: 28px 32px; background: #171a2b;
+            border: 1px solid #2a2f47; border-radius: 14px; line-height: 1.7; }
+    code { background: #0f1220; padding: 2px 6px; border-radius: 6px; color: #8ad; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔀 Harry's Chat · Supabase 反代节点</h1>
+    <p>这是一个纯转发节点，本身不存放任何数据，只为让国内用户免 VPN 访问聊天室后端。</p>
+    <p>前端请通过 <code>/sb</code> 路径访问，例如：<br />
+       <code>https://你的域名.netlify.app/sb/rest/v1/...</code></p>
+    <p style="color:#8b90a8;font-size:13px;">如果你看到这个页面，说明反代站点已正常上线。</p>
+  </div>
+</body>
+</html>
