@@ -1,11 +1,12 @@
-    const CHAT_APP_VERSION = "3.5.3";
+    const CHAT_APP_VERSION = "3.5.4";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
     //   Netlify（免信用卡，国内可达）：const SUPABASE_URL = 'https://xxx.netlify.app/sb';
     //   Render（需信用卡）         ：const SUPABASE_URL = 'https://xxx.onrender.com';
     // 只要地址里不含 supabase.co，前端就自动进入「反代模式」（带 X-Proxy-Key 头 + 跳过 WebSocket）。
-    const SUPABASE_URL = 'https://nryaxymneqyakeykulzq.supabase.co';
+    // 当前已切到 Netlify 反代（2026-10-24 部署：thriving-muffin-0bb5e1），国内用户免 VPN 可用。
+    const SUPABASE_URL = 'https://thriving-muffin-0bb5e1.netlify.app/sb';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
     let supabaseClient;
