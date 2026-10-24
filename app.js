@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.5.4";
+    const CHAT_APP_VERSION = "3.5.5";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -10,11 +10,13 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M';
     
     let supabaseClient;
-    // 防滥用密钥：仅当 SUPABASE_URL 指向反代（非官方域名）时才随请求带上，
-    // 直连官方地址时不带，避免多余的自定义头被 Supabase 的 CORS 拒绝。
-    const PROXY_KEY = 'harry-chat-2026';
+    // 反代模式判定：SUPABASE_URL 不是官方域名（如指向 Netlify 反代）时为 true，
+    // 用于跳过 WebSocket（边缘反代不支持）改走轮询。
+    // ⚠️ 不要给请求附加自定义头（如早期的 X-Proxy-Key）：自定义头会触发 CORS 预检，
+    // 而 Supabase Edge Functions 网关的预检白名单只有 authorization/x-client-info/apikey/content-type，
+    // 不含任何自定义头，会导致登录被浏览器直接拦下（2026-10-24 实测踩坑）。
     const USING_PROXY = SUPABASE_URL.indexOf('supabase.co') === -1;
-    const PROXY_HEADERS = USING_PROXY ? { 'X-Proxy-Key': PROXY_KEY } : {};
+    const PROXY_HEADERS = {};
     try {
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             global: { headers: PROXY_HEADERS }

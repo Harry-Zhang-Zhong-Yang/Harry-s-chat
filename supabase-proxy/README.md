@@ -94,5 +94,6 @@ Render 方案支持 WebSocket，无需前端轮询降级。
 
 - **来回切换**：直连官方域名 ↔ 反代地址，前端会自动识别模式，互不影响。
 - **Supabase 换项目**：改反代的目标地址（Netlify 改 `netlify.toml` 里的 `to`；Render 改环境变量 `SUPABASE_TARGET`），前端不用动。
-- **改密钥**：仅 Render 方案用得到；要换 `PROXY_KEY` 需同时改 Render 环境变量、`server.js` 默认值、`web/app.js` 里的 `PROXY_KEY` 三处。
+- **改密钥**：仅 Render 方案用得到；要换 `PROXY_KEY` 需同时改 Render 环境变量和 `server.js` 默认值两处。
+  ⚠️ 前端**不发送**任何自定义头（如 `X-Proxy-Key`）：自定义头会触发 CORS 预检，而 Supabase Edge Functions 网关的预检白名单不含自定义头，登录会被浏览器拦下。自建反代如需鉴权，请用白名单内的头（如复用 `x-client-info`）或在反代层校验来源。
 - 免费额度：Netlify 按请求计费、长期免费；Render 免费版每月 750 小时。
