@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.5.6";
+    const CHAT_APP_VERSION = "3.6.2";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -456,6 +456,8 @@
     function mrvPreviewText(m) {
         let body = String(m.content || '');
         if (!body && m.media_type) body = m.media_type === 'image' ? '[图片]' : (m.media_type === 'audio' ? '[语音]' : '[文件]');
+        // 房间列表预览只保留一行：过长直接截断，避免撑爆侧栏
+        if (body.length > 50) body = body.slice(0, 50) + '…';
         return body || '';
     }
 
@@ -1239,70 +1241,18 @@
         localStorage.setItem('chat_auth_expiry', expiryTime.toString());
 
         try {
-            // ====== 成员白名单 + 审批检查 ======
-            const join = await evaluateJoinStatus(currentRoomCode, mySender);
-
-            if (join.status === 'member' || join.status === 'new_room') {
-                // 成员 / 全新房间：直接进入
-                if (join.status === 'new_room') {
-                    // 全新房间，自动加入为第一个成员
-                    await ensureMembership(currentRoomCode, mySender);
-                }
-                stopJoinWaitWatcher();
-                hideApplyScreen();
-                document.getElementById('login-area').style.display = 'none';
-                showRoomLoading();
-                setRoomTitle(currentRoomCode);
-                await actuallyEnterRoom(prevRoomCode);
-            } else if (join.status === 'pending') {
-                if (switchingInChat) {
-                    revertToPrev();
-                    showToast('该房间的加入申请审核中，请等待成员审批', 'info', 3000);
-                    return;
-                }
-                // 已有进行中的申请：进入等待页
-                document.getElementById('login-area').style.display = 'none';
-                showApplyScreen();
-                renderWaitingScreen(currentRoomCode, mySender, join.requestId,
-                    join.approveCount || 0, join.totalMembers);
-            } else if (join.status === 'approved') {
-                // 之前已被批准但可能未自动写入成员 → 补一下
-                await ensureMembership(currentRoomCode, mySender);
-                document.getElementById('login-area').style.display = 'none';
-                showRoomLoading();
-                setRoomTitle(currentRoomCode);
-                await actuallyEnterRoom(prevRoomCode);
-            } else if (join.status === 'rejected') {
-                if (switchingInChat) {
-                    revertToPrev();
-                    showToast('你之前的加入申请被拒绝了，无法加入该房间', 'error', 3000);
-                    return;
-                }
-                // 之前被拒：用申请屏提示可重新发起
-                document.getElementById('login-area').style.display = 'none';
-                showApplyScreen(`
-                    <div class="apply-icon">🚫</div>
-                    <h3>你之前的加入申请被拒绝了</h3>
-                    <p>房间「${escapeHtml(currentRoomCode)}」暂时无法进入，可以重新发起申请。</p>
-                    <button onclick="window.reapplyJoin()">申请重新加入</button>
-                `);
-            } else {
-                // 'none'：房间存在但用户不是成员，需要申请加入
-                if (switchingInChat) {
-                    revertToPrev();
-                    showToast('你不是该房间的成员，加入需要成员审批', 'error', 3000);
-                    return;
-                }
-                document.getElementById('login-area').style.display = 'none';
-                const totalMembers = join.totalMembers || 0;
-                const need = votesNeeded(totalMembers);
-                showApplyScreen(`
-                    <div class="apply-icon">🙋</div>
-                    <h3>加入房间「${escapeHtml(currentRoomCode)}」需要审批</h3>
-                    <p>你不是该房间的成员（当前共 <b>${totalMembers}</b> 名成员）。<br>加入需要超过 1/2（即 <b>${need}</b> 票）现有成员同意。</p>
-                    <button onclick="window.requestJoinRoom()">🙋 申请加入房间</button>
-                `);
-            }
+            // ====== 进房：已取消「申请 / 审批 / 投票」 ======
+            // 2026-10-31 按需求移除加入审批：登录用户进房即成为成员。
+            // 仍然必须走 ensureMembership —— 成员身份要落库，否则房间列表查不到、
+            // 再次进入又会被判成非成员（历史上踩过：写成员失败静默）。
+            await ensureMembership(currentRoomCode, mySender);
+            stopJoinWaitWatcher();
+            hideApplyScreen();
+            document.getElementById('login-area').style.display = 'none';
+            showRoomLoading();
+            setRoomTitle(currentRoomCode);
+            await actuallyEnterRoom(prevRoomCode);
+            refreshAiNames(); // 不阻塞进房
         } catch (e) {
             console.error('加入房间检查失败:', e);
             showToast('加入房间检查失败：' + (e.message || ''), 'error');
@@ -1476,6 +1426,28 @@
      * 4) 已有 approved 申请（但还没写入 room_members，可能是并发或之前未自动同步）→ 'approved'
      * 5) 否则 → 'none'（需申请）
      */
+    /**
+     * 拉取 AI 人格名单，用于给消息打 AI 徽章。
+     * 表不存在（迁移还没跑）时静默失败，不影响任何既有功能。
+     */
+    async function refreshAiNames() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('ai_personas')
+                .select('name')
+                .eq('enabled', true);
+            if (error) { console.warn('[ai] 人格名单读取失败:', error.message); return; }
+            window.__aiNames = new Set((data || []).map(r => r.name));
+            document.querySelectorAll('.msg-wrapper').forEach(w => {
+                // 让已有消息重新打标
+                const nm = w.querySelector('.sender-name');
+                if (nm) nm.remove();
+            });
+            refreshMessageAvatars();
+        } catch (e) { /* 表还没建，忽略 */ }
+    }
+    window.refreshAiNames = refreshAiNames;
+
     async function evaluateJoinStatus(roomCode, userName) {
         const isMember = await checkRoomMembership(roomCode, userName);
         if (isMember) {
@@ -3502,6 +3474,16 @@
                 const label = document.createElement('span');
                 label.className = 'sender-name';
                 label.innerText = wrapper.dataset.sender || '';
+                // AI 成员打标：名字来自 ai_personas 表，真人不显示
+                try {
+                    if (window.__aiNames && window.__aiNames.has(wrapper.dataset.sender)) {
+                        const badge = document.createElement('span');
+                        badge.className = 'ai-badge';
+                        badge.textContent = 'AI';
+                        badge.title = '由 AI 扮演的身份';
+                        label.appendChild(badge);
+                    }
+                } catch (eAI) { /* 忽略 */ }
                 stack.insertBefore(label, content);
             }
         });
@@ -3606,7 +3588,26 @@
         }
     };
 
+    /**
+     * AI 消息显示前清理 markdown 残留（**加粗**、`代码`、# 标题、- 列表等）。
+     * 真人消息原样保留——只对 ai_personas 名单里的 sender 生效。
+     * 2026-10-31：用户反馈"聊天里为什么有那么多 * 号"，根因是 AI 发言带 markdown 而站点按纯文本渲染。
+     */
+    function stripMarkdownDisplay(t) {
+        return String(t ?? '')
+            .replace(/\*\*([^*]*)\*\*/g, '$1')
+            .replace(/(^|[\s（(，。！？、])\*([^*\n]+)\*(?=$|[\s）)，。！？、])/g, '$1$2')
+            .replace(/__([^_]+)__/g, '$1')
+            .replace(/`([^`]*)`/g, '$1')
+            .replace(/^[ \t]{0,3}#{1,4}[ \t]+/gm, '')
+            .replace(/^[ \t]*[-*][ \t]+/gm, '· ');
+    }
+
     function appendMessageToUI(id, sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false, skipAvatarRefresh = false, fileName = null, fileSize = null) {
+        // AI 成员的消息：显示层清理 markdown 残留（原始文本仍存 dataset.originalContent 之前的安全副本见下）
+        const isAiSender = !!(window.__aiNames && window.__aiNames.has(sender));
+        const rawContent = content;
+        if (isAiSender) content = stripMarkdownDisplay(content);
         // 安卓 APK：后台收到别人的新消息 → 弹系统通知
         if (isNew && !insertAtTop && sender && sender !== mySender && isNativeApp) {
             notifyIncomingMessage(sender, content, mediaType);
@@ -3627,7 +3628,7 @@
         if (id) wrapper.dataset.msgId = id;
         wrapper.dataset.sender = sender;
         wrapper.dataset.createdAt = timestamp_str || beijingISOString();
-        wrapper.dataset.originalContent = content || '';
+        wrapper.dataset.originalContent = rawContent || '';
         wrapper.dataset.mediaUrl = mediaUrl || '';
         wrapper.dataset.mediaType = mediaType || '';
 

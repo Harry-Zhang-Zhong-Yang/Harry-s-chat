@@ -1147,7 +1147,7 @@
         .sidebar-room-item.active .sri-text b, .sidebar-room-item.active .sri-text small { color:#fff; }
         .sidebar-room-item .sri-text { flex:1; min-width:0; display:flex; flex-direction:column; }
         .sidebar-room-item .sri-text b { font-size:14px; color:var(--text-main); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .sidebar-room-item .sri-text small { font-size:11px; color:var(--muted); }
+        .sidebar-room-item .sri-text small { font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; display:block; }
         .sidebar-room-item .sri-arrow { flex-shrink:0; color:var(--muted); font-size:13px; }
     .sidebar-room-item.active .sri-arrow { color:#fff; }
     .sidebar-room-item .sri-time { flex-shrink:0; font-size:11px; color:var(--muted); white-space:nowrap; }
@@ -1836,3 +1836,19 @@
             background: var(--chip-bg);
             color: var(--chip-text);
         }
+
+/* ===== AI 成员徽章（2026-10-31 新增）===== */
+.ai-badge {
+    display: inline-block;
+    margin-left: 5px;
+    padding: 0 4px;
+    font-size: 9px;
+    line-height: 14px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    border-radius: 4px;
+    vertical-align: 1px;
+    color: #7c5cff;
+    background: rgba(124, 92, 255, 0.14);
+    border: 1px solid rgba(124, 92, 255, 0.35);
+}
