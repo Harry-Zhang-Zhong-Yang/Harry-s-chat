@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.6.2";
+    const CHAT_APP_VERSION = "3.6.3";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -146,11 +146,11 @@
     async function logJoinRoom(joinType = 'manual') {
         if (!currentRoomCode || !mySender) return;
         try {
+            // 线上 join_logs 实际只有 id/user_name/room_code/joined_at 四列，
+            // 多传 join_type/user_agent 会 400（2026-10-31 实测修复）
             await supabaseClient.from('join_logs').insert([{
                 room_code: currentRoomCode,
-                user_name: mySender,
-                join_type: joinType,
-                user_agent: navigator.userAgent || ''
+                user_name: mySender
             }]);
         } catch (e) {
             console.warn('join_logs insert failed:', e);
