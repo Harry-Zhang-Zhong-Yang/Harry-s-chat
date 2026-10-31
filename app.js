@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.6.3";
+    const CHAT_APP_VERSION = "3.6.4";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -295,6 +295,9 @@
         fetchAndApplyUserAvatars([user]);
         const listEl = document.getElementById('sidebar-room-list');
         if (!listEl) return;
+        // 首次渲染清空搜索框：浏览器刷新会恢复输入框旧值，残留关键词会把列表过滤成"没有匹配的房间"
+        const searchEl = document.getElementById('sidebar-search');
+        if (searchEl && !window.__sidebarSearchReset) { searchEl.value = ''; window.__sidebarSearchReset = true; }
         // 首次加载显示骨架屏（不出现"加载中"文字）；已有数据时保留旧列表
         if (!sidebarRoomsData.length) {
             listEl.innerHTML = '<div class="skeleton-item"></div><div class="skeleton-item"></div><div class="skeleton-item"></div>';
@@ -349,7 +352,9 @@
             ? sidebarRoomsData.filter(r => r.code.toLowerCase().includes(kw) || r.name.toLowerCase().includes(kw))
             : [...sidebarRoomsData];
         if (!rows.length) {
-            listEl.innerHTML = `<div class="sidebar-empty">${kw ? '没有匹配的房间' : '还没有加入任何房间<br>点击顶部 ＋ 加入或创建'}</div>`;
+            listEl.innerHTML = kw
+                ? `<div class="sidebar-empty">没有匹配的房间<br><span class="sidebar-clear-link" onclick="window.clearSidebarSearch()">清空搜索，显示全部房间</span></div>`
+                : '<div class="sidebar-empty">还没有加入任何房间<br>点击顶部 ＋ 加入或创建</div>';
             return;
         }
         // 排序：有最新消息的按时间倒序；没消息的按加入时间倒序排在后面（和手机端一致）
@@ -372,6 +377,13 @@
     }
 
     window.filterSidebarRooms = function() { renderSidebarList(); };
+
+    /** 一键清空搜索框并恢复全量房间列表 */
+    window.clearSidebarSearch = function() {
+        const el = document.getElementById('sidebar-search');
+        if (el) el.value = '';
+        renderSidebarList();
+    };
 
     window.switchToRoom = function(code) {
         code = String(code || '').trim();
