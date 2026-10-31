@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.6.4";
+    const CHAT_APP_VERSION = "3.6.5";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -280,6 +280,10 @@
 
     // ===== 电脑端左侧房间栏 =====
     let sidebarRoomsData = []; // [{code, name, memberCount}]
+    // 搜索框"是否真由用户敲过字"。浏览器刷新会把上次输入的搜索词自动恢复到输入框里
+    // （用户遇到的残留 "zzy"），那个值不会触发 input 事件，绝不能用它去过滤房间列表，
+    // 否则列表会莫名只剩一两个房间 —— 用户说的"只能使用这个房间"就是这么来的。
+    let sidebarSearchUserTyped = false;
     async function renderRoomSidebar() {
         const user = getLoggedInUser();
         if (!user || !supabaseClient) return;
@@ -295,19 +299,39 @@
         fetchAndApplyUserAvatars([user]);
         const listEl = document.getElementById('sidebar-room-list');
         if (!listEl) return;
-        // 首次渲染清空搜索框：浏览器刷新会恢复输入框旧值，残留关键词会把列表过滤成"没有匹配的房间"
-        const searchEl = document.getElementById('sidebar-search');
-        if (searchEl && !window.__sidebarSearchReset) { searchEl.value = ''; window.__sidebarSearchReset = true; }
+        // 浏览器刷新会把上次的搜索词恢复到输入框（用户遇到的残留 "zzy"），
+        // 而 Chrome 的恢复时机可能晚于脚本执行，v3.6.4 只在这一处同步清一次治不干净。
+        // 现在三层兜底：立即清 → load 后清 → 1.5 秒后再清；且用户已开始打字就不抢他的字。
+        const clearSidebarSearchIfIdle = () => {
+            if (sidebarSearchUserTyped) return;
+            const el = document.getElementById('sidebar-search');
+            if (el && el.value) { el.value = ''; renderSidebarList(); }
+        };
+        clearSidebarSearchIfIdle();
+        if (!window.__sidebarSearchHook) {
+            window.__sidebarSearchHook = true;
+            window.addEventListener('load', () => {
+                setTimeout(clearSidebarSearchIfIdle, 0);
+                setTimeout(clearSidebarSearchIfIdle, 500);
+            });
+            setTimeout(clearSidebarSearchIfIdle, 1500);
+        }
         // 首次加载显示骨架屏（不出现"加载中"文字）；已有数据时保留旧列表
         if (!sidebarRoomsData.length) {
             listEl.innerHTML = '<div class="skeleton-item"></div><div class="skeleton-item"></div><div class="skeleton-item"></div>';
         }
         try {
-            const { data, error } = await supabaseClient
-                .from('room_members')
-                .select('room_code')
-                .eq('user_name', user)
-                .order('created_at', { ascending: false });
+            // 主查询给 10 秒超时：反代挂起时也要落到下面的 catch，显示"加载失败，请重试"，
+            // 而不是让用户对着骨架屏无限等（和上面 latest 查询同一个病根）。
+            const { data, error } = await Promise.race([
+                supabaseClient
+                    .from('room_members')
+                    .select('room_code')
+                    .eq('user_name', user)
+                    .order('created_at', { ascending: false }),
+                new Promise((_, reject) => setTimeout(
+                    () => reject(new Error('房间列表加载超时（10s）')), 10000))
+            ]);
             if (error) throw error;
             const codes = [...new Set((data || []).map(r => r.room_code))];
             if (!codes.length) {
@@ -328,16 +352,26 @@
                 (roomsRes.data || []).forEach(r => { if (r.room_name) nameMap[r.room_code] = r.room_name; });
                 (membersRes.data || []).forEach(m => { countMap[m.room_code] = (countMap[m.room_code] || 0) + 1; });
             } catch (e) { /* 表不可用时忽略 */ }
-            // 每个房间取最新一条消息（用于排序 + 预览，和手机端逻辑一致）
+            // 【先渲染，后补预览】房间名/成员数已就绪，立刻落地并渲染，用户马上能点房间。
+            // 历史缺陷：下面给每个房间并发查最新消息，N 个房间 = N 个并发请求。
+            // .catch() 只挡得住"请求失败"，挡不住"请求挂起"（反代不稳时会挂住），
+            // 只要任意一个不返回，Promise.all 永不 resolve → sidebarRoomsData 永不赋值
+            // → renderSidebarList 永不调用 → 列表永远停在上面那 3 条骨架屏（用户看到的"白框"）。
+            sidebarRoomsData = codes.map(c => ({ code: c, name: nameMap[c] || c, memberCount: countMap[c] || 1, latest: null, joinedAt: joinedAt[c] }));
+            renderSidebarList();
+            // 最新一条消息只用于"预览 + 排序"，异步补：带 3 秒超时，超时就跳过该房间，不拖累整张列表
             const latestMap = {};
-            await Promise.all(codes.map(c =>
+            await Promise.all(codes.map(c => Promise.race([
                 supabaseClient.from('messages').select('sender,content,media_type,created_at')
                     .eq('room_code', c).order('created_at', { ascending: false }).limit(1)
                     .then(res => { if (res.data && res.data[0]) latestMap[c] = res.data[0]; })
-                    .catch(() => {})
-            ));
-            sidebarRoomsData = codes.map(c => ({ code: c, name: nameMap[c] || c, memberCount: countMap[c] || 1, latest: latestMap[c] || null, joinedAt: joinedAt[c] }));
-            renderSidebarList();
+                    .catch(() => {}),
+                new Promise(resolve => setTimeout(resolve, 3000))
+            ])));
+            if (Object.keys(latestMap).length) {
+                sidebarRoomsData = sidebarRoomsData.map(r => ({ ...r, latest: latestMap[r.code] || r.latest }));
+                renderSidebarList();
+            }
         } catch (e) {
             console.warn('侧栏房间加载失败:', e);
             listEl.innerHTML = '<div class="sidebar-empty">加载失败，请重试</div>';
@@ -347,7 +381,10 @@
     function renderSidebarList() {
         const listEl = document.getElementById('sidebar-room-list');
         if (!listEl) return;
-        const kw = (document.getElementById('sidebar-search')?.value || '').trim().toLowerCase();
+        // 只有用户真在搜索框里敲过字才过滤。浏览器恢复的旧值不算数，
+        // 否则会莫名变成"列表只剩一两个房间"。
+        const searchElForFilter = document.getElementById('sidebar-search');
+        const kw = (sidebarSearchUserTyped ? (searchElForFilter?.value || '') : '').trim().toLowerCase();
         let rows = kw
             ? sidebarRoomsData.filter(r => r.code.toLowerCase().includes(kw) || r.name.toLowerCase().includes(kw))
             : [...sidebarRoomsData];
@@ -376,21 +413,38 @@
         }).join('');
     }
 
-    window.filterSidebarRooms = function() { renderSidebarList(); };
+    window.filterSidebarRooms = function() {
+        // 只有走这里（input 事件）才算"用户真在搜"；页面刷新恢复的旧值不会触发它
+        sidebarSearchUserTyped = true;
+        renderSidebarList();
+    };
 
     /** 一键清空搜索框并恢复全量房间列表 */
     window.clearSidebarSearch = function() {
         const el = document.getElementById('sidebar-search');
         if (el) el.value = '';
+        sidebarSearchUserTyped = false;   // 回到"未搜索"状态，列表不再被过滤
         renderSidebarList();
     };
 
+    // 切房闸门：连点两下会并发跑两遍 joinRoom，第二次会把 joinRoom 里的 prevRoomCode
+    // 覆盖成第一次的目标房，一旦失败回退就退到"错的那个房间"，还可能留下两套 realtime 订阅。
+    let isSwitchingRoom = false;
     window.switchToRoom = function(code) {
         code = String(code || '').trim();
         if (!code) return;
         if (code === currentRoomCode) return;
-        document.getElementById('join-room-modal').style.display = 'none';
-        window.joinRoom(code);
+        if (isSwitchingRoom) return;
+        isSwitchingRoom = true;
+        const modal = document.getElementById('join-room-modal');
+        if (modal) modal.style.display = 'none';
+        // 保险丝：joinRoom 内部含无超时的网络请求，万一挂住，闸门不能永久锁死
+        // （锁死的话之后点任何房间都毫无反应，比不加闸门更糟）。
+        const releaseTimer = setTimeout(() => { isSwitchingRoom = false; }, 20000);
+        Promise.resolve(window.joinRoom(code)).finally(() => {
+            clearTimeout(releaseTimer);
+            isSwitchingRoom = false;
+        });
     };
 
     window.openJoinRoomModal = function() {
@@ -512,39 +566,49 @@
                 const roomsRes = await supabaseClient.from('rooms').select('room_code,room_name').in('room_code', codes);
                 (roomsRes.data || []).forEach(r => { if (r.room_name) nameMap[r.room_code] = r.room_name; });
             } catch (e) { /* rooms 表不可用时忽略 */ }
-            // 每个房间取最新一条消息
-            const latest = {};
-            await Promise.all(codes.map(c =>
-                supabaseClient.from('messages').select('sender,content,media_type,created_at')
-                    .eq('room_code', c).order('created_at', { ascending: false }).limit(1)
-                    .then(res => { if (res.data && res.data[0]) latest[c] = res.data[0]; })
-                    .catch(() => {})
-            ));
-            // 排序：有消息的按最新消息时间倒序；没消息的按加入时间倒序排在后面
+            // 【先渲染，后补预览】和桌面侧栏同一个病根：N 个房间 = N 个并发查最新消息，
+            // .catch() 挡不住"请求挂起"，任一个不返回就永远停在上面那句"加载中…"，
+            // 用户看到的就是"房间列表出不来、只能待在一个房间"。
             const joinedAt = {};
             joined.forEach(r => { if (!(r.room_code in joinedAt)) joinedAt[r.room_code] = r.created_at; });
-            const sorted = codes.slice().sort((a, b) => {
-                const ta = latest[a] ? new Date(latest[a].created_at).getTime() : 0;
-                const tb = latest[b] ? new Date(latest[b].created_at).getTime() : 0;
-                if (ta !== tb) return tb - ta;
-                return new Date(joinedAt[b] || 0) - new Date(joinedAt[a] || 0);
-            });
-            const html = sorted.map(c => {
-                const m = latest[c];
-                const preview = m ? `${m.sender}: ${mrvPreviewText(m)}` : `房间 ${c}`;
-                const time = m ? mrvFmtTime(m.created_at) : '';
-                return `
+
+            const paintMobileList = (latest) => {
+                // 排序：有消息的按最新消息时间倒序；没消息的按加入时间倒序排在后面
+                const sorted = codes.slice().sort((a, b) => {
+                    const ta = latest[a] ? new Date(latest[a].created_at).getTime() : 0;
+                    const tb = latest[b] ? new Date(latest[b].created_at).getTime() : 0;
+                    if (ta !== tb) return tb - ta;
+                    return new Date(joinedAt[b] || 0) - new Date(joinedAt[a] || 0);
+                });
+                const html = sorted.map(c => {
+                    const m = latest[c];
+                    const preview = m ? `${m.sender}: ${mrvPreviewText(m)}` : `房间 ${c}`;
+                    const time = m ? mrvFmtTime(m.created_at) : '';
+                    return `
                 <div class="mrv-item" onclick="window.mrvEnter('${escapeHtml(c).replace(/'/g, '&#39;')}')">
                     <span class="mrv-badge" style="background:${hashGradient(c)}">${escapeHtml((nameMap[c] || c).slice(0, 1).toUpperCase())}</span>
                     <span class="mrv-item-text"><b>${escapeHtml(nameMap[c] || c)}</b><small>${escapeHtml(preview)}</small></span>
                     ${time ? `<span class="mrv-item-time">${time}</span>` : ''}
                 </div>`;
-            }).join('');
-            // 数据没变化就不重绘（避免刷新时闪烁）
-            if (listEl.dataset.ready && listEl.dataset.sig === html) return;
-            listEl.dataset.sig = html;
-            listEl.innerHTML = html;
-            listEl.dataset.ready = '1';
+                }).join('');
+                // 数据没变化就不重绘（避免刷新时闪烁）
+                if (listEl.dataset.ready && listEl.dataset.sig === html) return;
+                listEl.dataset.sig = html;
+                listEl.innerHTML = html;
+                listEl.dataset.ready = '1';
+            };
+
+            // 先出列表，房间立刻可点；预览后到再重绘一次
+            paintMobileList({});
+            const latest = {};
+            await Promise.all(codes.map(c => Promise.race([
+                supabaseClient.from('messages').select('sender,content,media_type,created_at')
+                    .eq('room_code', c).order('created_at', { ascending: false }).limit(1)
+                    .then(res => { if (res.data && res.data[0]) latest[c] = res.data[0]; })
+                    .catch(() => {}),
+                new Promise(resolve => setTimeout(resolve, 3000))
+            ])));
+            if (Object.keys(latest).length) paintMobileList(latest);
         } catch (e) {
             console.warn('手机房间列表加载失败:', e);
             if (!listEl.dataset.ready) listEl.innerHTML = '<div class="mrv-empty">加载失败，请下拉刷新重试</div>';
@@ -1267,6 +1331,12 @@
             refreshAiNames(); // 不阻塞进房
         } catch (e) {
             console.error('加入房间检查失败:', e);
+            // 聊天中切房失败必须回退到原房间：此时 currentRoomCode 已被改成目标房，
+            // 界面却还停在原房间。用户再点回原房间时，switchToRoom 的
+            // `code === currentRoomCode` 会误判成"已经在这个房间"直接 return，
+            // 于是点哪个房间都没反应 —— 这是"只能待在这一个房间"的成因之一。
+            // 首次进房（switchingInChat=false）不回退，保持原行为，避免把界面清空。
+            if (switchingInChat) revertToPrev();
             showToast('加入房间检查失败：' + (e.message || ''), 'error');
         }
     };
