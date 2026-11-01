@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.6";
+    const CHAT_APP_VERSION = "3.7.7";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -4138,18 +4138,21 @@
         [50, 150, 300].forEach((delay) => setTimeout(scrollToBottomInstant, delay));
 
         try {
-            const { data, error } = await supabaseClient
-                .from('messages')
-                .insert([{ 
-                    room_code: currentRoomCode, 
-                    content: finalContent, 
-                    sender: mySender,
+            let data = null;
+            let error = null;
+            try {
+                // 2b-1：主发送改走服务端 send-message（session 校验 + sender 服务端定，堵 P0-1 冒充）
+                const result = await callServerAction(null, 'send-message', {
+                    session: dmSession(),
+                    room_code: currentRoomCode,
+                    content: finalContent,
                     media_url: pendingMediaCopy ? pendingMediaCopy.url : null,
                     media_type: pendingMediaCopy ? pendingMediaCopy.type : null,
-                    created_at: now
-                }])
-                .select('id')
-                .single();
+                });
+                data = (result && result.message) || null;
+            } catch (e) {
+                error = e;
+            }
 
             if (error) {
                 console.error("发送失败:", error);
