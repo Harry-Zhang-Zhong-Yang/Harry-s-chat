@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.6.5";
+    const CHAT_APP_VERSION = "3.6.6";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -315,6 +315,13 @@
                 setTimeout(clearSidebarSearchIfIdle, 500);
             });
             setTimeout(clearSidebarSearchIfIdle, 1500);
+            // 兜底守护：Chrome 恢复表单值的时机不可预测（用户实测 1.5 秒后仍会冒出来），
+            // 所以前 15 秒内每 300ms 检查一次，冒头就清；用户一旦真开始打字就立刻停手。
+            let guardTicks = 0;
+            const guard = setInterval(() => {
+                if (sidebarSearchUserTyped || ++guardTicks > 50) { clearInterval(guard); return; }
+                clearSidebarSearchIfIdle();
+            }, 300);
         }
         // 首次加载显示骨架屏（不出现"加载中"文字）；已有数据时保留旧列表
         if (!sidebarRoomsData.length) {
