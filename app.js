@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.0";
+    const CHAT_APP_VERSION = "3.7.1";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -454,6 +454,94 @@
             clearTimeout(releaseTimer);
             isSwitchingRoom = false;
         });
+    };
+
+    /* ==================== AI 圆桌（可见的圆桌会议，deepseek 2026-11-01） ====================
+     * 主人 #1240：「圆桌只是一个虚拟的词，不是真的需要一个圆桌，先出成果」。
+     * 所以不做会议室/白板那套，就做两件用户能直接感知的事：
+     *  1) 圆桌面板：本房间有哪些 AI、各自什么人格、最近说了什么、在不在本房间；
+     *  2) 一键召集：输入议题 → 把所有人格拉进本房间 → 发一条 @全员 的议题，让 daemon 逐个发言。
+     */
+    window.openRoundtablePanel = async function() {
+        const modal = document.getElementById('roundtable-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        const list = document.getElementById('roundtable-list');
+        list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">加载中…</div>';
+        const room = currentRoomCode;
+        if (!room) { list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">请先进入一个房间</div>'; return; }
+        const personas = await loadAiPersonas(true);
+        if (!personas.length) {
+            list.innerHTML = '<div style="padding:26px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7;">还没有 AI 人格<br><small>在 ai_personas 表里添加后即可召集</small></div>';
+            return;
+        }
+        let memberNames = new Set();
+        const latest = {};
+        try {
+            const [memRes, msgRes] = await Promise.all([
+                supabaseClient.from('room_members').select('user_name,member_type').eq('room_code', room),
+                supabaseClient.from('messages').select('sender,content,created_at').eq('room_code', room).order('created_at', { ascending: false }).limit(60)
+            ]);
+            (memRes.data || []).forEach(m => { if (m.member_type === 'ai') memberNames.add(m.user_name); });
+            (msgRes.data || []).forEach(m => { if (!latest[m.sender]) latest[m.sender] = m; });
+        } catch (e) { console.warn('[圆桌] 数据加载失败:', e?.message || e); }
+
+        list.innerHTML = personas.map(p => {
+            const inRoom = memberNames.has(p.name);
+            const last = latest[p.name];
+            const desc = String(p.system_prompt || '').replace(/\s+/g, ' ').slice(0, 36) || '未设置角色描述';
+            return `<div style="display:flex;align-items:flex-start;gap:11px;padding:12px;border-radius:12px;border:1px solid var(--line);margin-bottom:9px;background:var(--bg);">
+                <span style="width:40px;height:40px;flex:0 0 40px;border-radius:11px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:17px;background:${hashGradient(p.name || p.id)}">${escapeHtml(personaInitial(p.name))}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:7px;">
+                        <b style="font-size:14px;">${escapeHtml(p.name || '未命名')}</b>
+                        <span style="font-size:10.5px;padding:1px 6px;border-radius:5px;${inRoom ? 'background:#e7f7ec;color:#16803c;' : 'background:var(--chip-bg,#f3f4f6);color:var(--muted);'}">${inRoom ? '本房间' : '未加入'}</span>
+                    </div>
+                    <div style="font-size:11.5px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(desc)}</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${last ? '最近：' + escapeHtml(String(last.content || '').replace(/\n/g, ' ').slice(0, 28)) : '还没有发言'}</div>
+                </div>
+                <button onclick="window.quickAtAi('${String(p.name || '').replace(/'/g, "\\'")}')" style="flex:0 0 auto;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--text-main);font-size:11.5px;cursor:pointer;">@</button>
+            </div>`;
+        }).join('');
+    };
+
+    window.closeRoundtablePanel = function() {
+        const m = document.getElementById('roundtable-modal');
+        if (m) m.style.display = 'none';
+    };
+
+    /** 一键召集：确保所有人格是本房间成员，再发一条 @全员 的议题，让 daemon 逐个发言 */
+    window.conveneRoundtable = async function() {
+        const topicInput = document.getElementById('roundtable-topic');
+        const topic = (topicInput?.value || '').trim();
+        if (!topic) { showToast('请先输入议题', 'error'); return; }
+        const me = getLoggedInUser();
+        const room = currentRoomCode;
+        if (!me || !room) { showToast('请先登录并进入房间', 'error'); return; }
+        const personas = await loadAiPersonas();
+        if (!personas.length) { showToast('没有可用的 AI 人格', 'error'); return; }
+
+        try {
+            const { data: mems } = await supabaseClient.from('room_members').select('user_name').eq('room_code', room);
+            const have = new Set((mems || []).map(r => r.user_name));
+            const toAdd = personas.filter(p => !have.has(p.name)).map(p => ({
+                room_code: room, user_name: p.name, member_type: 'ai', persona_id: p.id
+            }));
+            if (toAdd.length) {
+                const { error: addErr } = await supabaseClient.from('room_members').insert(toAdd);
+                if (addErr) console.warn('[圆桌] 拉人失败:', addErr.message);
+            }
+            const mentions = personas.map(p => '@' + p.name).join(' ');
+            const content = `${mentions}\n\n【圆桌议题】${topic}`;
+            const { error } = await supabaseClient.from('messages').insert([{ room_code: room, sender: me, content }]);
+            if (error) throw error;
+            if (topicInput) topicInput.value = '';
+            window.closeRoundtablePanel();
+            renderAiMembersBar();
+            showToast(`已召集 ${personas.length} 位 AI`, 'success');
+        } catch (e) {
+            showToast('召集失败：' + (e.message || ''), 'error');
+        }
     };
 
     /* ==================== AI 分身 & 私信（deepseek 主写 2026-11-01） ====================
