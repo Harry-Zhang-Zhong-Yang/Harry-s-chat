@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.1";
+    const CHAT_APP_VERSION = "3.7.2";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -279,9 +279,27 @@
     }
 
     // ===== 电脑端左侧房间栏 =====
-    let sidebarRoomsData = []; // [{code, name, memberCount}]
-    /** 私信房间统一前缀 dm_，不进普通房间列表（单独在「私信」面板展示） */
+    let sidebarRoomsData = []; // [{code, name, memberCount, latest, joinedAt}]
+    /** 私信房间统一前缀 dm_。v3.7.2 起不再单独开面板，直接和普通房间混排在左侧列表里（微信式） */
     function isDmRoom(code) { return String(code || '').startsWith('dm_'); }
+    /** 私信房间代码是 dm_<字母序a>__<字母序b>，取出"对方"的名字用于列表显示 */
+    function dmPeerOf(code) {
+        const s = String(code || '');
+        if (!isDmRoom(s)) return '';
+        const body = s.slice(3);
+        const idx = body.indexOf('__');
+        if (idx < 0) return '';
+        const a = body.slice(0, idx), b = body.slice(idx + 2);
+        const me = getLoggedInUser();
+        const peer = (a === me) ? b : (b === me ? a : b);
+        return String(peer || '').trim();
+    }
+    // ---- 侧栏渲染节流/去重状态（修「左侧房间列表一直闪」）----
+    let sidebarLoading = false;        // 主查询在飞
+    let sidebarPending = false;        // 在飞期间又被要求刷新 → 结束后补一次
+    let sidebarLastLoadedAt = 0;       // 上次成功加载完成时刻（冷却用）
+    let sidebarEverRendered = false;   // 是否已成功渲染过（骨架屏只在首次出现）
+    let sidebarLastSignature = '';     // 上一次真正写进 DOM 的内容签名（无变化就一个节点都不碰）
     // 搜索框"是否真由用户敲过字"。浏览器刷新会把上次输入的搜索词自动恢复到输入框里
     // （用户遇到的残留 "zzy"），那个值不会触发 input 事件，绝不能用它去过滤房间列表，
     // 否则列表会莫名只剩一两个房间 —— 用户说的"只能使用这个房间"就是这么来的。
@@ -325,8 +343,16 @@
                 clearSidebarSearchIfIdle();
             }, 300);
         }
-        // 首次加载显示骨架屏（不出现"加载中"文字）；已有数据时保留旧列表
-        if (!sidebarRoomsData.length) {
+        // 【去重 1】主查询在飞时不再并发打一轮：进房时 actuallyEnterRoom 会连调两次
+        // （进房后一次 + ensureMembership 完成后一次），旧代码=2 次调用 × 2 次全量重绘 = 列表闪 4 下。
+        if (sidebarLoading) { sidebarPending = true; return; }
+        // 【去重 2】1.5 秒冷却：同一波切房里的重复调用不打网络，只做一次本地重绘（保证 active 高亮正确）
+        if (Date.now() - sidebarLastLoadedAt < 1500) { renderSidebarList(); return; }
+        sidebarLoading = true;
+        // 骨架屏只在"从没成功渲染过"时出现。旧代码每次调用都判 !sidebarRoomsData.length，
+        // 一旦列表为空/加载慢就会反复插回带 1.1s 无限动画的 .skeleton-item —— 这就是"一直闪"。
+        if (!sidebarEverRendered && !sidebarRoomsData.length) {
+            sidebarLastSignature = '';
             listEl.innerHTML = '<div class="skeleton-item"></div><div class="skeleton-item"></div><div class="skeleton-item"></div>';
         }
         try {
@@ -342,9 +368,13 @@
                     () => reject(new Error('房间列表加载超时（10s）')), 10000))
             ]);
             if (error) throw error;
-            const codes = [...new Set((data || []).map(r => r.room_code))].filter(c => !isDmRoom(c));
+            // v3.7.2：私信房间（dm_）不再被过滤掉，和普通房间一起混排（微信式：私信就在会话列表里）
+            const codes = [...new Set((data || []).map(r => r.room_code))];
             if (!codes.length) {
                 sidebarRoomsData = [];
+                sidebarLastSignature = '';
+                sidebarEverRendered = true;
+                sidebarLastLoadedAt = Date.now();
                 listEl.innerHTML = '<div class="sidebar-empty">还没有加入任何房间<br>点击顶部 ＋ 加入或创建</div>';
                 return;
             }
@@ -381,12 +411,32 @@
                 sidebarRoomsData = sidebarRoomsData.map(r => ({ ...r, latest: latestMap[r.code] || r.latest }));
                 renderSidebarList();
             }
+            sidebarLastLoadedAt = Date.now();
+            sidebarEverRendered = true;
         } catch (e) {
             console.warn('侧栏房间加载失败:', e);
+            sidebarLastSignature = '';
+            sidebarEverRendered = true;
             listEl.innerHTML = '<div class="sidebar-empty">加载失败，请重试</div>';
+        } finally {
+            sidebarLoading = false;
+            if (sidebarPending) {
+                sidebarPending = false;
+                // 在飞期间攒下的刷新请求合并成一次，避免叠成请求风暴
+                setTimeout(() => { renderRoomSidebar(); }, 0);
+            }
         }
     }
 
+    /**
+     * 侧栏列表渲染。
+     * 【为什么改成增量更新】旧实现每次 `listEl.innerHTML = rows.map(...)`：
+     *  · 整列节点全部销毁重建 → 滚动位置归零、hover 丢失、整块重排 → 肉眼看就是"闪"；
+     *  · 进房时 renderRoomSidebar 调 2 次、每次内部又重绘 2 次（先出名单、3 秒后补最新消息），
+     *    于是**一次切房闪 4 下**，切得越勤越明显。
+     * 现在：先算内容签名，一样就一个节点都不碰；不一样则按 room_code 复用已有节点、
+     * 只改变化的文字、只在顺序真变了才 insertBefore 移动。全程不销毁节点 → 不闪、不丢滚动位置。
+     */
     function renderSidebarList() {
         const listEl = document.getElementById('sidebar-room-list');
         if (!listEl) return;
@@ -394,13 +444,19 @@
         // 否则会莫名变成"列表只剩一两个房间"。
         const searchElForFilter = document.getElementById('sidebar-search');
         const kw = (sidebarSearchUserTyped ? (searchElForFilter?.value || '') : '').trim().toLowerCase();
-        let rows = kw
+        // v3.7.2：私信不再单独隐藏，和普通房间混排（微信式）
+        const rows = kw
             ? sidebarRoomsData.filter(r => r.code.toLowerCase().includes(kw) || r.name.toLowerCase().includes(kw))
-            : sidebarRoomsData.filter(r => !isDmRoom(r.code));
+            : sidebarRoomsData.slice();
         if (!rows.length) {
-            listEl.innerHTML = kw
+            const emptyHtml = kw
                 ? `<div class="sidebar-empty">没有匹配的房间<br><span class="sidebar-clear-link" onclick="window.clearSidebarSearch()">清空搜索，显示全部房间</span></div>`
                 : '<div class="sidebar-empty">还没有加入任何房间<br>点击顶部 ＋ 加入或创建</div>';
+            if (listEl.dataset.emptyHtml !== emptyHtml) {
+                sidebarLastSignature = '';
+                listEl.dataset.emptyHtml = emptyHtml;
+                listEl.innerHTML = emptyHtml;
+            }
             return;
         }
         // 排序：有最新消息的按时间倒序；没消息的按加入时间倒序排在后面（和手机端一致）
@@ -410,16 +466,68 @@
             if (ta !== tb) return tb - ta;
             return new Date(b.joinedAt || 0) - new Date(a.joinedAt || 0);
         });
-        listEl.innerHTML = rows.map(r => {
+        // 先把"要显示成什么样"算成纯数据
+        const items = rows.map(r => {
             const m = r.latest;
-            const preview = m ? `${m.sender}: ${mrvPreviewText(m)}` : `${r.memberCount ? r.memberCount + ' 名成员 · ' : ''}${escapeHtml(r.code)}`;
-            const time = m ? mrvFmtTime(m.created_at) : '';
-            return `
-            <div class="sidebar-room-item ${r.code === currentRoomCode ? 'active' : ''}" onclick="window.switchToRoom('${escapeHtml(r.code).replace(/'/g, '&#39;')}')">
-                <span class="sri-text"><b>${escapeHtml(r.name)}</b><small>${escapeHtml(preview)}</small></span>
-                ${time ? `<span class="sri-time">${time}</span>` : '<span class="sri-arrow">›</span>'}
-            </div>`;
-        }).join('');
+            const dm = isDmRoom(r.code);
+            const peer = dm ? dmPeerOf(r.code) : '';
+            const name = peer ? ('私信 · ' + peer) : r.name;
+            const preview = m
+                ? `${m.sender}: ${mrvPreviewText(m)}`
+                : (dm ? '暂无消息' : `${r.memberCount ? r.memberCount + ' 名成员 · ' : ''}${r.code}`);
+            return {
+                code: r.code,
+                name,
+                preview,
+                time: m ? mrvFmtTime(m.created_at) : '',
+                dm,
+                active: r.code === currentRoomCode
+            };
+        });
+        // 内容签名：只要显示结果没变就直接返回（这是消灭"无意义重绘"的关键一步）
+        const sig = items.map(it => `${it.code}|${it.active ? 1 : 0}|${it.name}|${it.preview}|${it.time}`).join('\u00a7');
+        if (sig === sidebarLastSignature && listEl.firstElementChild) return;
+        sidebarLastSignature = sig;
+
+        // 1) 先删掉本次不该出现的节点（骨架屏/空态残留也在这里一并清掉）
+        const wanted = new Set(items.map(it => it.code));
+        Array.from(listEl.children).forEach(el => {
+            if (!el.dataset || !wanted.has(el.dataset.code)) el.remove();
+        });
+        // 2) 按目标顺序就地复用 / 补建
+        const liveMap = new Map();
+        Array.from(listEl.children).forEach(el => liveMap.set(el.dataset.code, el));
+        items.forEach((it, idx) => {
+            let el = liveMap.get(it.code);
+            if (!el) {
+                el = document.createElement('div');
+                el.className = 'sidebar-room-item';
+                el.dataset.code = it.code;
+                el.addEventListener('click', () => window.switchToRoom(it.code));
+                el.innerHTML = '<span class="sri-text"><b></b><small></small></span>'
+                    + '<span class="sri-time"></span><span class="sri-arrow">›</span>';
+                liveMap.set(it.code, el);
+                // 只在"新加入的房间"上有入场动画，重绘时不放动画（否则每次刷新整列一起闪）
+                el.classList.add('sri-enter');
+                setTimeout(() => { el.classList.remove('sri-enter'); }, 260);
+            }
+            const bEl = el.querySelector('b');
+            const smallEl = el.querySelector('small');
+            const timeEl = el.querySelector('.sri-time');
+            const arrowEl = el.querySelector('.sri-arrow');
+            if (bEl && bEl.textContent !== it.name) bEl.textContent = it.name;
+            if (smallEl && smallEl.textContent !== it.preview) smallEl.textContent = it.preview;
+            if (timeEl) {
+                if (timeEl.textContent !== it.time) timeEl.textContent = it.time;
+                timeEl.style.display = it.time ? '' : 'none';
+            }
+            if (arrowEl) arrowEl.style.display = it.time ? 'none' : '';
+            el.classList.toggle('active', it.active);
+            el.classList.toggle('sri-dm', it.dm);
+            // 3) 只在位置不对时才移动（insertBefore 对已在树上的节点是"移动"，不重建）
+            const ref = listEl.children[idx] || null;
+            if (el !== ref) listEl.insertBefore(el, ref);
+        });
     }
 
     window.filterSidebarRooms = function() {

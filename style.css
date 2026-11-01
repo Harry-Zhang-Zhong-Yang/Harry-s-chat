@@ -1152,6 +1152,11 @@
     .sidebar-room-item.active .sri-arrow { color:#fff; }
     .sidebar-room-item .sri-time { flex-shrink:0; font-size:11px; color:var(--muted); white-space:nowrap; }
     .sidebar-room-item.active .sri-time { color:rgba(255,255,255,.7); }
+    /* v3.7.2 私信混排：和普通房间在同一个列表里，用一个淡淡的小气泡区分身份（微信式，不加新入口） */
+    .sidebar-room-item.sri-dm .sri-text b::before { content:'💬'; font-size:11px; margin-right:4px; opacity:.72; }
+    /* 只有"新加入列表的房间"才播放入场动画；重绘走增量更新，不会让整列一起闪 */
+    .sidebar-room-item.sri-enter { animation: sriIn .18s ease-out; }
+    @keyframes sriIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
         .sidebar-empty { text-align:center; color:var(--muted); font-size:12.5px; padding:28px 12px; line-height:1.9; }
         .skeleton-item { height:44px; border-radius:10px; margin:6px 2px; background:linear-gradient(90deg, var(--chip-bg, #eef0f5) 25%, var(--surface-solid, #f8f9fc) 50%, var(--chip-bg, #eef0f5) 75%); background-size:200% 100%; animation:skel 1.1s infinite; }
         @keyframes skel { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
