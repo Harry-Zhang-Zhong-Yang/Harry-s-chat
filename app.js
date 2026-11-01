@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.7";
+    const CHAT_APP_VERSION = "3.7.8";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -757,8 +757,11 @@
             }
             const mentions = personas.map(p => '@' + p.name).join(' ');
             const content = `${mentions}\n\n【圆桌议题】${topic}`;
-            const { error } = await supabaseClient.from('messages').insert([{ room_code: room, sender: me, content }]);
-            if (error) throw error;
+            // 2b-2：召集议题走服务端 send-message（session 校验，sender 服务端定），不再 anon 直写
+            const { ok: smOk, error: smErr } = await callServerAction(null, 'send-message', {
+                session: dmSession(), room_code: room, content
+            });
+            if (!smOk) throw smErr || new Error('发送失败');
             if (topicInput) topicInput.value = '';
             window.closeRoundtablePanel();
             renderAiMembersBar();
@@ -2115,15 +2118,16 @@
             return { ok: false, reason: 'db_error', message: error.message };
         }
         // 系统消息：广播给现有成员（写入 messages 表，所有订阅者都会收到）
+        // 2b-2：system 广播走 send-message + system 标志（真人登录态发起，sender=system 服务端定）
         const sysMsg = `🙋 [新用户申请] ${userName} 请求加入本房间，老用户可投票（需超过 1/2 同意）`;
         try {
-            await supabaseClient.from('messages').insert([{
+            await callServerAction(null, 'send-message', {
+                session: dmSession(),
                 room_code: roomCode,
-                sender: 'system',
                 content: sysMsg,
-                media_url: null,
-                media_type: 'system_join_request:' + data.id   // 用 media_type 编码 request id，便于渲染投票 UI
-            }]);
+                media_type: 'system_join_request:' + data.id,
+                system: true
+            });
         } catch (e) { console.warn('[join] broadcast message failed:', e); }
         // ====== 触发站外通知（新用户申请加入）======
         try {
@@ -2177,15 +2181,15 @@
                 await supabaseClient.from('room_members')
                     .upsert([{ room_code: req.room_code, user_name: req.user_name }],
                         { onConflict: 'room_code,user_name' });
-                // 广播系统消息
+                // 广播系统消息（2b-2：走 send-message + system 标志，不再 anon 直写）
                 try {
-                    await supabaseClient.from('messages').insert([{
+                    await callServerAction(null, 'send-message', {
+                        session: dmSession(),
                         room_code: req.room_code,
-                        sender: 'system',
                         content: `✅ ${req.user_name} 已通过审批加入房间`,
-                        media_url: null,
-                        media_type: 'system_join_approved:' + requestId
-                    }]);
+                        media_type: 'system_join_approved:' + requestId,
+                        system: true
+                    });
                 } catch (e) { console.warn('[join] approval broadcast failed:', e); }
             }
         } catch (e) {
@@ -5805,6 +5809,9 @@
     let adminRoomsCache = [];
     let adminUsersCache = [];
     let adminLoading = false;
+    // P1b 硬前置：admin 敏感操作（list/delete users）改走 verify-auth，密码只存内存。
+    // openAdminPanel 每次强制重登、页面刷新即丢，不落 sessionStorage/localStorage。
+    let adminPasswordMemory = '';
 
     function adminEsc(s) {
         return String(s == null ? '' : s)
@@ -5832,6 +5839,7 @@
         document.getElementById('settings-modal').style.display = 'none';
         // 每次打开都强制重新输密码（不信任任何缓存）
         sessionStorage.removeItem('harry_admin_ok');
+        adminPasswordMemory = '';
         const modal = document.getElementById('admin-modal');
         modal.classList.add('show');
         document.getElementById('admin-login-view').style.display = 'flex';
@@ -5843,6 +5851,7 @@
 
     window.closeAdminPanel = function() {
         document.getElementById('admin-modal').classList.remove('show');
+        adminPasswordMemory = ''; // 面板一关密码即丢，重开必须重登
     };
 
     window.adminTryLogin = async function() {
@@ -5852,6 +5861,7 @@
         btn.disabled = true;
         try {
             await callServerAction(null, 'admin-login', { password: pwd });
+            adminPasswordMemory = pwd; // 仅内存，供本次 admin 会话内 admin-list-users / admin-delete-user 复用
             sessionStorage.setItem('harry_admin_ok', '1');
             err.style.display = 'none';
             document.getElementById('admin-login-view').style.display = 'none';
@@ -5867,6 +5877,7 @@
 
     window.adminLogout = function() {
         sessionStorage.removeItem('harry_admin_ok');
+        adminPasswordMemory = '';
         window.closeAdminPanel();
         showToast('已退出后台管理', 'info', 1500);
     };
@@ -6019,8 +6030,8 @@
             });
     };
 
-    /** 删除用户（两步确认，级联删登录日志 + 成员记录 + 消息） */
-    window.adminDeleteUser = function(btn) {
+    /** 删除用户（两步确认，服务端级联删登录日志 + 成员记录 + 消息 + 会话 + 账号） */
+    window.adminDeleteUser = async function(btn) {
         if (btn.dataset.armed !== '1') {
             btn.dataset.armed = '1';
             btn.textContent = '确认删除?';
@@ -6031,25 +6042,21 @@
         }
         const user = btn.dataset.username;
         btn.disabled = true; btn.textContent = '删除中…';
-        // 级联删除：登录日志 + 房间成员 + 用户消息 + 用户记录
-        Promise.all([
-            supabaseClient.from('login_logs').delete().eq('username', user),
-            supabaseClient.from('room_members').delete().eq('user_name', user),
-            supabaseClient.from('messages').delete().eq('sender', user)
-        ]).then(() =>
-            supabaseClient.from('users').delete().eq('username', user)
-        ).then(({ error }) => {
-            if (error) {
-                showToast('删除失败：' + (error.message || ''), 'error');
-                btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
-                return;
-            }
+        // P1b 硬前置：级联删除收进 verify-auth `admin-delete-user`（服务端顺序删日志→成员→消息→会话→账号），
+        // 前端不再 anon 直删任何表；users 表即将对 anon 禁读（docs/P1b-users禁读迁移.sql）。
+        let adminPassword = adminPasswordMemory;
+        if (!adminPassword) {
+            adminPassword = prompt('管理密码已过期，请重新输入以确认删除：');
+            if (!adminPassword) { btn.disabled = false; btn.textContent = '删除'; return; }
+        }
+        try {
+            await callServerAction(null, 'admin-delete-user', { adminPassword, username: user });
             showToast(`用户 ${user} 已删除`, 'success');
             window.adminRenderUsers();
-        }).catch(e => {
+        } catch (e) {
             showToast('删除失败：' + (e.message || e), 'error');
             btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
-        });
+        }
     };
 
     /** 消息浏览：选房间 + 搜索 + 分页 + 批量勾选删除 */
@@ -6180,9 +6187,14 @@
     async function adminRenderUsers() {
         const body = document.getElementById('admin-tab-body');
         try {
-            const { data: users, error } = await supabaseClient.from('users').select('username,avatar_url,created_at').order('created_at', { ascending: true });
-            if (error) throw error;
-            const rows = users || [];
+            // P1b 硬前置：改走 verify-auth `admin-list-users`，服务端只回公开三字段，password 列永不出函数
+            let adminPassword = adminPasswordMemory;
+            if (!adminPassword) {
+                adminPassword = prompt('管理密码已过期，请重新输入：');
+                if (!adminPassword) { body.innerHTML = '<div class="admin-empty">已取消</div>'; return; }
+            }
+            const resp = await callServerAction(null, 'admin-list-users', { adminPassword });
+            const rows = (resp && resp.users) || [];
             adminUsersCache = rows;
             if (!rows.length) { body.innerHTML = '<div class="admin-empty">暂无注册用户</div>'; return; }
             // 聚合最近登录时间和登录次数
