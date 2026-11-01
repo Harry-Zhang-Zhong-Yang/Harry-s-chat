@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.10";
+    const CHAT_APP_VERSION = "3.7.11";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -749,12 +749,14 @@
         try {
             const { data: mems } = await supabaseClient.from('room_members').select('user_name').eq('room_code', room);
             const have = new Set((mems || []).map(r => r.user_name));
-            const toAdd = personas.filter(p => !have.has(p.name)).map(p => ({
-                room_code: room, user_name: p.name, member_type: 'ai', persona_id: p.id
-            }));
-            if (toAdd.length) {
-                const { error: addErr } = await supabaseClient.from('room_members').insert(toAdd);
-                if (addErr) console.warn('[圆桌] 拉人失败:', addErr.message);
+            const personaIds = personas.filter(p => !have.has(p.name)).map(p => p.id);
+            if (personaIds.length) {
+                // 2b-3 收紧批次：批量拉 AI 走服务端（四验逐个过，member_type 服务端写死）
+                try {
+                    await callServerAction(null, 'add-ai-members', { session: dmSession(), room_code: room, persona_ids: personaIds });
+                } catch (addE) {
+                    console.warn('[圆桌] 拉人失败:', addE.message || addE);
+                }
             }
             const mentions = personas.map(p => '@' + p.name).join(' ');
             const content = `${mentions}\n\n【圆桌议题】${topic}`;
@@ -864,19 +866,13 @@
             const { data: mems } = await supabaseClient
                 .from('room_members').select('user_name').eq('room_code', roomCode);
             const have = new Set((mems || []).map(r => r.user_name));
-            const toAdd = [];
-            if (!have.has(me)) toAdd.push({ room_code: roomCode, user_name: me, member_type: 'human' });
-            if (!have.has(otherName)) {
-                toAdd.push({
-                    room_code: roomCode,
-                    user_name: otherName,
-                    member_type: personaId ? 'ai' : 'human',
-                    persona_id: personaId || null
-                });
-            }
-            if (toAdd.length) {
-                const { error: insErr } = await supabaseClient.from('room_members').insert(toAdd);
-                if (insErr) console.warn('[私信] 成员写入失败:', insErr.message);
+            if (!have.has(me) || !have.has(otherName)) {
+                // 2b-3 收紧批次：私信成员走服务端（房名编码验证参与者，AI 对方验 enabled）
+                try {
+                    await callServerAction(null, 'ensure-dm-members', { session: dmSession(), room_code: roomCode });
+                } catch (insE) {
+                    console.warn('[私信] 成员写入失败:', insE.message || insE);
+                }
             }
         } catch (e) {
             console.warn('[私信] 创建会话失败:', e?.message || e);
@@ -1999,19 +1995,12 @@
      */
     async function ensureMembership(roomCode, userName) {
         try {
-            const { error } = await supabaseClient
-                .from('room_members')
-                .upsert([{ room_code: roomCode, user_name: userName }],
-                    { onConflict: 'room_code,user_name' });
-            if (error) {
-                console.error('[members] upsert failed:', error);
-                showToast('成员写入失败：' + (error.message || error.code || ''), 'error', 3500);
-                return false;
-            }
+            // 2b-3 收紧批次（2026-11-02）：room_members anon 写策略即将 drop，写自己走服务端
+            await callServerAction(null, 'ensure-room-membership', { session: dmSession(), room_code: roomCode });
             return true;
         } catch (e) {
-            console.error('[members] upsert error:', e);
-            showToast('成员写入失败，请检查网络', 'error', 3000);
+            console.error('[members] ensure failed:', e);
+            showToast('成员写入失败：' + (e.message || ''), 'error', 3500);
             return false;
         }
     }
@@ -2116,27 +2105,27 @@
         };
     }
 
-    /** 申请人提交申请 → 写入 join_requests 并发系统消息 */
+    /** 申请人提交申请 → 走 verify-auth submit-join-request（session 绑定防代投）并发系统消息 */
     async function submitJoinRequest(roomCode, userName) {
         // 防止重复：先查 latest
         const existing = await getLatestJoinRequest(roomCode, userName);
         if (existing && existing.status === 'pending') {
             return { ok: false, reason: 'already_pending', requestId: existing.id };
         }
-        // 如果之前被拒过或已批准，则覆盖为新的一条 pending
-        const { data, error } = await supabaseClient
-            .from('join_requests')
-            .insert([{ room_code: roomCode, user_name: userName, status: 'pending' }])
-            .select()
-            .single();
-        if (error) {
-            console.warn('[join] insert error:', error);
-            // 如果触发器报「已有进行中」也算已有
-            if (error.code === 'P0001' || (error.message || '').includes('进行中')) {
+        // 2b-3 收紧批次：join_requests anon 直插已废，走服务端（requester 服务端绑定 session）
+        let requestId = null;
+        try {
+            const resp = await callServerAction(null, 'submit-join-request', {
+                session: dmSession(), room_code: roomCode
+            });
+            requestId = resp.request_id || null;
+            if (resp.existed) {
                 const cur = await getLatestJoinRequest(roomCode, userName);
                 if (cur && cur.status === 'pending') return { ok: true, requestId: cur.id };
             }
-            return { ok: false, reason: 'db_error', message: error.message };
+        } catch (e) {
+            console.warn('[join] submit error:', e);
+            return { ok: false, reason: 'db_error', message: e.message };
         }
         // 系统消息：广播给现有成员（写入 messages 表，所有订阅者都会收到）
         // 2b-2：system 广播走 send-message + system 标志（真人登录态发起，sender=system 服务端定）
@@ -2146,7 +2135,7 @@
                 session: dmSession(),
                 room_code: roomCode,
                 content: sysMsg,
-                media_type: 'system_join_request:' + data.id,
+                media_type: 'system_join_request:' + requestId,
                 system: true
             });
         } catch (e) { console.warn('[join] broadcast message failed:', e); }
@@ -2155,27 +2144,30 @@
             window.triggerExternalNotify('join_request', {
                 room_code: roomCode,
                 sender: userName,
-                request_id: data.id,
+                request_id: requestId,
             });
         } catch (eJ) { console.warn('[extn] join_request trigger error:', eJ); }
-        return { ok: true, requestId: data.id };
+        return { ok: true, requestId: requestId };
     }
 
-    /** 老用户投票：写入 join_votes（已投过则覆盖原票） */
+    /** 老用户投票：走 verify-auth cast-vote（voter 服务端绑定 session 防代投） */
     async function castJoinVote(requestId, voter, vote) {
         if (vote !== 'approve' && vote !== 'reject') return { ok: false };
-        const { error } = await supabaseClient
-            .from('join_votes')
-            .upsert([{ request_id: requestId, voter: voter, vote: vote, voted_at: new Date().toISOString() }],
-                { onConflict: 'request_id,voter' });
-        if (error) { console.warn('[vote] insert error:', error); return { ok: false, message: error.message }; }
-        // 投票后立即评估是否够阈值
-        await evaluateAndResolveRequest(requestId);
-        return { ok: true };
+        try {
+            const resp = await callServerAction(null, 'cast-vote', {
+                session: dmSession(), room_code: currentRoomCode, request_id: requestId, vote: vote
+            });
+            // 投票后立即评估是否够阈值（达标后 evaluate 会调 approve-join 服务端落库）
+            await evaluateAndResolveRequest(requestId);
+            return { ok: true, counts: resp };
+        } catch (e) {
+            console.warn('[vote] error:', e);
+            return { ok: false, message: e.message };
+        }
     }
 
     /**
-     * 评估某条申请：阈值达成则批准、自动入群、广播系统消息
+     * 评估某条申请：阈值达成则调 verify-auth approve-join（服务端复算票数+落库，防代投）
      */
     async function evaluateAndResolveRequest(requestId) {
         try {
@@ -2194,14 +2186,17 @@
             const approveCount = votes.filter(v => v.vote === 'approve').length;
             const needed = votesNeeded(totalMembers);
             if (approveCount >= needed) {
-                // 标记 approved
-                await supabaseClient.from('join_requests')
-                    .update({ status: 'approved', resolved_at: new Date().toISOString() })
-                    .eq('id', requestId);
-                // 写入 room_members（如果尚未存在）
-                await supabaseClient.from('room_members')
-                    .upsert([{ room_code: req.room_code, user_name: req.user_name }],
-                        { onConflict: 'room_code,user_name' });
+                // 2b-3 收紧批次：approved 标记 + 申请人成员行由服务端一次完成（票数服务端复算）
+                try {
+                    await callServerAction(null, 'approve-join', {
+                        session: dmSession(),
+                        room_code: req.room_code,
+                        request_id: requestId
+                    });
+                } catch (eA) {
+                    console.warn('[join] approve-join failed:', eA.message || eA);
+                    return; // 服务端没落库就不广播，避免假消息
+                }
                 // 广播系统消息（2b-2：走 send-message + system 标志，不再 anon 直写）
                 try {
                     await callServerAction(null, 'send-message', {
@@ -5981,16 +5976,22 @@
         }
         const code = btn.dataset.code, user = btn.dataset.user;
         btn.disabled = true; btn.textContent = '踢出中…';
-        supabaseClient.from('room_members').delete().eq('room_code', code).eq('user_name', user)
-            .then(({ error }) => {
-                if (error) {
-                    showToast('踢出失败：' + (error.message || ''), 'error');
-                    btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '踢出';
-                    return;
+        // 2b-3 收紧批次：踢人走服务端 admin-remove-member（anon DELETE 策略即将 drop）
+        (async () => {
+            try {
+                let adminPassword = adminPasswordMemory;
+                if (!adminPassword) {
+                    adminPassword = prompt('管理密码已过期，请重新输入：');
+                    if (!adminPassword) { btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '踢出'; return; }
                 }
+                await callServerAction(null, 'admin-remove-member', { adminPassword, room_code: code, user_name: user });
                 showToast(`已将 ${user} 移出房间 ${code}`, 'success');
                 window.adminOpenRoomMembers(code);
-            });
+            } catch (e) {
+                showToast('踢出失败：' + (e.message || e), 'error');
+                btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '踢出';
+            }
+        })();
     };
 
     /** 删除房间（两步确认，级联删消息和成员） */
