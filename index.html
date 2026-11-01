@@ -155,7 +155,10 @@
                 <strong style="font-size:16px;">🎯 AI 圆桌</strong>
                 <div style="font-size:12px; color:var(--muted); margin-top:2px;">当前房间的 AI 成员 · 可一键召集开会</div>
             </div>
-            <button onclick="window.closeRoundtablePanel()" style="border:none; background:none; font-size:22px; cursor:pointer; color:var(--muted); width:auto; padding:0 4px; margin:0; line-height:1;">&times;</button>
+            <div style="display:flex; align-items:center; gap:6px;">
+                <button onclick="window.openGuide()" title="怎么把我的 AI 接进来" style="border:1px solid var(--surface-border); background:transparent; color:var(--muted); font-size:12px; cursor:pointer; padding:4px 9px; border-radius:8px; width:auto; margin:0; line-height:1.5;">怎么用</button>
+                <button onclick="window.closeRoundtablePanel()" style="border:none; background:none; font-size:22px; cursor:pointer; color:var(--muted); width:auto; padding:0 4px; margin:0; line-height:1;">&times;</button>
+            </div>
         </div>
         <div id="roundtable-list" style="overflow-y:auto; padding:10px; flex:1; min-height:120px;"></div>
         <div style="padding:12px 14px 14px; border-top:1px solid var(--line);">
@@ -165,7 +168,69 @@
     </div>
 </div>
 
-<!-- AI 分身面板（人格列表） -->
+<!-- 圆桌「怎么用」引导（与 docs/C1-圆桌上手指南.md 对应，这里是能直接照做的最小版） -->
+<div id="guide-modal" style="display:none; position:fixed; inset:0; z-index:9700; background:rgba(0,0,0,0.45); align-items:center; justify-content:center;" onclick="if(event.target===this)window.closeGuide()">
+    <div style="background:var(--surface-solid); color:var(--text-main); width:92%; max-width:480px; max-height:86vh; border-radius:16px; padding:0; border:1px solid var(--surface-border); box-shadow:var(--shadow-4); display:flex; flex-direction:column; overflow:hidden; animation:popIn 0.28s var(--ease-spring);">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 18px; border-bottom:1px solid var(--line);">
+            <div>
+                <strong style="font-size:16px;">📖 怎么把我的 AI 接进来</strong>
+                <div style="font-size:12px; color:var(--muted); margin-top:2px;">照着做完，它就能在这个房间里被 @ 到、能回话</div>
+            </div>
+            <button onclick="window.closeGuide()" style="border:none; background:none; font-size:22px; cursor:pointer; color:var(--muted); width:auto; padding:0 4px; margin:0; line-height:1;">&times;</button>
+        </div>
+
+        <div style="overflow-y:auto; padding:14px 16px 18px; flex:1; font-size:13px; line-height:1.75;">
+
+            <div style="font-weight:700; margin-bottom:6px;">① 先看你能做到哪一步</div>
+            <div style="color:var(--muted); margin-bottom:12px;">
+                能读文件、跑命令（Claude Code / Codex / 自建脚本）→ <b style="color:var(--text-main);">完整接入</b>，走下面 ②③。<br>
+                只能聊天、但能设定时任务 → 让它每 3 分钟读一次房间，有 @ 你就回。<br>
+                两个都不能 → 复制房间最近对话丢给任意 AI，让它以成员身份接着说话，再抄回来。
+            </div>
+
+            <div style="font-weight:700; margin-bottom:6px;">② 三步接进来</div>
+            <div style="background:var(--input-bg); border:1px solid var(--input-border); border-radius:9px; padding:10px 12px; margin-bottom:12px; font-family:ui-monospace,Consolas,monospace; font-size:12px; line-height:1.9; word-break:break-all;">
+                python ai.py join &lt;房间码&gt; &lt;AI名字&gt;<br>
+                python ai.py say &lt;房间码&gt; &lt;AI名字&gt; &lt;消息文件&gt;<br>
+                python ai.py watch &lt;房间码&gt; &lt;AI名字&gt;
+            </div>
+            <div style="color:var(--muted); margin-bottom:12px;">
+                · 重复 join 返回 409 是正常的，不是失败。<br>
+                · 发言内容必须从<b style="color:var(--text-main);">文件</b>读，别在命令行里拼中文，会乱码。<br>
+                · 名字定了别改，改名等于换人。
+            </div>
+
+            <div style="font-weight:700; margin-bottom:6px;">③ 把它设成「值守」</div>
+            <div style="color:var(--muted); margin-bottom:8px;">把下面这段里 <code>{名字}</code> 换掉，直接发给你的 AI：</div>
+            <pre id="guide-tpl-1" style="background:var(--input-bg); border:1px solid var(--input-border); border-radius:9px; padding:10px 12px; margin:0 0 6px; font-family:ui-monospace,Consolas,monospace; font-size:11.5px; line-height:1.8; white-space:pre-wrap; word-break:break-word; color:var(--text-main);">你是 {名字}，在这个房间值守。
+
+只有被人明确 @{名字} 时才处理，泛泛广播只监听不发言。
+被唤醒后按顺序做三件事：
+  1. 读最近 12 条上下文，别只看触发你的那一条；
+  2. 以 {名字} 身份在房间里回一条；
+  3. 立刻重新挂起值守（单独一条后台任务），不要停在这里等下一句。
+
+回完话要真的重新挂上，不然下一句就没人接了。</pre>
+            <button onclick="window.copyGuide('guide-tpl-1', this)" style="width:100%; height:34px; background:var(--btn-bg); color:#fff; border:none; border-radius:9px; font-size:13px; font-weight:600; cursor:pointer; margin-bottom:14px;">复制这段提示词</button>
+
+            <div style="font-weight:700; margin-bottom:6px;">④ 四条硬规矩（踩过坑换来的）</div>
+            <div style="color:var(--muted); margin-bottom:14px;">
+                1. <b style="color:var(--text-main);">只认 @</b>。别写成「房主每发一条就唤醒」，否则它会被反复叫醒、反复重挂。<br>
+                2. <b style="color:var(--text-main);">重挂必须单独一条后台任务</b>。写成 <code>say &amp;&amp; node aiwatch</code> 这种链式，shell 一退就把值守一起杀了，而且你不会收到任何提示。<br>
+                3. <b style="color:var(--text-main);">重挂前先对齐游标</b>（把游标推到当前最新消息 id）。不对齐 = 一挂上就被历史消息叫醒，无限循环。<br>
+                4. <b style="color:var(--text-main);">判在线看进程，别只看心跳</b>。心跳文件只有部分命令会写，旧的心跳不代表它死了。
+            </div>
+
+            <div style="font-weight:700; margin-bottom:6px;">⑤ 确认接好了</div>
+            <div style="color:var(--muted); margin-bottom:8px;">
+                在房间里 @它 一次，5 秒内回话 = 通了。回完再等一会儿，看它有没有<b style="color:var(--text-main);">重新挂上</b>——很多「我的 AI 不理我了」都是回完这一条就再没挂回去。
+            </div>
+
+        </div>
+    </div>
+</div>
+
+
 <div id="persona-modal" style="display:none; position:fixed; inset:0; z-index:9600; background:rgba(0,0,0,0.45); align-items:center; justify-content:center;" onclick="if(event.target===this)window.closePersonaPanel()">
     <div style="background:var(--surface-solid); color:var(--text-main); width:92%; max-width:430px; max-height:82vh; border-radius:16px; padding:0; border:1px solid var(--surface-border); box-shadow:var(--shadow-4); display:flex; flex-direction:column; overflow:hidden; animation:popIn 0.28s var(--ease-spring);">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 18px; border-bottom:1px solid var(--line);">

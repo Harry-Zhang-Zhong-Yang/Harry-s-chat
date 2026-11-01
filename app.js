@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.2";
+    const CHAT_APP_VERSION = "3.7.3";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -616,6 +616,53 @@
     window.closeRoundtablePanel = function() {
         const m = document.getElementById('roundtable-modal');
         if (m) m.style.display = 'none';
+    };
+
+    /* ------------------------- 圆桌「怎么用」引导 -------------------------
+     * 内容对应 docs/C1-圆桌上手指南.md 的最小可执行版。
+     * 刻意做成弹层而不是新页面：不新增路由、不引第三方库，离线也能看。
+     */
+    window.openGuide = function() {
+        const m = document.getElementById('guide-modal');
+        if (!m) return;
+        m.style.display = 'flex';
+        const body = m.querySelector('div > div:nth-child(2)');
+        if (body) body.scrollTop = 0;
+    };
+
+    window.closeGuide = function() {
+        const m = document.getElementById('guide-modal');
+        if (m) m.style.display = 'none';
+    };
+
+    /** 复制模板。失败时降级为选中文本，别让用户面对一个没反应的按钮 */
+    window.copyGuide = function(id, btn) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const text = el.textContent || '';
+        const done = () => {
+            if (!btn) return;
+            const old = btn.textContent;
+            btn.textContent = '已复制 ✓';
+            setTimeout(() => { btn.textContent = old; }, 1600);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done).catch(() => {
+                const r = document.createRange();
+                r.selectNodeContents(el);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(r);
+                if (btn) btn.textContent = '请按 Ctrl+C 复制';
+            });
+        } else {
+            const r = document.createRange();
+            r.selectNodeContents(el);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(r);
+            if (btn) btn.textContent = '请按 Ctrl+C 复制';
+        }
     };
 
     /** 一键召集：确保所有人格是本房间成员，再发一条 @全员 的议题，让 daemon 逐个发言 */
