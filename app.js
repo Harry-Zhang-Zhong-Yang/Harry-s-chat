@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.8";
+    const CHAT_APP_VERSION = "3.7.9";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -678,6 +678,7 @@
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${last ? '最近：' + escapeHtml(String(last.content || '').replace(/\n/g, ' ').slice(0, 28)) : '还没有发言'}</div>
                 </div>
                 <button onclick="window.quickAtAi('${String(p.name || '').replace(/'/g, "\\'")}')" style="flex:0 0 auto;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--text-main);font-size:11.5px;cursor:pointer;">@</button>
+                <button onclick="window.addPersonaToRoom('${escapeHtml(p.id)}')" style="flex:0 0 auto;padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:transparent;color:var(--btn-color);font-size:11.5px;cursor:pointer;margin-left:6px;">＋进群</button>
             </div>`;
         }).join('');
     };
@@ -983,6 +984,28 @@
         input.value = cur && !cur.endsWith(' ') ? cur + ' ' + token : cur + token;
         input.focus();
         try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
+    };
+
+    /** 把某个人格拉进当前房间（B4 ④「拉 AI 进群」；persona_id 绑定 room_members，存在性校验在下方） */
+    window.addPersonaToRoom = async function(personaId) {
+        const me = getLoggedInUser();
+        const room = currentRoomCode;
+        if (!me || !room) { showToast('请先登录并进入一个房间', 'error'); return; }
+        const p = (aiPersonasCache || []).find(x => x.id === personaId);
+        if (!p) { showToast('人格不存在或已停用', 'error'); return; }
+        try {
+            const { data: mems } = await supabaseClient.from('room_members').select('user_name').eq('room_code', room);
+            const have = new Set((mems || []).map(r => r.user_name));
+            if (have.has(p.name)) { showToast(p.name + ' 已在本房间', 'info'); return; }
+            const { error } = await supabaseClient.from('room_members').insert([
+                { room_code: room, user_name: p.name, member_type: 'ai', persona_id: p.id }
+            ]);
+            if (error) throw error;
+            renderAiMembersBar();
+            showToast('已把 ' + p.name + ' 拉进本房间', 'success');
+        } catch (e) {
+            showToast('拉人失败：' + (e.message || ''), 'error');
+        }
     };
 
     window.openJoinRoomModal = function() {
@@ -6016,18 +6039,23 @@
         }
         const id = btn.dataset.id;
         btn.disabled = true; btn.textContent = '删除中…';
-        supabaseClient.from('messages').delete().eq('id', id)
-            .then(({ error }) => {
-                if (error) {
-                    showToast('删除失败：' + (error.message || ''), 'error');
-                    btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
-                    return;
+        // P1b 附带修复：anon DELETE 策略已封死，删消息改走 verify-auth admin-delete-message
+        (async () => {
+            try {
+                let adminPassword = adminPasswordMemory;
+                if (!adminPassword) {
+                    adminPassword = prompt('管理密码已过期，请重新输入：');
+                    if (!adminPassword) { btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除'; return; }
                 }
+                await callServerAction(null, 'admin-delete-message', { adminPassword, id: Number(id) });
                 showToast('消息已删除', 'success');
-                // 从列表移除
                 const item = btn.closest('.admin-msg-item');
                 if (item) item.remove();
-            });
+            } catch (e) {
+                showToast('删除失败：' + (e.message || e), 'error');
+                btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
+            }
+        })();
     };
 
     /** 删除用户（两步确认，服务端级联删登录日志 + 成员记录 + 消息 + 会话 + 账号） */
