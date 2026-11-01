@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.9";
+    const CHAT_APP_VERSION = "3.7.10";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -986,7 +986,7 @@
         try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
     };
 
-    /** 把某个人格拉进当前房间（B4 ④「拉 AI 进群」；persona_id 绑定 room_members，存在性校验在下方） */
+    /** 把某个人格拉进当前房间（B4 ④「拉 AI 进群」；2b-3 后走 verify-auth，anon 直插已废） */
     window.addPersonaToRoom = async function(personaId) {
         const me = getLoggedInUser();
         const room = currentRoomCode;
@@ -997,10 +997,8 @@
             const { data: mems } = await supabaseClient.from('room_members').select('user_name').eq('room_code', room);
             const have = new Set((mems || []).map(r => r.user_name));
             if (have.has(p.name)) { showToast(p.name + ' 已在本房间', 'info'); return; }
-            const { error } = await supabaseClient.from('room_members').insert([
-                { room_code: room, user_name: p.name, member_type: 'ai', persona_id: p.id }
-            ]);
-            if (error) throw error;
+            // 服务端四验（成员身份/persona enabled/防重复），member_type 服务端写死
+            await callServerAction(null, 'add-ai-member', { session: dmSession(), room_code: room, persona_id: personaId });
             renderAiMembersBar();
             showToast('已把 ' + p.name + ' 拉进本房间', 'success');
         } catch (e) {
@@ -6007,24 +6005,24 @@
         }
         const code = btn.dataset.code;
         btn.disabled = true; btn.textContent = '删除中…';
-        // 级联删除：先删消息、再删成员、最后删房间
-        Promise.all([
-            supabaseClient.from('messages').delete().eq('room_code', code),
-            supabaseClient.from('room_members').delete().eq('room_code', code)
-        ]).then(() =>
-            supabaseClient.from('rooms').delete().eq('room_code', code)
-        ).then(({ error }) => {
-            if (error) {
-                showToast('删除失败：' + (error.message || ''), 'error');
+        // deepseek #4 挑刺后改造（2026-11-01）：anon 级联直删已死（messages DELETE 被封），
+        // 且旧写法丢弃前两个结果只判 rooms 的 error → 假成功留孤儿消息。
+        // 现在走服务端 admin-delete-room（五表级联单通道），失败明确报"可能已部分删除"。
+        (async () => {
+            try {
+                let adminPassword = adminPasswordMemory;
+                if (!adminPassword) {
+                    adminPassword = prompt('管理密码已过期，请重新输入：');
+                    if (!adminPassword) { btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除'; return; }
+                }
+                await callServerAction(null, 'admin-delete-room', { adminPassword, room_code: code });
+                showToast(`房间 ${code} 已删除`, 'success');
+                window.adminRenderRooms();
+            } catch (e) {
+                showToast('删除失败（可能已部分删除，请重试或联系管理员）：' + (e.message || e), 'error', 4000);
                 btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
-                return;
             }
-            showToast(`房间 ${code} 已删除`, 'success');
-            window.adminRenderRooms();
-        }).catch(e => {
-            showToast('删除失败：' + (e.message || e), 'error');
-            btn.disabled = false; btn.dataset.armed = ''; btn.textContent = '删除';
-        });
+        })();
     };
 
     /** 删除单条消息（两步确认） */
