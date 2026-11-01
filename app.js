@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.3";
+    const CHAT_APP_VERSION = "3.7.6";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -282,6 +282,75 @@
     let sidebarRoomsData = []; // [{code, name, memberCount, latest, joinedAt}]
     /** 私信房间统一前缀 dm_。v3.7.2 起不再单独开面板，直接和普通房间混排在左侧列表里（微信式） */
     function isDmRoom(code) { return String(code || '').startsWith('dm_'); }
+
+    /* ---------------- 私信读通道（阶段 2a） ----------------
+     * 为什么私信不能直连：P1a 起 messages 的 dm 读对 anon 全封（含主人自己），
+     * 因为全站共用一把 anon key，数据库没法区分"你"和"别人"。
+     * 现在唯一的合法读法：带登录时发的 session 调 verify-auth 的 dm-history，
+     * 服务端用 service_role 取、并查 room_members 判成员。
+     * 公开房继续直连 anon（不花函数额度），只有 dm 房走这条路。
+     * 只读。写仍然直连 —— 阶段 2 没动写，那条挂在 A3 的账上。
+     */
+    function dmSession() { return localStorage.getItem('chat_dm_session') || ''; }
+
+    /* 设备标识：让"同一台设备重登"只换掉自己那条会话，不把手机/平板踢下线。
+     * 不做这个的话，多端会被当成同一端互相顶掉 —— 而且不报错，只是私信突然空了。 */
+    function deviceId() {
+        let id = localStorage.getItem('chat_device_id');
+        if (!id) {
+            id = 'dev_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+            localStorage.setItem('chat_device_id', id);
+        }
+        return id;
+    }
+
+    async function dmHistory(roomCode, opts) {
+        const o = opts || {};
+        const session = dmSession();
+        if (!session) throw new Error('私信需要重新登录后才能查看');
+        const payload = { session: session, room_code: roomCode, limit: o.limit || 20 };
+        if (Number.isFinite(o.cursor) && o.cursor > 0) payload.cursor = o.cursor; // 往更旧翻
+        if (Number.isFinite(o.since) && o.since > 0) payload.since = o.since;     // 轮询取增量
+        const r = await callServerAction(null, 'dm-history', payload);
+        return (r && r.messages) ? r.messages : [];
+    }
+
+    /* 私信空态：三种情况必须长得不一样，否则用户分不清"没消息 / 掉线 / 坏了"。
+     *  - no-session：没有登录凭证 → 给一个真的能点的"重新登录"（这是唯一他自己能修的）
+     *  - failed：有凭证但请求失败 → 给"重试"，并把真实原因显出来
+     *  - empty：一切正常，只是这个对话还没有消息
+     * 以前三种全落进"历史消息加载失败，请检查网络后重试"，用户只能干瞪眼，
+     * 而且第一反应会以为"你把我的记录弄没了"。 */
+    function renderDmEmptyState(el, kind, detail) {
+        if (!el) return;
+        const title = kind === 'no-session' ? '私信需要重新登录后才能查看'
+            : kind === 'failed' ? '私信没能加载出来'
+            : '这个对话还没有消息';
+        const desc = kind === 'no-session'
+            ? '私信内容现在只对本人可见，机器上需要一份登录凭证。<br>重新登录一下就好，记录一条都不会丢。'
+            : kind === 'failed'
+                ? '可能是登录状态过期了，也可能是网络问题。'
+                : '在下面说第一句话吧。';
+        const detailHtml = (kind === 'failed' && detail)
+            ? `<div style="font-size:12px;opacity:.7;margin-top:6px;word-break:break-all">${escapeHtml(detail)}</div>`
+            : '';
+        const button = kind === 'empty'
+            ? ''
+            : `<button type="button" onclick="window.__chatRelogin && window.__chatRelogin()"
+                    style="margin-top:14px;padding:9px 20px;border:0;border-radius:9px;cursor:pointer;background:var(--accent,#4f7cff);color:#fff;font-size:13px;">重新登录</button>`;
+        el.innerHTML = `<div class="welcome-card">
+            <div style="font-size:26px;line-height:1;margin-bottom:6px">${kind === 'empty' ? '💬' : '🔒'}</div>
+            <h3>${title}</h3>
+            <p>${desc}</p>
+            ${detailHtml}
+            ${button}
+        </div>`;
+    }
+
+    window.__chatRelogin = function () {
+        if (typeof window.showAuthOverlay === 'function') { window.showAuthOverlay(); return; }
+        location.reload();
+    };
     /** 私信房间代码是 dm_<字母序a>__<字母序b>，取出"对方"的名字用于列表显示 */
     function dmPeerOf(code) {
         const s = String(code || '');
@@ -2446,12 +2515,32 @@
                 messagesCache = [];
                 lastKnownMessageId = null; // 跨房间重置，避免新房间消息被误跳过
 
-                let { data: recentData, error } = await supabaseClient
-                    .from('messages')
-                    .select('id,room_code,sender,content,media_url,media_type,created_at')
-                    .eq('room_code', currentRoomCode)
-                    .order('created_at', { ascending: false })
-                    .limit(PAGE_SIZE);
+                let recentData, error;
+                if (isDmRoom(currentRoomCode)) {
+                    // 私信：anon 直连读不到（阶段 1 封的就是这一步），改走函数代理。
+                    // 没凭证就别发请求了：省一次往返，而且能明确告诉用户"是没登录，不是坏了"。
+                    if (!dmSession()) {
+                        recentData = null;
+                        error = new Error('私信需要重新登录后才能查看');
+                    } else {
+                        try {
+                            recentData = await dmHistory(currentRoomCode, { limit: PAGE_SIZE });
+                            error = null;
+                        } catch (e) {
+                            recentData = null;
+                            error = e;
+                        }
+                    }
+                } else {
+                    const res = await supabaseClient
+                        .from('messages')
+                        .select('id,room_code,sender,content,media_url,media_type,created_at')
+                        .eq('room_code', currentRoomCode)
+                        .order('created_at', { ascending: false })
+                        .limit(PAGE_SIZE);
+                    recentData = res.data;
+                    error = res.error;
+                }
 
                 // 等待期间用户已切到其他房间：丢弃本次结果，避免旧房间消息渲染进新房
                 if (continuationToken || currentRoomCode !== roomAtStart) {
@@ -2464,9 +2553,21 @@
                     throw error;
                 }
 
+                // 首屏拿到历史后，把轮询游标对齐到当前最新一条。
+                // 不这么做的话，第一次轮询会因为游标是 0 而把最旧的一批再拉一遍（虽然会被去重挡住，
+                // 但白花一次带宽，而且私信那边是要花函数额度的）。
+                pollCursorRoom = currentRoomCode;
+                pollCursorId = (recentData || []).reduce((m, r) => Math.max(m, Number(r.id) || 0), 0);
+                pollFailStreak = 0;
+                pollNextAt = 0;
+
                 if (!recentData || recentData.length === 0) {
                     console.warn('[chat] 未查询到任何消息，房间:', currentRoomCode);
                     if (!chatBox.children.length) {
+                        if (isDmRoom(currentRoomCode)) {
+                            // 私信的空态单独一套：这里是"确实没消息"，不是掉线
+                            renderDmEmptyState(chatBox, 'empty');
+                        } else {
                         chatBox.innerHTML = `
                             <div class="welcome-card">
                                 <div class="welcome-badge" style="background:${hashGradient(currentRoomCode || 'chat')}">${escapeHtml(String(currentRoomCode || '?').slice(0, 1).toUpperCase())}</div>
@@ -2479,6 +2580,7 @@
                                     <span class="welcome-tip">🎮 小游戏</span>
                                 </div>
                             </div>`;
+                        }
                     }
                     noMoreHistory = true;
                     isFetchingHistory = false;
@@ -2562,7 +2664,13 @@
             console.error("LoadHistory Error:", e);
             const errorBox = document.getElementById('chat-box');
             if (errorBox && !errorBox.children.length) {
-                errorBox.innerHTML = '<div style="padding:18px; text-align:center; color:var(--muted); font-size:13px;">历史消息加载失败，请检查网络后重试</div>';
+                if (isDmRoom(currentRoomCode)) {
+                    // 私信失败要分两种：没凭证（点一下重新登录就好）vs 真出错（等）。
+                    // 都显示"请检查网络"等于什么都没说。
+                    renderDmEmptyState(errorBox, dmSession() ? 'failed' : 'no-session', String((e && e.message) || ''));
+                } else {
+                    errorBox.innerHTML = '<div style="padding:18px; text-align:center; color:var(--muted); font-size:13px;">历史消息加载失败，请检查网络后重试</div>';
+                }
             }
         } finally {
             isFetchingHistory = false;
@@ -2786,24 +2894,73 @@
 
     }
 
+    /* 轮询（阶段 2a 一起改的三件事）
+     * ① 增量游标：以前每次都 order(created_at desc).limit(5)，切房/断线那几秒的消息会永久漏掉。
+     *    改成 gt('id', cursor) 往新取，id 单调不会漏；created_at 有同秒并列，不能当游标。
+     * ② 后台标签不轮询：document.visibilityState === 'hidden' 直接跳过。
+     * ③ 429 指数退避：连续失败 3 次退到 30 秒，成功一次立刻回常态。
+     *    不退避的话，被限流之后照旧死板地轮，会变成 429 风暴，越限越狠。
+     * 另外私信（dm_）改走函数代理，间隔放宽到 10 秒省函数额度；公开房仍是 5 秒直连。
+     */
+    let pollCursorId = 0;
+    let pollCursorRoom = '';
+    let pollFailStreak = 0;
+    let pollNextAt = 0;
+    let pollLastAt = 0;
+
+    function resetPollCursor() {
+        pollCursorId = 0;
+        pollCursorRoom = '';
+        pollFailStreak = 0;
+        pollNextAt = 0;
+    }
+
     function startPolling() {
         if (continuationToken) return;
         if (realtimePolling) return;
+        pollLastAt = 0;
         realtimePolling = setInterval(async () => {
             try {
                 if (continuationToken) return;
+                const now = Date.now();
+                if (now < pollNextAt) return;                                  // 退避中
+                if (document.visibilityState === 'hidden') return;             // 后台标签不轮
+                const isDm = isDmRoom(currentRoomCode);
+                if (isDm && now - pollLastAt < 10000) return;                  // 私信放宽到 10 秒
+                pollLastAt = now;
+
                 const roomAtStart = currentRoomCode;
-                const { data, error } = await supabaseClient
-                    .from('messages')
-                    .select('*')
-                    .eq('room_code', currentRoomCode)
-                    .order('created_at', { ascending: false })
-                    .limit(5);
-                if (error) return;
+                if (pollCursorRoom !== roomAtStart) { pollCursorId = 0; pollCursorRoom = roomAtStart; }
+
+                let data = null;
+                if (isDm) {
+                    // 没凭证就别轮了：每 10 秒抛一次错，除了刷控制台没有任何作用，
+                    // 还会把失败计数顶上去触发退避。重新登录后 loadHistory 会重走一遍。
+                    if (!dmSession()) return;
+                    data = await dmHistory(roomAtStart, { limit: 20, since: pollCursorId });
+                } else {
+                    let q = supabaseClient
+                        .from('messages')
+                        .select('*')
+                        .eq('room_code', roomAtStart)
+                        .order('id', { ascending: true })
+                        .limit(20);
+                    if (pollCursorId > 0) q = q.gt('id', pollCursorId);
+                    const res = await q;
+                    if (res.error) throw res.error;
+                    data = res.data;
+                }
+                // 走到这里说明这次调用成功了，退避立刻清零
+                pollFailStreak = 0;
+                pollNextAt = 0;
+
                 // 等待期间已切换房间：丢弃本次结果，避免旧房间消息串台
                 if (continuationToken || currentRoomCode !== roomAtStart) return;
                 if (data && data.length > 0) {
-                    for (const msg of data.reverse()) {
+                    // 私信返回的是倒序（新→旧），公开房现在是正序，统一成"从旧到新"再渲染
+                    if (isDm) data = data.slice().reverse();
+                    for (const msg of data) {
+                        if (Number(msg.id) > pollCursorId) pollCursorId = Number(msg.id);
                         const existing = document.querySelector(`.msg-wrapper[data-msg-id="${msg.id}"]`);
                         if (existing && (msg.is_recalled || msg.content === '[已撤回]')) {
                             const contentEl = existing.querySelector('.msg-content');
@@ -2837,7 +2994,15 @@
                     }
                     lastKnownMessageId = data[data.length - 1].id;
                 }
-            } catch (e) { /* ignore polling errors */ }
+            } catch (e) {
+                // 退避：连续失败 3 次 → 30 秒不轮询，成功一次（见上面的清零）立刻回常态。
+                // 不这么做的话，被 429 限流后仍然按 5 秒硬轮，只会越限越狠。
+                pollFailStreak += 1;
+                if (pollFailStreak >= 3) {
+                    pollNextAt = Date.now() + 30000;
+                    console.warn('[poll] 连续失败 ' + pollFailStreak + ' 次，退避 30 秒：', e && e.message ? e.message : e);
+                }
+            }
         }, 5000);
     }
 
@@ -2847,6 +3012,7 @@
             clearInterval(realtimePolling);
             realtimePolling = null;
         }
+        resetPollCursor();
     }
 
     function updateOnlineCount() {
@@ -3008,20 +3174,39 @@
     });
 
     // 上传单个媒体文件到 Supabase 存储桶，返回公开 URL
+    /* 上传前的本地校验。
+     * 为什么要有：桶里现在躺着一个 45MB 的安装包 —— 传完了才发现不合适，等于白花流量、
+     * 白占存储，而且它已经能被别人下载了。所以要在**选中文件的那一刻**就挡住。
+     * 规则跟服务端 media_rules.ts 的白名单同源，两边对不上就是 bug。 */
+    /* 上传体积上限：**全站只有这一个数字**。
+     * 以前这里有四个各说各的：validateUpload 10MB、图片入口 15MB、文件卡入口 50MB、语音 15MB，
+     * 结果"录一段 12MB 的语音"前端放行、桶拒绝，用户只看到一句"上传失败"，查不出原因。
+     * 改这里等于改全站；桶上的 File size limit 要同步改（桶是第二道闸）。 */
+    const UPLOAD_MAX_MB = 10;
+    const UPLOAD_MAX_BYTES = UPLOAD_MAX_MB * 1024 * 1024;
+    const UPLOAD_ALLOWED_EXT = new Set([
+        'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'bmp',
+        'mp3', 'm4a', 'wav', 'ogg', 'aac', 'amr', 'webm',
+        'mp4', 'mov',
+        'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'csv',
+    ]);
+
+    function validateUpload(file) {
+        if (!file) return '没有选中文件';
+        const ext = (String(file.name || '').split('.').pop() || '').toLowerCase();
+        if (!UPLOAD_ALLOWED_EXT.has(ext)) {
+            return `不支持 ${ext || '这种'} 格式。可发：图片 / 语音 / 视频 / pdf / office 文档 / txt`;
+        }
+        if (file.size > UPLOAD_MAX_BYTES) {
+            return `文件 ${(file.size / 1024 / 1024).toFixed(1)}MB 超过 ${UPLOAD_MAX_MB}MB 上限`;
+        }
+        return '';
+    }
+
     async function uploadMediaToStorage(file) {
-        const fileExt = (file.name.split('.').pop() || 'bin').toLowerCase();
-        const fileName = `media_${Math.random().toString(36).substring(2, 10)}.${fileExt}`;
-        const filePath = `chat_media/${fileName}`;
-        const { error } = await supabaseClient
-            .storage
-            .from('chat_media')
-            .upload(filePath, file);
-        if (error) throw error;
-        const { data: publicData } = await supabaseClient
-            .storage
-            .from('chat_media')
-            .getPublicUrl(filePath);
-        return publicData.publicUrl;
+        // 走服务端上传（media-upload）：桶的 anon insert 被 drop 之后直传会直接 RLS 报错。
+        const r = await uploadViaServer(file, currentRoomCode);
+        return r.url;
     }
 
     // 直接把单条媒体消息写入数据库（不依赖输入框/回复/全局 pendingMedia）
@@ -3090,6 +3275,7 @@
     }
 
     window.handleFileSelect = async function(event) {
+        if (mediaUploadBlocked()) { event.target.value = ''; return; }
         const fileList = event.target.files;
         if (!fileList || fileList.length === 0) return;
         const files = Array.from(fileList);
@@ -3120,8 +3306,8 @@
                     if (compressed && compressed.size > 100 && compressed.size < file.size) file = compressed;
                 } catch (e) { console.warn('image compression failed', e); }
             }
-            if (file.size > 15 * 1024 * 1024) {
-                showToast("文件太大啦！请选择小于15MB的文件。", 'error');
+            if (file.size > UPLOAD_MAX_BYTES) {
+                showToast(`文件太大啦！请选择小于${UPLOAD_MAX_MB}MB的文件。`, 'error');
                 event.target.value = '';
                 return;
             }
@@ -3177,8 +3363,8 @@
                     const compressed = await window.compressImageFile(file, 1100, 0.68);
                     if (compressed && compressed.size > 100 && compressed.size < file.size) uploadFile = compressed;
                 } catch (e) { /* 压缩失败用原图 */ }
-                if (uploadFile.size > 15 * 1024 * 1024) {
-                    showToast(`第 ${i + 1} 张超过 15MB，已跳过。`, 'error');
+                if (uploadFile.size > UPLOAD_MAX_BYTES) {
+                    showToast(`第 ${i + 1} 张超过 ${UPLOAD_MAX_MB}MB，已跳过。`, 'error');
                     failed++;
                     continue;
                 }
@@ -3203,35 +3389,24 @@
     };
 
     window.handleGenericFileSelect = async function(event) {
+        if (mediaUploadBlocked()) { event.target.value = ''; return; }
         const file = event.target.files[0];
         if (!file) return;
 
-        if (file.size > 50 * 1024 * 1024) {
-            return showToast("文件太大啦！请选择小于50MB的文件。", 'error');
-        }
-
+        // 体积/类型统一交给下面的 validateUpload 判 —— 这里原来还有一道"50MB"的预检，
+        // 和 validateUpload 的 10MB 打架：>50MB 报"小于50MB"，50MB 以下又报 10MB 上限。
         const tempId = 'uploading_' + Date.now();
+        // 先校验再插占位气泡：不合规的文件连"上传中"都不该出现，
+        // 否则用户以为在传，等半天弹一句失败。
+        const uploadErr = validateUpload(file);
+        if (uploadErr) { showToast(uploadErr, 'error', 4000); return; }
         const progressEl = appendUploadingPlaceholder(tempId, file.name, file.size);
 
         try {
-            const fileExt = file.name.split('.').pop();
-            const safeName = file.name.replace(/[^a-zA-Z0-9\u4e00-\u9fff._-]/g, '_');
-            const fileName = `file_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${safeName}`;
-            const filePath = `chat_media/${fileName}`;
 
-            const { data, error } = await supabaseClient
-                .storage
-                .from('chat_media')
-                .upload(filePath, file);
-
-            if (error) throw error;
-
-            const { data: publicData } = await supabaseClient
-                .storage
-                .from('chat_media')
-                .getPublicUrl(filePath);
-
-            const mediaUrl = publicData.publicUrl;
+            // 走服务端上传：桶的 anon insert 一旦 drop，直传就会 RLS 报错
+            const up = await uploadViaServer(file, currentRoomCode);
+            const mediaUrl = up.url;
 
             removeUploadingPlaceholder(tempId);
 
@@ -3346,6 +3521,225 @@
         return labelMap[ext] || ext.toUpperCase().slice(0, 4) || 'FILE';
     }
 
+    /* ---------------- 附件签名（桶转私有之后） ----------------
+     * 背景：chat_media 桶一旦设为私有，消息里存的 getPublicUrl 老地址直接打就是 403，
+     * 历史图片、语音、文件全挂。修法不是改历史数据里的地址，而是**渲染时**换成签名地址。
+     *
+     * 四条约束（Supervisor #1388 六）：
+     *   ① 按需签：只签这条消息里实际出现的，不预先全量签
+     *   ② 批量签：同一批渲染合并成一个 createSignedUrls 请求（50 张图 ≠ 50 次请求）
+     *   ③ 有效期 1 小时，别给 7 天（签名 URL 泄露的窗口太大）
+     *   ④ 签失败要有占位，不能让整条消息渲染不出来
+     *
+     * 为什么不改写入侧：写入侧一直是 getPublicUrl 拿到的规范地址兼"对象路径载体"，
+     * 桶私有之后它只是个坏链接，但字符串里的路径信息仍然是对的 —— 解析出来就能签。
+     */
+    const MEDIA_PUBLIC_MARK = '/storage/v1/object/public/chat_media/';
+    /* 附件功能总开关。
+     * 2026-11-01：chat_media 桶正在"关桶 + drop 掉 anon 四条策略"，这期间传上去也看不到，
+     * 所以先关入口 —— 传了看不到比不能传更糟（用户以为丢了）。
+     * 重新开放的顺序：建 media-sign/media-upload → 部署函数 → 把这里改回 true。
+     * 改回 true 之前，先确认桶的 anon select 已经 drop（否则等于没保护）。 */
+    const MEDIA_UPLOAD_ENABLED = false;
+
+    function mediaUploadBlocked() {
+        if (MEDIA_UPLOAD_ENABLED) return false;
+        showToast('图片/文件功能正在升级，暂时关闭。文字和语音不受影响。', 'error', 4000);
+        return true;
+    }
+
+    /** 上传走服务端**签发**：桶的 anon insert 被 drop 之后前端不能直传，
+     *  但让函数收 base64 也不划算（10MB 文件 → 13.3MB 请求体，函数还要解码一遍，
+     *  而且只有大文件才失败，这种 bug 最难复现）。
+     *  现在是两步：① 服务端验身份/扩展名/成员，签一个只锁这个 path 的一次性 token；
+     *           ② 前端拿 token 直传，文件内容不经过函数。 */
+    async function uploadViaServer(file, roomCode) {
+        const bad = validateUpload(file);
+        if (bad) throw new Error(bad);
+        const safeName = `file_${Date.now()}_${Math.random().toString(36).substring(2, 6)}_${String(file.name).replace(/[^a-zA-Z0-9\u4e00-\u9fff._-]/g, '_')}`;
+
+        const r = await callServerAction(null, 'media-upload', {
+            session: dmSession(),
+            room_code: roomCode,
+            filename: safeName,
+            size: file.size,
+        });
+        if (!r || !r.upload_url) throw new Error('上传通道暂时不可用，请稍后重试');
+
+        // upload_url 是服务端给**相对**路径：必须拼本站的 /storage/v1，
+        // 不能让它指向 supabase.co —— 国内直连打不开，反代就白做了。
+        // 也别加 x-upsert 之类的自定义头：会触发预检，而网关的白名单里没有它。
+        let put;
+        try {
+            put = await fetch(SUPABASE_URL + '/storage/v1' + r.upload_url, {
+                method: 'PUT',
+                headers: {
+                    apikey: SUPABASE_ANON_KEY,
+                    Authorization: 'Bearer ' + SUPABASE_ANON_KEY,
+                    'Content-Type': file.type || 'application/octet-stream',
+                },
+                body: file,
+            });
+        } catch (e) {
+            throw new Error('上传中断，请检查网络后重试');
+        }
+        if (!put.ok) {
+            const detail = await put.text().catch(function () { return ''; });
+            console.warn('[media] signed upload failed', put.status, String(detail).slice(0, 200));
+            if (put.status === 413) throw new Error(`文件超过 ${UPLOAD_MAX_MB}MB 上限，服务器拒绝了这次上传`);
+            if (put.status === 401 || put.status === 403) throw new Error('上传凭证已失效，请重新发送');
+            throw new Error('上传失败，请稍后重试');
+        }
+        // 服务端算出来的 path 和 storage 实际落盘的 Key 必须**完全一致**。
+        // 这道断言是给一个已经踩过的坑留的门闩：签发 URL 里 bucket 名少写一个，
+        // 对象会落到 <room>/<file>，签得出、传得上，但之后 media-sign 永远认不出来 ——
+        // 表现是"传上去了但永远看不见"，这种问题没有断言基本查不出来。
+        let key = '';
+        try {
+            const done = await put.json();
+            key = String((done && (done.Key || done.key)) || '');
+        } catch (e) { /* 个别后端不回 body，交给下面的空值分支 */ }
+        if (key !== r.path) {
+            console.error('[media] 路径不一致：服务端算出', r.path, '，storage 落盘', key || '(空)');
+            throw new Error('上传路径校验失败，请重试；一直失败请联系管理员');
+        }
+        return { url: r.url, path: r.path };
+    }
+
+    const MEDIA_SIGN_TTL_SEC = 900;   // 15 分钟，跟服务端 media_rules.ts 对齐；1 小时的窗口太大
+    const mediaSignCache = new Map();  // objectPath -> { url, expireAt }
+    const mediaSignQueue = new Map();  // objectPath -> Set<Element>
+    let mediaSignTimer = null;
+
+    function mediaPathOf(url) {
+        const s = String(url || '');
+        const i = s.indexOf(MEDIA_PUBLIC_MARK);
+        if (i < 0) return '';
+        // 返回**未解码**的对象路径：服务端要靠它跟 media_url 做后缀精确比对，
+        // 解码后的中文名对不上库里存的百分号编码形式。
+        return s.slice(i + MEDIA_PUBLIC_MARK.length).split('?')[0];
+    }
+
+    function markMediaFailed(el) {
+        try {
+            if (el.tagName === 'IMG') {
+                const ph = el.previousElementSibling;
+                if (ph && ph.classList && ph.classList.contains('msg-img-placeholder')) {
+                    ph.innerHTML = '图片加载失败<br><span style="font-size:11px">附件暂时无法访问，请稍后重试</span>';
+                    ph.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);font-size:13px;text-align:center;padding:10px;grid-area:1/1;width:100%;height:180px;border-radius:8px;background:var(--chip-bg);margin-top:5px;';
+                    el.remove();
+                    return;
+                }
+                el.classList.add('media-unavailable');
+                el.alt = '图片暂时无法访问';
+            } else if (el.hasAttribute && el.hasAttribute('data-audio-url')) {
+                el.disabled = true;
+                el.title = '语音暂时无法播放';
+            }
+        } catch (e) { /* 占位本身失败不影响其它消息 */ }
+    }
+
+    function applySigned(el, path, url) {
+        if (!el || el.dataset.mediaSigned === '1') return;
+        el.dataset.mediaSigned = '1';
+        el.dataset.mediaPath = path;
+        if (!url) { markMediaFailed(el); return; }
+        if (el.tagName === 'IMG') {
+            el.src = url;
+            // 403/失效兜底：15 分钟 TTL，页面开久了签名会过期。
+            // 只重签一次 —— 不限次数的话，一个坏对象会让它无限重试打接口。
+            if (!el.dataset.mediaRetryBound) {
+                el.dataset.mediaRetryBound = '1';
+                el.addEventListener('error', function onErr() {
+                    if (el.dataset.mediaRetried === '1') return;
+                    el.dataset.mediaRetried = '1';
+                    mediaSignCache.delete(path);
+                    el.dataset.mediaSigned = '0';
+                    wireMediaUrls(el.parentNode || el);
+                });
+            }
+        } else if (el.hasAttribute('data-audio-url')) el.setAttribute('data-audio-url', url);
+        else if (el.dataset) el.dataset.signedUrl = url;
+    }
+
+    function drainMediaQueue() {
+        mediaSignTimer = null;
+        const missing = [];
+        for (const path of mediaSignQueue.keys()) {
+            if (!mediaSignCache.has(path)) missing.push(path);
+        }
+        const finish = () => {
+            for (const [path, els] of mediaSignQueue) {
+                const hit = mediaSignCache.get(path);
+                const url = hit && hit.expireAt > Date.now() ? hit.url : '';
+                els.forEach((el) => applySigned(el, path, url));
+            }
+            mediaSignQueue.clear();
+        };
+        if (!missing.length) { finish(); return; }
+
+        // 走服务端签：客户端自己签等于没保护 —— 只要有 select 策略在，anon key 也能给任何对象签名
+        // （2026-11-01 实测：anon 直接 POST /object/sign/... 就拿到能裸下的地址）。
+        // 服务端会先核"这个对象真的属于这个房"，dm 房再核"你真是这个房的成员"。
+        const session = dmSession();
+        if (!session) {
+            missing.forEach((p) => mediaSignCache.set(p, { url: '', expireAt: Date.now() + 60_000 }));
+            finish();
+            return;
+        }
+        const items = missing.map((path) => ({ path, room_code: currentRoomCode }));
+        callServerAction(null, 'media-sign', { session, items })
+            .then((r) => {
+                const map = (r && r.urls) || {};
+                missing.forEach((p) => {
+                    const u = map[p];
+                    if (u) mediaSignCache.set(p, { url: u, expireAt: Date.now() + (MEDIA_SIGN_TTL_SEC - 60) * 1000 });
+                    else mediaSignCache.set(p, { url: '', expireAt: Date.now() + 60_000 });
+                });
+                finish();
+            })
+            .catch(() => {
+                missing.forEach((p) => mediaSignCache.set(p, { url: '', expireAt: Date.now() + 60_000 }));
+                finish();
+            });
+    }
+
+    /** 扫一条消息里的附件，把公有地址换成签名地址（批量、去重、带缓存） */
+    function wireMediaUrls(root) {
+        if (!root || !supabaseClient) return;
+        const targets = [];
+        root.querySelectorAll('img').forEach((el) => {
+            // data-media-path 优先：重签时 src 已经是签名地址，不再含公有标记，靠 src 会认不出来
+            if (el.dataset.mediaPath || mediaPathOf(el.getAttribute('src'))) targets.push(el);
+        });
+        root.querySelectorAll('[data-audio-url]').forEach((el) => {
+            if (mediaPathOf(el.getAttribute('data-audio-url'))) targets.push(el);
+        });
+        root.querySelectorAll('[data-file-url]').forEach((el) => {
+            if (mediaPathOf(el.getAttribute('data-file-url'))) targets.push(el);
+        });
+        if (!targets.length) return;
+
+        for (const el of targets) {
+            if (el.dataset.mediaSigned === '1') continue;
+            const raw = el.dataset.mediaPath
+                || (el.tagName === 'IMG' ? el.getAttribute('src')
+                    : (el.getAttribute('data-audio-url') || el.getAttribute('data-file-url')));
+            const path = el.dataset.mediaPath || mediaPathOf(raw);
+            if (!path) continue;
+            const hit = mediaSignCache.get(path);
+            if (hit && hit.expireAt > Date.now()) {
+                applySigned(el, path, hit.url);
+                continue;
+            }
+            if (!mediaSignQueue.has(path)) mediaSignQueue.set(path, new Set());
+            mediaSignQueue.get(path).add(el);
+        }
+        if (mediaSignQueue.size && !mediaSignTimer) {
+            mediaSignTimer = setTimeout(drainMediaQueue, 50);
+        }
+    }
+
     function fileMessageHtml(url, fileName, fileSize) {
         const icon = getFileIcon(fileName);
         const extLabel = getFileExtLabel(fileName);
@@ -3353,7 +3747,7 @@
         const displayName = fileName || '未知文件';
         const safeUrl = escapeHtml(url);
         const safeName = escapeHtml(displayName);
-        return `<div class="file-card" onclick="window.downloadFile('${safeUrl}', '${safeName}')" title="点击下载 ${safeName}">
+        return `<div class="file-card" data-file-url="${safeUrl}" data-file-name="${safeName}" onclick="window.downloadFileCard(this)" title="点击下载 ${safeName}">
             <div class="file-card-icon-wrap">
                 <span class="file-card-icon-emoji">${icon}</span>
                 <span class="file-card-ext-label">${escapeHtml(extLabel)}</span>
@@ -3374,6 +3768,31 @@
         if (window.matchMedia('(pointer: coarse)').matches && !/Tablet/i.test(navigator.userAgent || '')) return false;
         if (window.matchMedia('(max-width: 768px)').matches && !/Tablet/i.test(navigator.userAgent || '')) return false;
         return true;
+    };
+
+    /** 文件卡片点击：优先用已经签好的地址，没有就现场走服务端签一次再下。
+     *  桶私有之后 data-file-url 里的公有地址打不开，不能直接把老地址丢给 downloadFile；
+     *  也不能在客户端自己签（anon 能签 = 等于没保护）。 */
+    window.downloadFileCard = async function(el) {
+        if (!el) return;
+        let url = el.dataset.signedUrl || '';
+        if (!url) {
+            const path = mediaPathOf(el.dataset.fileUrl);
+            if (path) {
+                try {
+                    const r = await callServerAction(null, 'media-sign', {
+                        session: dmSession(),
+                        items: [{ path: path, room_code: currentRoomCode }],
+                    });
+                    url = (r && r.urls && r.urls[path]) || '';
+                    if (url) mediaSignCache.set(path, { url, expireAt: Date.now() + (MEDIA_SIGN_TTL_SEC - 60) * 1000 });
+                } catch (e) { /* 落到下面的报错分支 */ }
+            } else {
+                url = el.dataset.fileUrl || '';   // 不是桶里的地址（例如老的外链），原样下
+            }
+        }
+        if (!url) { showToast('文件暂时无法下载，请稍后重试', 'error', 3000); return; }
+        window.downloadFile(url, el.dataset.fileName);
     };
 
     window.downloadFile = async function(url, fileName) {
@@ -3517,21 +3936,22 @@
         const extMap = { 'audio/mp4': 'm4a', 'audio/aac': 'aac', 'audio/wav': 'wav', 'audio/ogg': 'ogg' };
         const extension = extMap[mimeType] || (mimeType.includes('webm') ? 'webm' : 'm4a');
         const file = new File([new Blob(chunks, { type: mimeType || 'audio/webm' })], `voice_${Date.now()}.${extension}`, { type: mimeType || 'audio/webm' });
-        if (file.size > 15 * 1024 * 1024) {
-            showToast('语音文件过大，请缩短录音后重试。', 'error');
+        if (file.size > UPLOAD_MAX_BYTES) {
+            showToast(`语音文件过大（${(file.size / 1024 / 1024).toFixed(1)}MB，上限 ${UPLOAD_MAX_MB}MB），请缩短录音后重试。`, 'error');
             return;
         }
         try {
-            const filePath = `chat_media/voice_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
-            const { error } = await supabaseClient.storage.from('chat_media').upload(filePath, file);
-            if (error) throw error;
-            const { data } = supabaseClient.storage.from('chat_media').getPublicUrl(filePath);
-            pendingMedia = { url: data.publicUrl, type: 'audio' };
+            // 必须走服务端代传：桶的 anon insert 策略被 drop 之后，这里直传会直接 RLS 报错。
+            // 这段是四条上传路径里唯一漏改的（图片/批量图/文件卡早改了），一并收口。
+            const up = await uploadViaServer(file, currentRoomCode);
+            pendingMedia = { url: up.url, type: 'audio' };
             if (transcript) document.getElementById('message-input').value = transcript;
             await window.sendMessage();
         } catch (error) {
             console.error('voice upload failed:', error);
-            showToast('语音发送失败，请检查 Storage 权限或网络连接。', 'error');
+            // 把真实原因透出来：以前不管什么错都只说"请检查 Storage 权限"，
+            // 而真实原因可能是"登录状态已失效"或"文件超过上限"，用户根本没法自己判断。
+            showToast((error && error.message) ? error.message : '语音发送失败，请稍后重试。', 'error', 4000);
         }
     }
 
@@ -3543,7 +3963,9 @@
         const objectPath = decodeURIComponent(media.url.slice(markerIndex + marker.length).split('?')[0]);
         if (!objectPath) return;
         const { error } = await supabaseClient.storage.from('chat_media').remove([objectPath]);
-        if (error) throw error;
+        // 桶锁死之后 anon 本来就删不掉对象，这是**预期**，不是故障：
+        // 残留文件由管理侧统一清，不该弹个"请检查存储空间"吓用户。
+        if (error) console.warn('[media] 残留附件清理失败（桶已锁定，属预期）:', error.message || error);
     }
 
     // 图片压缩工具：返回压缩后的 File/Blob
@@ -3661,8 +4083,7 @@
                         try {
                             await discardPendingUpload(mediaToDiscard);
                         } catch (error) {
-                            console.error('Unable to discard pending upload:', error);
-                            showToast('附件未发送且无法自动清理，请检查存储空间', 'error', 4000);
+                            console.warn('Unable to discard pending upload:', error);
                         }
                     }
                     // 保存暗号（仅内存）并派生加密密钥
@@ -4309,6 +4730,10 @@
             chatBox.appendChild(wrapper);
         }
 
+        // 附件桶改成私有之后，消息里存的还是 getPublicUrl 的老地址（直接打会 403）。
+        // 插入 DOM 之后在这里统一换成签名 URL —— 只处理这一条消息，不扫全表。
+        wireMediaUrls(wrapper);
+
         if (shouldShowTime) {
             const divider = document.createElement('div');
             divider.className = 'message-time-divider';
@@ -4855,13 +5280,17 @@
         localMatches.forEach(m => results.push({ source: 'local', id: m.id, sender: m.sender, content: m.content, created_at: m.created_at }));
 
         try {
-            const { data, error } = await supabaseClient.from('messages').select('*').ilike('content', `%${term}%`).eq('room_code', currentRoomCode).order('created_at', { ascending: false }).limit(100);
-            if (!error && data && data.length) {
-                data.forEach(m => {
-                    if (!results.find(r => String(r.id) === String(m.id))) {
-                        results.push({ source: 'server', id: m.id, sender: m.sender, content: m.content, created_at: m.created_at });
-                    }
-                });
+            // 私信房不能走这条：anon 直连读 dm 被 RLS 全拒，查了也是空，
+            // 而且真能查通就说明封漏了。dm 房只在已加载的 messagesCache 里搜（上面的 localMatches）。
+            if (!isDmRoom(currentRoomCode)) {
+                const { data, error } = await supabaseClient.from('messages').select('*').ilike('content', `%${term}%`).eq('room_code', currentRoomCode).order('created_at', { ascending: false }).limit(100);
+                if (!error && data && data.length) {
+                    data.forEach(m => {
+                        if (!results.find(r => String(r.id) === String(m.id))) {
+                            results.push({ source: 'server', id: m.id, sender: m.sender, content: m.content, created_at: m.created_at });
+                        }
+                    });
+                }
             }
         } catch (e) { console.warn('server search failed', e); }
 
@@ -5949,9 +6378,17 @@
         btn.disabled = true;
         btn.textContent = '登录中…';
         try {
-            const result = await callServerAction(SUPABASE_URL + '/functions/v1/verify-auth', 'login', { username, password });
+            const result = await callServerAction(SUPABASE_URL + '/functions/v1/verify-auth', 'login', { username, password, device_id: deviceId() });
             localStorage.setItem('chat_logged_user', username);
             localStorage.setItem('chat_auth_token', username);
+            // 私信读通道的凭证。没拿到 = 私信会读不出来，所以这里必须落盘并告警，
+            // 不能静默——否则用户看到的是"私信空了"，排障会往错的方向找。
+            if (result && result.session) {
+                localStorage.setItem('chat_dm_session', result.session);
+            } else {
+                localStorage.removeItem('chat_dm_session');
+                console.warn('[auth] 登录响应里没有 session，私信将无法读取。函数可能还没部署 2a 版本。');
+            }
             mySender = username;
             insertLoginLog('manual');
             document.getElementById('auth-overlay').classList.remove('show');
@@ -6009,8 +6446,17 @@
     };
 
     window.doLogout = function() {
+        // 先让服务端把 session 作废，再清本地。
+        // 只清本地不作废的话，那个 token 在 30 天里一直有效 —— 在共用电脑上等于没登出。
+        const s = dmSession();
+        if (s) {
+            try {
+                callServerAction(null, 'logout', { session: s }).catch(() => {});
+            } catch (e) { /* 网络失败也要让本地登出继续 */ }
+        }
         localStorage.removeItem('chat_logged_user');
         localStorage.removeItem('chat_auth_token');
+        localStorage.removeItem('chat_dm_session');
         localStorage.removeItem('chat_last_room');
         localStorage.removeItem('chat_auth_expiry');
         location.reload();
