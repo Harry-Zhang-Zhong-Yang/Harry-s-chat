@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.6.6";
+    const CHAT_APP_VERSION = "3.7.0";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -280,6 +280,8 @@
 
     // ===== 电脑端左侧房间栏 =====
     let sidebarRoomsData = []; // [{code, name, memberCount}]
+    /** 私信房间统一前缀 dm_，不进普通房间列表（单独在「私信」面板展示） */
+    function isDmRoom(code) { return String(code || '').startsWith('dm_'); }
     // 搜索框"是否真由用户敲过字"。浏览器刷新会把上次输入的搜索词自动恢复到输入框里
     // （用户遇到的残留 "zzy"），那个值不会触发 input 事件，绝不能用它去过滤房间列表，
     // 否则列表会莫名只剩一两个房间 —— 用户说的"只能使用这个房间"就是这么来的。
@@ -340,7 +342,7 @@
                     () => reject(new Error('房间列表加载超时（10s）')), 10000))
             ]);
             if (error) throw error;
-            const codes = [...new Set((data || []).map(r => r.room_code))];
+            const codes = [...new Set((data || []).map(r => r.room_code))].filter(c => !isDmRoom(c));
             if (!codes.length) {
                 sidebarRoomsData = [];
                 listEl.innerHTML = '<div class="sidebar-empty">还没有加入任何房间<br>点击顶部 ＋ 加入或创建</div>';
@@ -394,7 +396,7 @@
         const kw = (sidebarSearchUserTyped ? (searchElForFilter?.value || '') : '').trim().toLowerCase();
         let rows = kw
             ? sidebarRoomsData.filter(r => r.code.toLowerCase().includes(kw) || r.name.toLowerCase().includes(kw))
-            : [...sidebarRoomsData];
+            : sidebarRoomsData.filter(r => !isDmRoom(r.code));
         if (!rows.length) {
             listEl.innerHTML = kw
                 ? `<div class="sidebar-empty">没有匹配的房间<br><span class="sidebar-clear-link" onclick="window.clearSidebarSearch()">清空搜索，显示全部房间</span></div>`
@@ -452,6 +454,220 @@
             clearTimeout(releaseTimer);
             isSwitchingRoom = false;
         });
+    };
+
+    /* ==================== AI 分身 & 私信（deepseek 主写 2026-11-01） ====================
+     * 落实豆包对 B4 的 3 条挑刺：
+     *  ① personaId 存在性校验——只认 ai_personas 里 enabled=true 的真实 id，前端拼的假 id 直接拒绝；
+     *  ② @人格包语义定死——以该人格发言的是 AI 成员（room_members.member_type='ai'），真人不借名冒充；
+     *  ③ 会话绑定生命周期——persona_id 在「新建私信」时写入，之后不提供修改入口（绑定期内不可变）。
+     * 数据面：不新建表。private_conversation_* 已被 RLS 锁死（anon 实测 401），
+     *         私信复用 rooms/messages/room_members，房间代码 dm_<a>__<b>（字母序，两端一致）。
+     */
+    let aiPersonasCache = [];
+    let aiPersonasLoaded = false;
+
+    async function loadAiPersonas(force) {
+        if (aiPersonasLoaded && !force) return aiPersonasCache;
+        if (!supabaseClient) return [];
+        try {
+            const { data, error } = await Promise.race([
+                supabaseClient.from('ai_personas')
+                    .select('id,name,avatar_url,model,system_prompt,style,enabled')
+                    .eq('enabled', true)
+                    .order('created_at', { ascending: true }),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('人格列表加载超时（8s）')), 8000))
+            ]);
+            if (error) throw error;
+            aiPersonasCache = data || [];
+            aiPersonasLoaded = true;
+        } catch (e) {
+            console.warn('[AI分身] 人格列表读取失败:', e?.message || e);
+            aiPersonasCache = [];
+        }
+        return aiPersonasCache;
+    }
+
+    function personaInitial(name) { return String(name || '?').trim().slice(0, 1).toUpperCase(); }
+
+    window.openPersonaPanel = async function() {
+        const modal = document.getElementById('persona-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        const list = document.getElementById('persona-list');
+        list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">加载中…</div>';
+        const personas = await loadAiPersonas(true);
+        if (!personas.length) {
+            list.innerHTML = '<div style="padding:26px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7;">还没有可用的人格<br><small>房主可在数据库 ai_personas 表里添加</small></div>';
+            return;
+        }
+        list.innerHTML = personas.map(p => {
+            const desc = String(p.system_prompt || '').replace(/\s+/g, ' ').slice(0, 42) || '未设置角色描述';
+            const model = p.model || 'AI';
+            return `<div onclick="window.startDmWithPersona('${escapeHtml(p.id)}')" style="display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:11px;cursor:pointer;border:1px solid var(--line);margin-bottom:8px;background:var(--bg);">
+                <span style="width:38px;height:38px;flex:0 0 38px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;background:${hashGradient(p.name || p.id)}">${escapeHtml(personaInitial(p.name))}</span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
+                    <b style="font-size:14px;color:var(--text-main);">${escapeHtml(p.name || '未命名')}</b>
+                    <small style="font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(desc)}</small>
+                </span>
+                <span style="font-size:10.5px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:2px 6px;flex:0 0 auto;">${escapeHtml(model)}</span>
+            </div>`;
+        }).join('');
+    };
+
+    window.closePersonaPanel = function() {
+        const m = document.getElementById('persona-modal');
+        if (m) m.style.display = 'none';
+    };
+
+    window.startDmWithPersona = async function(personaId) {
+        const p = aiPersonasCache.find(x => x.id === personaId);
+        if (!p) { showToast('人格不存在或已停用', 'error'); return; }
+        window.closePersonaPanel();
+        await openDmWith(p.name, p.id);
+    };
+
+    /** 打开/创建与某人（AI 人格或真人）的私信会话 */
+    async function openDmWith(otherName, personaId) {
+        const me = getLoggedInUser();
+        if (!me) { showToast('请先登录', 'error'); return; }
+        otherName = String(otherName || '').trim();
+        if (!otherName || otherName === me) return;
+        if (!supabaseClient) return;
+
+        const pair = [me, otherName].sort();
+        const roomCode = 'dm_' + pair.join('__');
+        const roomName = '私信 · ' + otherName;
+
+        try {
+            const { data: exist } = await supabaseClient
+                .from('rooms').select('room_code').eq('room_code', roomCode).maybeSingle();
+            if (!exist) {
+                await supabaseClient.from('rooms').insert([{ room_code: roomCode, room_name: roomName }]);
+            }
+            const { data: mems } = await supabaseClient
+                .from('room_members').select('user_name').eq('room_code', roomCode);
+            const have = new Set((mems || []).map(r => r.user_name));
+            const toAdd = [];
+            if (!have.has(me)) toAdd.push({ room_code: roomCode, user_name: me, member_type: 'human' });
+            if (!have.has(otherName)) {
+                toAdd.push({
+                    room_code: roomCode,
+                    user_name: otherName,
+                    member_type: personaId ? 'ai' : 'human',
+                    persona_id: personaId || null
+                });
+            }
+            if (toAdd.length) {
+                const { error: insErr } = await supabaseClient.from('room_members').insert(toAdd);
+                if (insErr) console.warn('[私信] 成员写入失败:', insErr.message);
+            }
+        } catch (e) {
+            console.warn('[私信] 创建会话失败:', e?.message || e);
+        }
+
+        await window.joinRoom(roomCode);
+    }
+
+    window.openDmPanel = async function() {
+        const modal = document.getElementById('dm-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        const list = document.getElementById('dm-list');
+        list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">加载中…</div>';
+        const me = getLoggedInUser();
+        if (!me || !supabaseClient) { list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">请先登录</div>'; return; }
+        try {
+            const { data } = await supabaseClient.from('room_members').select('room_code').eq('user_name', me);
+            const dmCodes = [...new Set((data || []).map(r => r.room_code))].filter(isDmRoom);
+            if (!dmCodes.length) {
+                list.innerHTML = '<div style="padding:26px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7;">还没有私信<br><small>点下面的按钮，选一个 AI 人格开聊</small></div>';
+                return;
+            }
+            const latest = {};
+            await Promise.all(dmCodes.map(c => Promise.race([
+                supabaseClient.from('messages').select('sender,content,created_at')
+                    .eq('room_code', c).order('created_at', { ascending: false }).limit(1)
+                    .then(res => { if (res.data && res.data[0]) latest[c] = res.data[0]; })
+                    .catch(() => {}),
+                new Promise(r => setTimeout(r, 2500))
+            ])));
+            const rows = dmCodes.map(c => {
+                const other = String(c).replace(/^dm_/, '').split('__').find(n => n !== me) || '未知';
+                return { code: c, other, latest: latest[c] };
+            }).sort((a, b) => new Date(b.latest?.created_at || 0) - new Date(a.latest?.created_at || 0));
+            list.innerHTML = rows.map(r => {
+                const preview = r.latest ? `${r.latest.sender}: ${String(r.latest.content || '').replace(/\n/g, ' ').slice(0, 30)}` : '还没有消息';
+                const time = r.latest ? new Date(r.latest.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
+                return `<div onclick="window.enterDm('${escapeHtml(r.code)}')" style="display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:11px;cursor:pointer;border:1px solid var(--line);margin-bottom:8px;background:var(--bg);">
+                    <span style="width:38px;height:38px;flex:0 0 38px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;background:${hashGradient(r.other)}">${escapeHtml(personaInitial(r.other))}</span>
+                    <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
+                        <b style="font-size:14px;color:var(--text-main);">${escapeHtml(r.other)}</b>
+                        <small style="font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(preview)}</small>
+                    </span>
+                    <span style="font-size:10.5px;color:var(--muted);flex:0 0 auto;">${time}</span>
+                </div>`;
+            }).join('');
+        } catch (e) {
+            console.warn('[私信] 列表加载失败:', e?.message || e);
+            list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">加载失败，请重试</div>';
+        }
+    };
+
+    window.closeDmPanel = function() {
+        const m = document.getElementById('dm-modal');
+        if (m) m.style.display = 'none';
+    };
+
+    window.enterDm = function(code) {
+        window.closeDmPanel();
+        if (code === currentRoomCode) return;
+        window.switchToRoom(code);
+    };
+
+    /** 房间内 AI 成员条：把当前房间的 AI 成员显性展示（用户要的"圆桌可见"） */
+    async function renderAiMembersBar() {
+        const bar = document.getElementById('ai-members-bar');
+        if (!bar || !supabaseClient) return;
+        const room = currentRoomCode;
+        if (!room) { bar.style.display = 'none'; return; }
+        try {
+            const [memRes, perRes] = await Promise.all([
+                supabaseClient.from('room_members').select('user_name,member_type,persona_id').eq('room_code', room),
+                supabaseClient.from('ai_personas').select('id,name,avatar_url,model').eq('enabled', true)
+            ]);
+            const personas = perRes.data || [];
+            const pByName = new Map(personas.map(p => [p.name, p]));
+            const pById = new Map(personas.map(p => [p.id, p]));
+            const aiMembers = (memRes.data || []).filter(m => {
+                if (m.member_type === 'ai') return true;
+                if (m.member_type === 'human') return false;
+                return pByName.has(m.user_name);
+            });
+            if (!aiMembers.length) { bar.style.display = 'none'; return; }
+            bar.style.display = 'flex';
+            bar.innerHTML = '<span class="ai-members-label">AI 成员</span>' + aiMembers.map(m => {
+                const p = (m.persona_id && pById.get(m.persona_id)) || pByName.get(m.user_name) || {};
+                const name = p.name || m.user_name;
+                return `<span class="ai-member-chip" onclick="window.quickAtAi('${String(name).replace(/'/g, "\\'")}')" title="点一下 @${escapeHtml(name)}">
+                    <span class="ai-member-avatar" style="background:${hashGradient(name)}">${escapeHtml(personaInitial(name))}</span>
+                    <span>${escapeHtml(name)}</span>
+                </span>`;
+            }).join('');
+        } catch (e) {
+            bar.style.display = 'none';
+        }
+    }
+
+    /** 点 AI 成员 → 输入框自动插入 @名字 */
+    window.quickAtAi = function(name) {
+        const input = document.getElementById('message-input');
+        if (!input) return;
+        const token = '@' + name + ' ';
+        const cur = input.value || '';
+        input.value = cur && !cur.endsWith(' ') ? cur + ' ' + token : cur + token;
+        input.focus();
+        try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
     };
 
     window.openJoinRoomModal = function() {
@@ -1297,9 +1513,12 @@
         currentRoomCode = wantedCode || currentRoomCode;
         pendingUrlRoom = '';
 
-        if (!/^[a-zA-Z0-9\s\W]+$/.test(currentRoomCode)) {
+        // 房间代码格式校验：只拦空值和不可见控制字符。
+        // 历史缺陷：原正则 /^[a-zA-Z0-9\s\W]+$/ 对中文返回 false（实测"dm_harrzzy__小哈"→false），
+        // 导致任何中文房间名（含私信房间 dm_<user>__<人格名>）都被判"格式不正确"直接退回。
+        if (!currentRoomCode.trim() || /[\u0000-\u001F\u007F]/.test(currentRoomCode)) {
             currentRoomCode = prevRoomCode;
-            return showToast("房间代码格式不正确，请只使用字母、数字或符号。", 'error');
+            return showToast("房间代码格式不正确，请检查后重试。", 'error');
         }
 
         if (!nameInput || !currentRoomCode) {
@@ -1879,6 +2098,7 @@
             await loadHistory(true);
             hideRoomLoading();
             if (isDesktopLayout()) renderRoomSidebar(); // 进入房间后刷新左侧栏（高亮当前房间）
+            renderAiMembersBar(); // 房间内 AI 成员条（"圆桌"可见形态）
             logJoinRoom('manual');
             setTimeout(() => { document.getElementById('message-input').focus(); }, 100);
             ensureRoomExists().catch(e => console.warn('ensureRoomExists failed:', e));
