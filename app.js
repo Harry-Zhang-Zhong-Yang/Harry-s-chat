@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.15";
+    const CHAT_APP_VERSION = "3.7.16";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -595,7 +595,7 @@
             const m = r.latest;
             const dm = isDmRoom(r.code);
             const peer = dm ? dmPeerOf(r.code) : '';
-            const name = peer ? ('私信 · ' + peer) : r.name;
+            const name = peer || r.name;
             const preview = m
                 ? `${m.sender}: ${mrvPreviewText(m)}`
                 : (dm ? '暂无消息' : `${r.memberCount ? r.memberCount + ' 名成员 · ' : ''}${r.code}`);
@@ -910,7 +910,7 @@
 
         const pair = [me, otherName].sort();
         const roomCode = 'dm_' + pair.join('__');
-        const roomName = '私信 · ' + otherName;
+        const roomName = otherName;
 
         try {
             const { data: exist } = await supabaseClient
