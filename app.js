@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.14";
+    const CHAT_APP_VERSION = "3.7.15";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -330,6 +330,43 @@
         return (r && r.messages) ? r.messages : [];
     }
 
+    /* 时间统一按北京时间（Asia/Shanghai）显示。
+     * 不能依赖设备时区：设备时区错一点，消息就整体偏移 8 小时。 */
+    function bjParts(ts) {
+        const d = new Date(ts);
+        if (isNaN(d)) return null;
+        try {
+            const fmt = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Shanghai', hourCycle: 'h23',
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            });
+            const o = {};
+            fmt.formatToParts(d).forEach(p => { if (p.type !== 'literal') o[p.type] = p.value; });
+            return { y: +o.year, mo: +o.month, da: +o.day, h: +o.hour, mi: +o.minute };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /* 侧栏/手机列表的"最新一条"：
+     * 私信房 dm_ 的 messages 对匿名读全封（RLS），直连永远返回 0 条，
+     * 导致房间不置顶、小字退化成房间数据。私信改走服务端 dm-history（带 session 判成员）。 */
+    async function latestMessageOf(roomCode) {
+        if (isDmRoom(roomCode)) {
+            try {
+                const rows = await dmHistory(roomCode, { limit: 1 });
+                return (rows && rows[0]) ? rows[0] : null;
+            } catch (e) {
+                return null;
+            }
+        }
+        const res = await supabaseClient.from('messages')
+            .select('sender,content,media_type,created_at')
+            .eq('room_code', roomCode).order('created_at', { ascending: false }).limit(1);
+        return (res && res.data && res.data[0]) ? res.data[0] : null;
+    }
+
     /* 私信空态：三种情况必须长得不一样，否则用户分不清"没消息 / 掉线 / 坏了"。
      *  - no-session：没有登录凭证 → 给一个真的能点的"重新登录"（这是唯一他自己能修的）
      *  - failed：有凭证但请求失败 → 给"重试"，并把真实原因显出来
@@ -485,9 +522,8 @@
             // 最新一条消息只用于"预览 + 排序"，异步补：带 3 秒超时，超时就跳过该房间，不拖累整张列表
             const latestMap = {};
             await Promise.all(codes.map(c => Promise.race([
-                supabaseClient.from('messages').select('sender,content,media_type,created_at')
-                    .eq('room_code', c).order('created_at', { ascending: false }).limit(1)
-                    .then(res => { if (res.data && res.data[0]) latestMap[c] = res.data[0]; })
+                latestMessageOf(c)
+                    .then(m => { if (m) latestMap[c] = m; })
                     .catch(() => {}),
                 new Promise(resolve => setTimeout(resolve, 3000))
             ])));
@@ -929,7 +965,8 @@
             }).sort((a, b) => new Date(b.latest?.created_at || 0) - new Date(a.latest?.created_at || 0));
             list.innerHTML = rows.map(r => {
                 const preview = r.latest ? `${r.latest.sender}: ${String(r.latest.content || '').replace(/\n/g, ' ').slice(0, 30)}` : '还没有消息';
-                const time = r.latest ? new Date(r.latest.created_at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '';
+                const p = r.latest ? bjParts(r.latest.created_at) : null;
+                const time = p ? `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}` : '';
                 return `<div onclick="window.enterDm('${escapeHtml(r.code)}')" style="display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:11px;cursor:pointer;border:1px solid var(--line);margin-bottom:8px;background:var(--bg);">
                     <span style="width:38px;height:38px;flex:0 0 38px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;background:${hashGradient(r.other)}">${escapeHtml(personaInitial(r.other))}</span>
                     <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;">
@@ -1101,17 +1138,17 @@
         return body || '';
     }
 
-    /** 微信式时间戳：今天显示 HH:MM，昨天显示"昨天"，今年显示 M/D，更早显示 Y/M/D */
+    /** 微信式时间戳：今天显示 HH:MM，昨天显示"昨天"，今年显示 M/D，更早显示 Y/M/D（固定北京时间） */
     function mrvFmtTime(ts) {
-        const d = new Date(ts);
-        if (isNaN(d)) return '';
-        const now = new Date();
-        const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-        const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
-        if (d.toDateString() === now.toDateString()) return hm;
-        if (d.toDateString() === yesterday.toDateString()) return '昨天';
-        if (now.getFullYear() === d.getFullYear()) return `${d.getMonth() + 1}/${d.getDate()}`;
-        return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+        const p = bjParts(ts);
+        if (!p) return '';
+        const nowP = bjParts(Date.now());
+        const hm = `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}`;
+        const yP = bjParts(Date.now() - 24 * 60 * 60 * 1000);
+        if (p.y === nowP.y && p.mo === nowP.mo && p.da === nowP.da) return hm;
+        if (p.y === yP.y && p.mo === yP.mo && p.da === yP.da) return '昨天';
+        if (p.y === nowP.y) return `${p.mo}/${p.da}`;
+        return `${p.y}/${p.mo}/${p.da}`;
     }
 
     /** 手机端房间列表：微信式 —— 最新一条消息预览 + 时间，按最新消息时间倒序 */
@@ -1180,9 +1217,8 @@
             paintMobileList({});
             const latest = {};
             await Promise.all(codes.map(c => Promise.race([
-                supabaseClient.from('messages').select('sender,content,media_type,created_at')
-                    .eq('room_code', c).order('created_at', { ascending: false }).limit(1)
-                    .then(res => { if (res.data && res.data[0]) latest[c] = res.data[0]; })
+                latestMessageOf(c)
+                    .then(m => { if (m) latest[c] = m; })
                     .catch(() => {}),
                 new Promise(resolve => setTimeout(resolve, 3000))
             ])));
@@ -1268,6 +1304,9 @@
                 const chatContainer = document.getElementById('chat-container');
                 const mobileWidth = window.matchMedia('(max-width: 900px)').matches;
                 const kbOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                // 布局变化（键盘弹起/输入框长高）前先记住"用户是不是贴在底部"，
+                // 是的话布局完成后再贴回去 —— 否则最新那条会被输入框盖住看不见。
+                const wasAtBottom = !chatBox || (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight) <= 120;
                 if (mobileWidth && kbOffset > 8) {
                     document.body.style.height = vv.height + 'px';
                     document.body.style.top = vv.offsetTop + 'px';
@@ -1276,10 +1315,10 @@
                 } else {
                     resetKeyboardLayout();
                 }
-                if (chatBox && chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 100) {
-                    requestAnimationFrame(() => {
-                        chatBox.scrollTop = chatBox.scrollHeight;
-                    });
+                if (wasAtBottom && chatBox) {
+                    const stick = () => { chatBox.scrollTop = chatBox.scrollHeight; };
+                    requestAnimationFrame(stick);
+                    setTimeout(stick, 120);
                 }
             };
             window.visualViewport.addEventListener('resize', fixIOSKeyboard);
@@ -4856,17 +4895,16 @@
     }
 
     function formatMessageTime(date) {
-        // 消息时间戳带有时区信息，解析后直接用本地时间即可（之前的 +8h 手动偏移
-        // 在东八区设备上会把当天上午的消息错判成"昨天"，故移除）
-        const d = new Date(date);
-        if (isNaN(d)) return '';
-        const now = new Date();
-        const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-        if (d.toDateString() === now.toDateString()) return time;
-        const yesterday = new Date(now);
-        yesterday.setDate(now.getDate() - 1);
-        if (d.toDateString() === yesterday.toDateString()) return `昨天 ${time}`;
-        return `${d.getMonth() + 1}月${d.getDate()}日 ${time}`;
+        // 固定按北京时间（Asia/Shanghai）显示，不看设备时区，避免整体偏移 8 小时。
+        const p = bjParts(date);
+        if (!p) return '';
+        const nowP = bjParts(Date.now());
+        const pad = n => String(n).padStart(2, '0');
+        const time = `${pad(p.h)}:${pad(p.mi)}`;
+        if (p.y === nowP.y && p.mo === nowP.mo && p.da === nowP.da) return time;
+        const yP = bjParts(Date.now() - 24 * 60 * 60 * 1000);
+        if (p.y === yP.y && p.mo === yP.mo && p.da === yP.da) return `昨天 ${time}`;
+        return `${p.mo}月${p.da}日 ${time}`;
     }
 
     const chatBoxEl = document.getElementById('chat-box');
@@ -6859,8 +6897,16 @@
     msgInput.addEventListener('input', (e) => {
         sendTypingNotification();
         updateMentionPopup();
+        const box = document.getElementById('chat-box');
+        // 输入框长高会把聊天区压窄：先记是否贴底，长高后贴回去，否则最新那条被输入框盖住。
+        const wasAtBottom = !box || (box.scrollHeight - box.scrollTop - box.clientHeight) <= 120;
         msgInput.style.height = 'auto';
         msgInput.style.height = `${Math.min(msgInput.scrollHeight, 150)}px`;
+        if (wasAtBottom && box) {
+            const stick = () => { box.scrollTop = box.scrollHeight; };
+            requestAnimationFrame(stick);
+            setTimeout(stick, 120);
+        }
     });
 
     msgInput.addEventListener('keydown', (e) => {
