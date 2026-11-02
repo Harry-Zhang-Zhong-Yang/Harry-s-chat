@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.12";
+    const CHAT_APP_VERSION = "3.7.13";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -1245,6 +1245,13 @@
         if (window.visualViewport) {
             // 键盘弹起时把 body 锁到 visualViewport 上（高度 + offsetTop），输入行随容器贴在键盘上沿。
             // 不再对 #chat-container 做 translateY：整页上移正是「输入框被挡住 / 整行能拖动」的根因。
+            const resetKeyboardLayout = () => {
+                document.body.style.height = '';
+                document.body.style.top = '';
+                document.body.classList.remove('kb-open');
+                const chatContainer = document.getElementById('chat-container');
+                if (chatContainer) chatContainer.style.height = '';
+            };
             const fixIOSKeyboard = () => {
                 const vv = window.visualViewport;
                 const chatBox = document.getElementById('chat-box');
@@ -1257,10 +1264,7 @@
                     document.body.classList.add('kb-open');
                     if (chatContainer) chatContainer.style.height = vv.height + 'px';
                 } else {
-                    document.body.style.height = '';
-                    document.body.style.top = '';
-                    document.body.classList.remove('kb-open');
-                    if (chatContainer) chatContainer.style.height = '';
+                    resetKeyboardLayout();
                 }
                 if (chatBox && chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 100) {
                     requestAnimationFrame(() => {
@@ -1270,6 +1274,12 @@
             };
             window.visualViewport.addEventListener('resize', fixIOSKeyboard);
             window.visualViewport.addEventListener('scroll', fixIOSKeyboard);
+            // 兜底：输入框失焦（键盘收起）/横竖屏切换时无条件复位，避免残留错误高度（chatgpt 挑刺点 #1732）。
+            const keyboardInput = document.getElementById('message-input');
+            if (keyboardInput) {
+                keyboardInput.addEventListener('blur', () => setTimeout(resetKeyboardLayout, 150));
+            }
+            window.addEventListener('orientationchange', () => setTimeout(resetKeyboardLayout, 300));
         }
 
         const voiceButton = document.getElementById('voice-btn');
@@ -4793,6 +4803,35 @@
             chatBox.appendChild(wrapper);
         }
 
+        // 长消息折叠：正文超过 800 字默认收起，点「展开全文」再显示；
+        // 展开/收起前后按 scrollHeight 差补偿，避免跳屏（chatgpt 挑刺点 #1732）。
+        const contentBody = wrapper.querySelector('.msg-content > div');
+        if (contentBody && !isRecalled && !mediaHtml) {
+            const plainText = String(displayContent || '').replace(/<[^>]+>/g, '');
+            if (plainText.length > 800) {
+                wrapper.classList.add('msg-collapsed');
+                const expandBtn = document.createElement('span');
+                expandBtn.className = 'msg-expand-btn';
+                expandBtn.setAttribute('role', 'button');
+                expandBtn.textContent = `展开全文（${plainText.length} 字）`;
+                expandBtn.onclick = (event) => {
+                    event.stopPropagation();
+                    const box = document.getElementById('chat-box');
+                    const prevHeight = box ? box.scrollHeight : 0;
+                    const prevTop = box ? box.scrollTop : 0;
+                    const atBottom = box ? (prevTop + box.clientHeight >= prevHeight - 5) : false;
+                    wrapper.classList.toggle('msg-collapsed');
+                    const expanded = !wrapper.classList.contains('msg-collapsed');
+                    expandBtn.textContent = expanded ? '收起' : `展开全文（${plainText.length} 字）`;
+                    if (box) {
+                        const newHeight = box.scrollHeight;
+                        box.scrollTop = atBottom ? newHeight : prevTop + (newHeight - prevHeight);
+                    }
+                };
+                contentBody.parentElement.appendChild(expandBtn);
+            }
+        }
+
         // 附件桶改成私有之后，消息里存的还是 getPublicUrl 的老地址（直接打会 403）。
         // 插入 DOM 之后在这里统一换成签名 URL —— 只处理这一条消息，不扫全表。
         wireMediaUrls(wrapper);
@@ -6195,24 +6234,33 @@
         const ids = Array.from(list.querySelectorAll('.admin-msg-check:checked')).map(c => Number(c.value));
         if (!ids.length) { showToast('请先勾选要删除的消息', 'info'); return; }
         if (!confirm(`确定删除选中的 ${ids.length} 条消息？此操作不可撤销`)) return;
-        showToast(`正在删除 ${ids.length} 条消息…`, 'info', 3000);
-        Promise.all(ids.map(id => supabaseClient.from('messages').delete().eq('id', id)))
-            .then(() => {
-                showToast('批量删除完成', 'success');
-                window.adminClearSelection();
-                // 移除已删节点
-                ids.forEach(id => {
+        // RLS 收紧后 anon DELETE 已封死：批量删必须逐条走服务端 admin-delete-message，
+        // 否则会 0 行受影响却提示“完成”（假成功）。
+        (async () => {
+            try {
+                let adminPassword = adminPasswordMemory;
+                if (!adminPassword) {
+                    adminPassword = prompt('管理密码已过期，请重新输入：');
+                    if (!adminPassword) return;
+                }
+                showToast(`正在删除 ${ids.length} 条消息…`, 'info', 3000);
+                for (const id of ids) {
+                    await callServerAction(null, 'admin-delete-message', { adminPassword, id: Number(id) });
                     const row = list.querySelector(`.admin-msg-row[data-id="${id}"]`);
                     if (row) row.remove();
-                });
+                }
+                showToast('批量删除完成', 'success');
+                window.adminClearSelection();
                 // 如果列表空了，显示空提示
                 if (!list.children.length) {
                     list.innerHTML = '<div class="admin-empty">没有匹配的消息</div>';
                     const more = document.getElementById('admin-msg-more');
                     if (more) more.style.display = 'none';
                 }
-            })
-            .catch(e => showToast('删除失败：' + (e.message || e), 'error'));
+            } catch (e) {
+                showToast('删除失败：' + (e.message || e), 'error');
+            }
+        })();
     };
 
     async function adminLoadMessagesPage(append) {
