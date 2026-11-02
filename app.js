@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.18";
+    const CHAT_APP_VERSION = "3.7.19";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -50,6 +50,74 @@
         if (error) throw error;
         const existing = new Set((data || []).map(row => row.room_code));
         return unique.filter(code => existing.has(code));
+    }
+
+    // ===== 3.7.19 本地缓存（IndexedDB）：房间列表 + 每房最近 60 条 =====
+    // 目的：打开先用本地数据一次画完，再后台增量同步；弱网/断网不再白屏或空列表。
+    // 只做「读加速」，数据仍以服务器为准；不支持 IndexedDB 时全部静默降级。
+    const LOCAL_CACHE_DB = 'harry_chat_cache';
+    const LOCAL_CACHE_ROOMS = 'rooms';
+    const LOCAL_CACHE_MSGS = 'messages';
+    const LOCAL_CACHE_MSG_KEEP = 60;
+    let localCacheDBPromise = null;
+    function localCacheOpen() {
+        if (!('indexedDB' in window)) return Promise.resolve(null);
+        if (localCacheDBPromise) return localCacheDBPromise;
+        localCacheDBPromise = new Promise((resolve) => {
+            let req;
+            try { req = indexedDB.open(LOCAL_CACHE_DB, 1); } catch (e) { resolve(null); return; }
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(LOCAL_CACHE_ROOMS)) db.createObjectStore(LOCAL_CACHE_ROOMS);
+                if (!db.objectStoreNames.contains(LOCAL_CACHE_MSGS)) db.createObjectStore(LOCAL_CACHE_MSGS);
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+            req.onblocked = () => resolve(null);
+        });
+        return localCacheDBPromise;
+    }
+    async function localCacheGet(store, key) {
+        const db = await localCacheOpen();
+        if (!db) return null;
+        return new Promise((resolve) => {
+            try {
+                const req = db.transaction(store, 'readonly').objectStore(store).get(key);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => resolve(null);
+            } catch (e) { resolve(null); }
+        });
+    }
+    async function localCacheSet(store, key, value) {
+        const db = await localCacheOpen();
+        if (!db) return;
+        return new Promise((resolve) => {
+            try {
+                const tx = db.transaction(store, 'readwrite');
+                tx.objectStore(store).put(value, key);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+                tx.onabort = () => resolve();
+            } catch (e) { resolve(); }
+        });
+    }
+    /** 合并新消息进本地缓存：按 id 去重，只保留最新 60 条（按时间升序存，读出来可直接渲染） */
+    async function localCacheSaveMessages(roomCode, list) {
+        if (!roomCode || !Array.isArray(list) || !list.length) return;
+        const key = String(roomCode);
+        const old = await localCacheGet(LOCAL_CACHE_MSGS, key);
+        const byId = new Map();
+        (Array.isArray(old) ? old : []).forEach(m => { if (m && m.id != null) byId.set(String(m.id), m); });
+        list.forEach(m => { if (m && m.id != null) byId.set(String(m.id), m); });
+        const merged = [...byId.values()].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        await localCacheSet(LOCAL_CACHE_MSGS, key, merged.slice(-LOCAL_CACHE_MSG_KEEP));
+    }
+    /** 侧栏房间快照（key: u:<用户>），下次冷启动直接画出正确顺序与预览 */
+    function localCacheSaveRoomSnapshot(user, rooms) {
+        if (!user || !Array.isArray(rooms) || !rooms.length) return;
+        const latest = {};
+        rooms.forEach(r => { if (r && r.code && r.latest) latest[r.code] = r.latest; });
+        localCacheSet(LOCAL_CACHE_ROOMS, 'u:' + user, { rooms, latest, savedAt: Date.now() });
     }
 
     function showToast(message, type = 'info', duration = 2500) {
@@ -474,6 +542,18 @@
         // 【去重 2】1.5 秒冷却：同一波切房里的重复调用不打网络，只做一次本地重绘（保证 active 高亮正确）
         if (Date.now() - sidebarLastLoadedAt < 1500) { renderSidebarList(); return; }
         sidebarLoading = true;
+        // 3.7.19：先用本地快照画一次（冷启动/弱网首屏立即有内容），随后网络结果覆盖。
+        // 命中缓存时 sidebarEverRendered 直接置 true，下面就不会再插骨架屏。
+        if (!sidebarEverRendered && !sidebarRoomsData.length) {
+            const snap = await localCacheGet(LOCAL_CACHE_ROOMS, 'u:' + user);
+            if (snap && Array.isArray(snap.rooms) && snap.rooms.length) {
+                sidebarRoomsData = snap.rooms;
+                if (snap.latest && typeof snap.latest === 'object') prevLatest = Object.assign({}, snap.latest);
+                sidebarEverRendered = true;
+                sidebarLastSignature = '';
+                renderSidebarList();
+            }
+        }
         // 骨架屏只在"从没成功渲染过"时出现。旧代码每次调用都判 !sidebarRoomsData.length，
         // 一旦列表为空/加载慢就会反复插回带 1.1s 无限动画的 .skeleton-item —— 这就是"一直闪"。
         if (!sidebarEverRendered && !sidebarRoomsData.length) {
@@ -557,13 +637,18 @@
                     renderSidebarList();
                 }
             }
+            // 3.7.19：把这次成功的房间列表落本地，下次冷启动先用它画
+            localCacheSaveRoomSnapshot(user, sidebarRoomsData);
             sidebarLastLoadedAt = Date.now();
             sidebarEverRendered = true;
         } catch (e) {
             console.warn('侧栏房间加载失败:', e);
             sidebarLastSignature = '';
             sidebarEverRendered = true;
-            listEl.innerHTML = '<div class="sidebar-empty">加载失败，请重试</div>';
+            // 有本地快照时保留已画好的列表（断网也照常能看能点），只有完全空白才提示失败
+            if (!sidebarRoomsData.length) {
+                listEl.innerHTML = '<div class="sidebar-empty">加载失败，请重试</div>';
+            }
         } finally {
             sidebarLoading = false;
             if (sidebarPending) {
@@ -1177,12 +1262,50 @@
         return `${p.y}/${p.mo}/${p.da}`;
     }
 
+    /** 手机端房间行渲染（3.7.19 抽成独立函数，缓存快照与网络结果共用一份画法） */
+    function paintMobileRoomRows(listEl, codes, nameMap, joinedAt, latest) {
+        // 排序：有消息的按最新消息时间倒序；没消息的按加入时间倒序排在后面
+        const sorted = (codes || []).slice().sort((a, b) => {
+            const ta = latest[a] ? new Date(latest[a].created_at).getTime() : 0;
+            const tb = latest[b] ? new Date(latest[b].created_at).getTime() : 0;
+            if (ta !== tb) return tb - ta;
+            const ja = new Date(joinedAt[a] || 0).getTime();
+            const jb = new Date(joinedAt[b] || 0).getTime();
+            if (ja !== jb) return jb - ja;
+            // 兜底键：时间完全相同也永远同一顺序，避免列表无新消息时上下跳。
+            return String(a).localeCompare(String(b));
+        });
+        const html = sorted.map(c => {
+            const m = latest[c];
+            const preview = m ? `${m.sender}: ${mrvPreviewText(m)}` : `房间 ${c}`;
+            const time = m ? mrvFmtTime(m.created_at) : '';
+            return `
+                <div class="mrv-item" onclick="window.mrvEnter('${escapeHtml(c).replace(/'/g, '&#39;')}')">
+                    <span class="mrv-badge" style="background:${hashGradient(c)}">${escapeHtml((nameMap[c] || c).slice(0, 1).toUpperCase())}</span>
+                    <span class="mrv-item-text"><b>${escapeHtml(nameMap[c] || c)}</b><small>${escapeHtml(preview)}</small></span>
+                    ${time ? `<span class="mrv-item-time">${time}</span>` : ''}
+                </div>`;
+        }).join('');
+        // 数据没变化就不重绘（避免刷新时闪烁）
+        if (listEl.dataset.ready && listEl.dataset.sig === html) return;
+        listEl.dataset.sig = html;
+        listEl.innerHTML = html;
+        listEl.dataset.ready = '1';
+    }
+
     /** 手机端房间列表：微信式 —— 最新一条消息预览 + 时间，按最新消息时间倒序 */
     async function renderMobileRoomList() {
         const listEl = document.getElementById('mrv-list');
         if (!listEl) return;
         const user = getLoggedInUser();
         if (!user || !supabaseClient) return;
+        // 3.7.19：先用本地快照画出列表（手机冷启动/弱网不再空等），随后网络刷新覆盖
+        if (!listEl.dataset.ready) {
+            const snap = await localCacheGet(LOCAL_CACHE_ROOMS, 'm:' + user);
+            if (snap && Array.isArray(snap.codes) && snap.codes.length) {
+                paintMobileRoomRows(listEl, snap.codes, snap.nameMap || {}, snap.joinedAt || {}, snap.latest || {});
+            }
+        }
         if (!listEl.dataset.ready) listEl.innerHTML = '<div class="mrv-empty">加载中…</div>';
         try {
             const { data, error } = await supabaseClient
@@ -1209,35 +1332,7 @@
             const joinedAt = {};
             joined.forEach(r => { if (!(r.room_code in joinedAt)) joinedAt[r.room_code] = r.created_at; });
 
-            const paintMobileList = (latest) => {
-                // 排序：有消息的按最新消息时间倒序；没消息的按加入时间倒序排在后面
-                const sorted = codes.slice().sort((a, b) => {
-                    const ta = latest[a] ? new Date(latest[a].created_at).getTime() : 0;
-                    const tb = latest[b] ? new Date(latest[b].created_at).getTime() : 0;
-                    if (ta !== tb) return tb - ta;
-                    const ja = new Date(joinedAt[a] || 0).getTime();
-                    const jb = new Date(joinedAt[b] || 0).getTime();
-                    if (ja !== jb) return jb - ja;
-                    // 兜底键：时间完全相同也永远同一顺序，避免列表无新消息时上下跳。
-                    return String(a).localeCompare(String(b));
-                });
-                const html = sorted.map(c => {
-                    const m = latest[c];
-                    const preview = m ? `${m.sender}: ${mrvPreviewText(m)}` : `房间 ${c}`;
-                    const time = m ? mrvFmtTime(m.created_at) : '';
-                    return `
-                <div class="mrv-item" onclick="window.mrvEnter('${escapeHtml(c).replace(/'/g, '&#39;')}')">
-                    <span class="mrv-badge" style="background:${hashGradient(c)}">${escapeHtml((nameMap[c] || c).slice(0, 1).toUpperCase())}</span>
-                    <span class="mrv-item-text"><b>${escapeHtml(nameMap[c] || c)}</b><small>${escapeHtml(preview)}</small></span>
-                    ${time ? `<span class="mrv-item-time">${time}</span>` : ''}
-                </div>`;
-                }).join('');
-                // 数据没变化就不重绘（避免刷新时闪烁）
-                if (listEl.dataset.ready && listEl.dataset.sig === html) return;
-                listEl.dataset.sig = html;
-                listEl.innerHTML = html;
-                listEl.dataset.ready = '1';
-            };
+            const paintMobileList = (latestMap) => paintMobileRoomRows(listEl, codes, nameMap, joinedAt, latestMap);
 
             // 首屏用上一次已知的最新消息排序；首次进入则最多等 1.5 秒，避免"先旧顺序再重排"闪一下
             const latest = Object.assign({}, mobileLatestCache);
@@ -1263,6 +1358,8 @@
                 return !old || new Date(fresh[c].created_at).getTime() !== new Date(old.created_at).getTime();
             });
             mobileLatestCache = Object.assign({}, fresh);
+            // 3.7.19：落本地快照，下次冷启动先用它画
+            localCacheSet(LOCAL_CACHE_ROOMS, 'm:' + user, { codes, nameMap, joinedAt, latest: mobileLatestCache, savedAt: Date.now() });
             if (changed) paintMobileList(fresh);
         } catch (e) {
             console.warn('手机房间列表加载失败:', e);
@@ -2634,6 +2731,38 @@
         } catch (e) { console.warn('[join] decorate history error:', e); }
     }
 
+    /** 首屏按内容量取：recentData 最新在前，累加到 12 条或约 10KB 即停（3.7.19 抽出，缓存/网络共用同一算法） */
+    function firstScreenOf(recentData) {
+        const firstScreen = [];
+        let chars = 0;
+        for (const m of recentData) {
+            const c = String(m.content || '').length + (m.media_url ? 256 : 0);
+            if (firstScreen.length >= FIRST_SCREEN_MSG_MAX) break;
+            if (firstScreen.length > 0 && chars + c > FIRST_SCREEN_CHARS_MAX) break;
+            firstScreen.push(m);
+            chars += c;
+        }
+        return firstScreen;
+    }
+    /** 一次画完首屏：传入「最新在前」的列表，返回实际渲染的消息（旧→新） */
+    function paintFirstScreen(chatBox, newestFirst) {
+        const msgs = newestFirst.slice().reverse();
+        chatBox.innerHTML = "";
+        const prevChatDisplay = chatBox.style.display;
+        chatBox.style.display = 'none';
+        const addedIds = new Set();
+        msgs.forEach(msg => {
+            if (!addedIds.has(String(msg.id))) {
+                addedIds.add(String(msg.id));
+                appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type);
+            }
+        });
+        chatBox.style.display = prevChatDisplay;
+        chatBox.scrollTop = chatBox.scrollHeight;
+        return msgs;
+    }
+    function messageListSig(list) { return (list || []).map(m => String(m.id)).join('|'); }
+
     /**
      * 加载历史记录逻辑
      * @param {boolean} isInitial - 是否为初始加载（如果是，则只显示最新的30条）
@@ -2659,6 +2788,21 @@
                 noMoreHistory = false;
                 messagesCache = [];
                 lastKnownMessageId = null; // 跨房间重置，避免新房间消息被误跳过
+
+                // 3.7.19：先用本地缓存画首屏（弱网/断网也有内容），网络结果回来再校正
+                let cachePaintedSig = '';
+                const cachedMsgs = await localCacheGet(LOCAL_CACHE_MSGS, currentRoomCode);
+                if (continuationToken || currentRoomCode !== roomAtStart) { isFetchingHistory = false; return; }
+                if (Array.isArray(cachedMsgs) && cachedMsgs.length && !chatBox.children.length) {
+                    const cachedFirst = firstScreenOf(cachedMsgs.slice().reverse());
+                    if (cachedFirst.length) {
+                        const painted = paintFirstScreen(chatBox, cachedFirst);
+                        cachePaintedSig = messageListSig(cachedFirst);
+                        oldestLoadedAt = painted.length ? painted[0].created_at : null;
+                        noMoreHistory = cachedMsgs.length < FIRST_FETCH_LIMIT;
+                        if (!isSpeedMode) fetchAndApplyUserAvatars(painted.map(m => m.sender));
+                    }
+                }
 
                 let recentData, error;
                 if (isDmRoom(currentRoomCode)) {
@@ -2708,6 +2852,8 @@
 
                 if (!recentData || recentData.length === 0) {
                     console.warn('[chat] 未查询到任何消息，房间:', currentRoomCode);
+                    // 服务端确认没有消息：清掉该房本地缓存，避免下次冷启动还显示已删除的旧消息
+                    localCacheSet(LOCAL_CACHE_MSGS, currentRoomCode, []);
                     if (!chatBox.children.length) {
                         if (isDmRoom(currentRoomCode)) {
                             // 私信的空态单独一套：这里是"确实没消息"，不是掉线
@@ -2732,36 +2878,21 @@
                     return;
                 }
 
-                // 首屏按内容量取：recentData 最新在前，累加到 12 条或约 10KB 即停。
-                const firstScreen = [];
-                let firstScreenChars = 0;
-                for (const m of recentData) {
-                    const chars = String(m.content || '').length + (m.media_url ? 256 : 0);
-                    if (firstScreen.length >= FIRST_SCREEN_MSG_MAX) break;
-                    if (firstScreen.length > 0 && firstScreenChars + chars > FIRST_SCREEN_CHARS_MAX) break;
-                    firstScreen.push(m);
-                    firstScreenChars += chars;
-                }
-                const msgs = firstScreen.reverse();
-                chatBox.innerHTML = "";
-                // 首屏一次性插入：先隐藏容器再追加，追加完恢复显示，避免逐条重排/逐条上冒。
-                const prevChatDisplay = chatBox.style.display;
-                chatBox.style.display = 'none';
-                const addedIds = new Set();
-                msgs.forEach(msg => {
-                    if (!addedIds.has(String(msg.id))) {
-                        addedIds.add(String(msg.id));
-                        appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type);
+                // 首屏按内容量取：recentData 最新在前（算法见 firstScreenOf）。
+                const firstScreen = firstScreenOf(recentData);
+                if (cachePaintedSig && messageListSig(firstScreen) === cachePaintedSig) {
+                    // 本地缓存与线上首屏完全一致：不重绘，避免"闪一下重画"
+                } else {
+                    const msgs = paintFirstScreen(chatBox, firstScreen);
+                    oldestLoadedAt = msgs[0].created_at;
+                    if (!isSpeedMode) {
+                        fetchAndApplyUserAvatars(msgs.map(m => m.sender));
                     }
-                });
-                chatBox.style.display = prevChatDisplay;
-                chatBox.scrollTop = chatBox.scrollHeight;
-                oldestLoadedAt = msgs[0].created_at;
+                }
                 // 只有「拉到不足 50 条且全部用上」才说明可能没有更早消息；被内容量截断时一定还有。
                 noMoreHistory = recentData.length < FIRST_FETCH_LIMIT && firstScreen.length === recentData.length;
-                if (!isSpeedMode) {
-                    fetchAndApplyUserAvatars(msgs.map(m => m.sender));
-                }
+                // 3.7.19：把线上最近消息落本地，下次冷启动/断网直接用
+                localCacheSaveMessages(currentRoomCode, recentData);
                 // ====== 装饰：把已存在的 pending 申请渲染为可投票卡片 ======
                 await decorateHistoryJoinRequests();
             } else {
@@ -2913,6 +3044,8 @@
                 if (continuationToken) return;
                 const existing = document.querySelector(`.msg-wrapper[data-msg-id="${payload.new.id}"]`);
                 if (existing) return;
+                // 3.7.19：实时新消息同步进本地缓存（断网重开也能看到最近 60 条）
+                localCacheSaveMessages(currentRoomCode, [payload.new]);
                 if (payload.new.sender === mySender) {
                     const existingTemp = findTempMessage(payload.new.content, payload.new.created_at);
                     if (existingTemp && existingTemp.dataset.sending === 'true') {
@@ -3153,6 +3286,8 @@
                         appendMessageToUI(msg.id, msg.sender, msg.content, true, msg.created_at, msg.media_url, msg.media_type);
                     }
                     lastKnownMessageId = data[data.length - 1].id;
+                    // 3.7.19：轮询到的新消息同步进本地缓存
+                    localCacheSaveMessages(roomAtStart, data);
                 }
             } catch (e) {
                 // 退避：连续失败 3 次 → 30 秒不轮询，成功一次（见上面的清零）立刻回常态。
