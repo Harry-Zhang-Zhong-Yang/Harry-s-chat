@@ -1903,3 +1903,68 @@
 }
 
         .sidebar-clear-link { display:inline-block; margin-top:8px; font-size:12px; color:#2b6cb0; cursor:pointer; text-decoration:underline; }
+
+/* ============ 3.7.18 · 黑白 + 雾面玻璃（默认主题 A） ============ */
+/* 底仍是黑/白，只把顶栏、输入条、侧栏、弹窗换成磨砂玻璃；消息气泡保持实底，低端机不卡。 */
+:root[data-theme="a"] {
+    --app-bg:
+        radial-gradient(1200px 700px at 8% -12%, #ffffff 0%, rgba(255,255,255,0) 62%),
+        radial-gradient(900px 620px at 92% 112%, #e6e6ea 0%, rgba(230,230,234,0) 58%),
+        #f2f2f4;
+    --page-bg: transparent;
+    --surface: rgba(255,255,255,0.55);
+    --surface-solid: rgba(252,252,253,0.86);
+    --surface-border: rgba(255,255,255,0.72);
+    --input-bg: rgba(255,255,255,0.62);
+    --input-border: rgba(0,0,0,0.06);
+    --chip-bg: rgba(255,255,255,0.55);
+    --line: rgba(0,0,0,0.06);
+    --panel-soft: rgba(255,255,255,0.5);
+}
+/* 背景铺一层极淡的灰白光斑，玻璃才有东西可"糊"，不会糊成一片死白 */
+:root[data-theme="a"] #chat-bg::after {
+    content: "";
+    position: absolute;
+    inset: -20%;
+    background:
+        radial-gradient(42% 38% at 18% 12%, rgba(0,0,0,0.05), transparent 70%),
+        radial-gradient(36% 34% at 84% 78%, rgba(0,0,0,0.045), transparent 70%),
+        radial-gradient(30% 28% at 62% 22%, rgba(255,255,255,0.55), transparent 70%);
+    filter: blur(18px);
+    pointer-events: none;
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    :root[data-theme="a"] #nav-bar,
+    :root[data-theme="a"] #input-area {
+        background: rgba(255,255,255,0.52);
+        -webkit-backdrop-filter: blur(24px) saturate(1.25);
+        backdrop-filter: blur(24px) saturate(1.25);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 10px 30px rgba(17,24,39,0.06);
+    }
+    :root[data-theme="a"] #room-sidebar {
+        background: rgba(255,255,255,0.5);
+        -webkit-backdrop-filter: blur(28px) saturate(1.2);
+        backdrop-filter: blur(28px) saturate(1.2);
+        border-right: 1px solid rgba(255,255,255,0.7);
+    }
+    :root[data-theme="a"] .modal-content,
+    :root[data-theme="a"] .extn-modal-card {
+        background: rgba(253,253,254,0.78);
+        -webkit-backdrop-filter: blur(30px) saturate(1.2);
+        backdrop-filter: blur(30px) saturate(1.2);
+        border: 1px solid rgba(255,255,255,0.75);
+        box-shadow: 0 30px 80px rgba(17,24,39,0.14), inset 0 1px 0 rgba(255,255,255,0.9);
+    }
+    :root[data-theme="a"] #message-input {
+        background: rgba(255,255,255,0.7);
+    }
+}
+/* 老 WebView 没有 backdrop-filter：退成高不透明白，保证可读 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root[data-theme="a"] #nav-bar,
+    :root[data-theme="a"] #input-area { background: rgba(255,255,255,0.94); }
+    :root[data-theme="a"] #room-sidebar { background: #ffffff; }
+    :root[data-theme="a"] .modal-content,
+    :root[data-theme="a"] .extn-modal-card { background: #ffffff; }
+}
+
