@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.11";
+    const CHAT_APP_VERSION = "3.7.12";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -171,6 +171,11 @@
     // 分页相关变量
     let isFetchingHistory = false;
     const PAGE_SIZE = 30;
+    // 首屏不按固定条数取：从最新往回累加，最多 12 条或约 10KB 即停，
+    // 避免一次灌 30 条长文（SQL 全文那种）导致逐条上冒、滚动重排。
+    const FIRST_SCREEN_MSG_MAX = 12;
+    const FIRST_SCREEN_CHARS_MAX = 10240;
+    const FIRST_FETCH_LIMIT = 50;
     // 用于分页：记录已加载的最早消息时间戳
     let oldestLoadedAt = null;
     // 是否已经没有更多历史可加载
@@ -533,7 +538,11 @@
             const ta = a.latest ? new Date(a.latest.created_at).getTime() : 0;
             const tb = b.latest ? new Date(b.latest.created_at).getTime() : 0;
             if (ta !== tb) return tb - ta;
-            return new Date(b.joinedAt || 0) - new Date(a.joinedAt || 0);
+            const ja = new Date(a.joinedAt || 0).getTime();
+            const jb = new Date(b.joinedAt || 0).getTime();
+            if (ja !== jb) return jb - ja;
+            // 兜底键：时间完全相同也永远给出同一顺序，避免无新消息时列表上下跳。
+            return String(a.code).localeCompare(String(b.code));
         });
         // 先把"要显示成什么样"算成纯数据
         const items = rows.map(r => {
@@ -1133,7 +1142,11 @@
                     const ta = latest[a] ? new Date(latest[a].created_at).getTime() : 0;
                     const tb = latest[b] ? new Date(latest[b].created_at).getTime() : 0;
                     if (ta !== tb) return tb - ta;
-                    return new Date(joinedAt[b] || 0) - new Date(joinedAt[a] || 0);
+                    const ja = new Date(joinedAt[a] || 0).getTime();
+                    const jb = new Date(joinedAt[b] || 0).getTime();
+                    if (ja !== jb) return jb - ja;
+                    // 兜底键：时间完全相同也永远同一顺序，避免列表无新消息时上下跳。
+                    return String(a).localeCompare(String(b));
                 });
                 const html = sorted.map(c => {
                     const m = latest[c];
@@ -1230,12 +1243,24 @@
         }
 
         if (window.visualViewport) {
+            // 键盘弹起时把 body 锁到 visualViewport 上（高度 + offsetTop），输入行随容器贴在键盘上沿。
+            // 不再对 #chat-container 做 translateY：整页上移正是「输入框被挡住 / 整行能拖动」的根因。
             const fixIOSKeyboard = () => {
+                const vv = window.visualViewport;
                 const chatBox = document.getElementById('chat-box');
                 const chatContainer = document.getElementById('chat-container');
-                if (chatContainer) {
-                    const offset = window.innerHeight - window.visualViewport.height;
-                    chatContainer.style.transform = offset > 0 ? `translateY(${-offset}px)` : '';
+                const mobileWidth = window.matchMedia('(max-width: 900px)').matches;
+                const kbOffset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                if (mobileWidth && kbOffset > 8) {
+                    document.body.style.height = vv.height + 'px';
+                    document.body.style.top = vv.offsetTop + 'px';
+                    document.body.classList.add('kb-open');
+                    if (chatContainer) chatContainer.style.height = vv.height + 'px';
+                } else {
+                    document.body.style.height = '';
+                    document.body.style.top = '';
+                    document.body.classList.remove('kb-open');
+                    if (chatContainer) chatContainer.style.height = '';
                 }
                 if (chatBox && chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 100) {
                     requestAnimationFrame(() => {
@@ -2544,7 +2569,7 @@
                         error = new Error('私信需要重新登录后才能查看');
                     } else {
                         try {
-                            recentData = await dmHistory(currentRoomCode, { limit: PAGE_SIZE });
+                            recentData = await dmHistory(currentRoomCode, { limit: FIRST_FETCH_LIMIT });
                             error = null;
                         } catch (e) {
                             recentData = null;
@@ -2557,7 +2582,7 @@
                         .select('id,room_code,sender,content,media_url,media_type,created_at')
                         .eq('room_code', currentRoomCode)
                         .order('created_at', { ascending: false })
-                        .limit(PAGE_SIZE);
+                        .limit(FIRST_FETCH_LIMIT);
                     recentData = res.data;
                     error = res.error;
                 }
@@ -2607,8 +2632,21 @@
                     return;
                 }
 
-                const msgs = recentData.reverse();
+                // 首屏按内容量取：recentData 最新在前，累加到 12 条或约 10KB 即停。
+                const firstScreen = [];
+                let firstScreenChars = 0;
+                for (const m of recentData) {
+                    const chars = String(m.content || '').length + (m.media_url ? 256 : 0);
+                    if (firstScreen.length >= FIRST_SCREEN_MSG_MAX) break;
+                    if (firstScreen.length > 0 && firstScreenChars + chars > FIRST_SCREEN_CHARS_MAX) break;
+                    firstScreen.push(m);
+                    firstScreenChars += chars;
+                }
+                const msgs = firstScreen.reverse();
                 chatBox.innerHTML = "";
+                // 首屏一次性插入：先隐藏容器再追加，追加完恢复显示，避免逐条重排/逐条上冒。
+                const prevChatDisplay = chatBox.style.display;
+                chatBox.style.display = 'none';
                 const addedIds = new Set();
                 msgs.forEach(msg => {
                     if (!addedIds.has(String(msg.id))) {
@@ -2616,9 +2654,11 @@
                         appendMessageToUI(msg.id, msg.sender, msg.content, false, msg.created_at, msg.media_url, msg.media_type);
                     }
                 });
+                chatBox.style.display = prevChatDisplay;
                 chatBox.scrollTop = chatBox.scrollHeight;
                 oldestLoadedAt = msgs[0].created_at;
-                noMoreHistory = msgs.length < PAGE_SIZE;
+                // 只有「拉到不足 50 条且全部用上」才说明可能没有更早消息；被内容量截断时一定还有。
+                noMoreHistory = recentData.length < FIRST_FETCH_LIMIT && firstScreen.length === recentData.length;
                 if (!isSpeedMode) {
                     fetchAndApplyUserAvatars(msgs.map(m => m.sender));
                 }
