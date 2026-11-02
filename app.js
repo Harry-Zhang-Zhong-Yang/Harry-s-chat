@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.16";
+    const CHAT_APP_VERSION = "3.7.17";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -426,6 +426,9 @@
     // （用户遇到的残留 "zzy"），那个值不会触发 input 事件，绝不能用它去过滤房间列表，
     // 否则列表会莫名只剩一两个房间 —— 用户说的"只能使用这个房间"就是这么来的。
     let sidebarSearchUserTyped = false;
+    // 上一轮的最新消息缓存（手机列表也用）：首屏直接用已知值排序，避免"先按加入时间画一版再重排"的闪动。
+    let prevLatest = {};
+    let mobileLatestCache = {};
     async function renderRoomSidebar() {
         const user = getLoggedInUser();
         if (!user || !supabaseClient) return;
@@ -518,19 +521,41 @@
             // .catch() 只挡得住"请求失败"，挡不住"请求挂起"（反代不稳时会挂住），
             // 只要任意一个不返回，Promise.all 永不 resolve → sidebarRoomsData 永不赋值
             // → renderSidebarList 永不调用 → 列表永远停在上面那 3 条骨架屏（用户看到的"白框"）。
-            sidebarRoomsData = codes.map(c => ({ code: c, name: nameMap[c] || c, memberCount: countMap[c] || 1, latest: null, joinedAt: joinedAt[c] }));
-            renderSidebarList();
-            // 最新一条消息只用于"预览 + 排序"，异步补：带 3 秒超时，超时就跳过该房间，不拖累整张列表
+            sidebarRoomsData = codes.map(c => ({ code: c, name: nameMap[c] || c, memberCount: countMap[c] || 1, latest: prevLatest[c] || null, joinedAt: joinedAt[c] }));
+            // 【消灭"闪一下旧顺序"】首屏不先用 joinedAt 画一版再重排：
+            // 已有上一轮最新消息的直接按正确顺序一次画出；首次进入则最多等 1.5 秒补齐后再画。
             const latestMap = {};
-            await Promise.all(codes.map(c => Promise.race([
-                latestMessageOf(c)
-                    .then(m => { if (m) latestMap[c] = m; })
-                    .catch(() => {}),
-                new Promise(resolve => setTimeout(resolve, 3000))
-            ])));
-            if (Object.keys(latestMap).length) {
-                sidebarRoomsData = sidebarRoomsData.map(r => ({ ...r, latest: latestMap[r.code] || r.latest }));
-                renderSidebarList();
+            const missing = codes.filter(c => !prevLatest[c]);
+            if (missing.length) {
+                await Promise.all(missing.map(c => Promise.race([
+                    latestMessageOf(c)
+                        .then(m => { if (m) latestMap[c] = m; })
+                        .catch(() => {}),
+                    new Promise(resolve => setTimeout(resolve, 1500))
+                ])));
+                if (Object.keys(latestMap).length) {
+                    sidebarRoomsData = sidebarRoomsData.map(r => ({ ...r, latest: latestMap[r.code] || r.latest }));
+                }
+            }
+            renderSidebarList();
+            // 已有缓存的房间后台刷新预览：只有真来了新消息才重绘（不再出现"空 latest → 重排"的跳变）
+            const stale = codes.filter(c => prevLatest[c]);
+            if (stale.length) {
+                const fresh = {};
+                await Promise.all(stale.map(c => Promise.race([
+                    latestMessageOf(c)
+                        .then(m => { if (m) fresh[c] = m; })
+                        .catch(() => {}),
+                    new Promise(resolve => setTimeout(resolve, 3000))
+                ])));
+                const changed = Object.keys(fresh).some(c => {
+                    const old = prevLatest[c];
+                    return !old || new Date(fresh[c].created_at).getTime() !== new Date(old.created_at).getTime();
+                });
+                if (changed) {
+                    sidebarRoomsData = sidebarRoomsData.map(r => ({ ...r, latest: fresh[r.code] || r.latest }));
+                    renderSidebarList();
+                }
             }
             sidebarLastLoadedAt = Date.now();
             sidebarEverRendered = true;
@@ -1214,16 +1239,31 @@
                 listEl.dataset.ready = '1';
             };
 
-            // 先出列表，房间立刻可点；预览后到再重绘一次
-            paintMobileList({});
-            const latest = {};
+            // 首屏用上一次已知的最新消息排序；首次进入则最多等 1.5 秒，避免"先旧顺序再重排"闪一下
+            const latest = Object.assign({}, mobileLatestCache);
+            if (!Object.keys(latest).length) {
+                await Promise.all(codes.map(c => Promise.race([
+                    latestMessageOf(c)
+                        .then(m => { if (m) latest[c] = m; })
+                        .catch(() => {}),
+                    new Promise(resolve => setTimeout(resolve, 1500))
+                ])));
+            }
+            paintMobileList(latest);
+            // 后台刷新：只有真来了新消息才重绘
+            const fresh = {};
             await Promise.all(codes.map(c => Promise.race([
                 latestMessageOf(c)
-                    .then(m => { if (m) latest[c] = m; })
+                    .then(m => { if (m) fresh[c] = m; })
                     .catch(() => {}),
                 new Promise(resolve => setTimeout(resolve, 3000))
             ])));
-            if (Object.keys(latest).length) paintMobileList(latest);
+            const changed = Object.keys(fresh).some(c => {
+                const old = latest[c];
+                return !old || new Date(fresh[c].created_at).getTime() !== new Date(old.created_at).getTime();
+            });
+            mobileLatestCache = Object.assign({}, fresh);
+            if (changed) paintMobileList(fresh);
         } catch (e) {
             console.warn('手机房间列表加载失败:', e);
             if (!listEl.dataset.ready) listEl.innerHTML = '<div class="mrv-empty">加载失败，请下拉刷新重试</div>';
