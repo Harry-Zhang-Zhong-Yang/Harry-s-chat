@@ -272,8 +272,9 @@
         const a = document.getElementById('mrv-apk-download');
         if (!a) return;
         if (isNativeApp) { a.style.display = 'none'; return; }
-        // jsDelivr CDN 托管在 GitHub 仓库的 APK，跨域请求不经过 SW，无缓存截断问题
-        const base = 'https://cdn.jsdelivr.net/gh/Harry-Zhang-Zhong-Yang/Harry-s-chat@main/Harry%E7%9A%84%E8%81%8A%E5%A4%A9%E5%AE%A4-v' + CHAT_APP_VERSION + '.apk';
+        // 3.7.16 自检发现 cdn.jsdelivr.net 在本机被重置（连接 reset），改为与应用同源的 Pages 托管
+        // （APK 已随 web 一起提交到仓库根目录，实测 GET 200、字节数与安装包一致）。
+        const base = 'https://harry-s-chat.pages.dev/Harry%E7%9A%84%E8%81%8A%E5%A4%A9%E5%AE%A4-v' + CHAT_APP_VERSION + '.apk';
         a.href = base;
         a.addEventListener('click', () => {
             showToast('正在下载安卓 App，请等待1-2分钟，在通知栏可查看进度', 'info', 4000);
