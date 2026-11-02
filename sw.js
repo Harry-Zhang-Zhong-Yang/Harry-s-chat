@@ -1,4 +1,4 @@
-const CACHE_NAME = 'harrys-chat-v90';
+const CACHE_NAME = 'harrys-chat-v91';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -109,18 +109,17 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // 其余静态资源：stale-while-revalidate —— 立即返回缓存（快），同时后台拉新版更新缓存（保证下次打开是最新）
+    // 其余静态资源：network-first —— 先拿线上最新（发版后不会再先闪旧版本），
+    // 只有断网/请求失败时才回退缓存。旧实现是 stale-while-revalidate，
+    // 必然先返回上一版 app.js/style.css，用户看到的就是"闪过没改过的版本"。
     event.respondWith(
         caches.open(CACHE_NAME).then((cache) => {
-            return cache.match(event.request).then((cached) => {
-                const fetchPromise = fetch(event.request).then((response) => {
-                    if (response && response.status === 200) {
-                        cache.put(event.request, response.clone());
-                    }
-                    return response;
-                }).catch(() => cached);
-                return cached || fetchPromise;
-            });
+            return fetch(event.request).then((response) => {
+                if (response && response.status === 200) {
+                    cache.put(event.request, response.clone());
+                }
+                return response;
+            }).catch(() => cache.match(event.request).then((cached) => cached || Response.error()));
         })
     );
 });
