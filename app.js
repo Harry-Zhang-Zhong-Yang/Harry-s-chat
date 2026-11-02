@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.13";
+    const CHAT_APP_VERSION = "3.7.14";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -40,6 +40,16 @@
     function parseBeijingTime(isoStr) {
         if (!isoStr) return new Date();
         return new Date(isoStr);
+    }
+
+    /** room_members 是成员关系；房间是否存在必须以 rooms 为准。 */
+    async function existingRoomCodes(codes) {
+        const unique = [...new Set((codes || []).map(code => String(code || '').trim()).filter(Boolean))];
+        if (!unique.length) return [];
+        const { data, error } = await supabaseClient.from('rooms').select('room_code').in('room_code', unique);
+        if (error) throw error;
+        const existing = new Set((data || []).map(row => row.room_code));
+        return unique.filter(code => existing.has(code));
     }
 
     function showToast(message, type = 'info', duration = 2500) {
@@ -443,7 +453,7 @@
             ]);
             if (error) throw error;
             // v3.7.2：私信房间（dm_）不再被过滤掉，和普通房间一起混排（微信式：私信就在会话列表里）
-            const codes = [...new Set((data || []).map(r => r.room_code))];
+            const codes = await existingRoomCodes((data || []).map(r => r.room_code));
             if (!codes.length) {
                 sidebarRoomsData = [];
                 sidebarLastSignature = '';
@@ -900,7 +910,7 @@
         if (!me || !supabaseClient) { list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);">请先登录</div>'; return; }
         try {
             const { data } = await supabaseClient.from('room_members').select('room_code').eq('user_name', me);
-            const dmCodes = [...new Set((data || []).map(r => r.room_code))].filter(isDmRoom);
+            const dmCodes = (await existingRoomCodes((data || []).map(r => r.room_code))).filter(isDmRoom);
             if (!dmCodes.length) {
                 list.innerHTML = '<div style="padding:26px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.7;">还没有私信<br><small>点下面的按钮，选一个 AI 人格开聊</small></div>';
                 return;
@@ -1119,7 +1129,7 @@
                 .order('created_at', { ascending: false });
             if (error) throw error;
             const joined = data || [];
-            const codes = [...new Set(joined.map(r => r.room_code))];
+            const codes = await existingRoomCodes(joined.map(r => r.room_code));
             if (!codes.length) {
                 listEl.innerHTML = '<div class="mrv-empty">还没有房间<br>在下方输入房间代码加入或创建</div>';
                 listEl.dataset.ready = '1';
@@ -3300,19 +3310,12 @@
         requestAnimationFrame(scrollToBottomInstant);
         [50, 150, 300].forEach((d) => setTimeout(scrollToBottomInstant, d));
         try {
-            const { data, error } = await supabaseClient
-                .from('messages')
-                .insert([{
-                    room_code: currentRoomCode,
-                    content: finalContent,
-                    sender: mySender,
-                    media_url: url,
-                    media_type: type,
-                    created_at: now
-                }])
-                .select('id')
-                .single();
-            if (error) throw error;
+            const result = await callServerAction(null, 'send-message', {
+                session: dmSession(), room_code: currentRoomCode, content: finalContent,
+                media_url: url, media_type: type
+            });
+            const data = result && result.message;
+            if (!data || !data.id) throw new Error('媒体消息未返回编号');
             if (tempEl && data && data.id) {
                 tempEl.dataset.msgId = String(data.id);
                 tempEl.dataset.sending = 'false';
@@ -4378,19 +4381,12 @@
         wrapper.title = '';
         updateMessageStatus(msgId, 'sending', '重试中...');
         try {
-            const { data, error } = await supabaseClient
-                .from('messages')
-                .insert([{
-                    room_code: currentRoomCode,
-                    content: content,
-                    sender: mySender,
-                    media_url: mediaUrl || null,
-                    media_type: mediaType || null,
-                    created_at: createdAt
-                }])
-                .select('id')
-                .single();
-            if (error) throw error;
+            const result = await callServerAction(null, 'send-message', {
+                session: dmSession(), room_code: currentRoomCode, content,
+                media_url: mediaUrl || null, media_type: mediaType || null
+            });
+            const data = result && result.message;
+            if (!data || !data.id) throw new Error('重试消息未返回编号');
             if (data && data.id) {
                 wrapper.dataset.msgId = String(data.id);
                 wrapper.dataset.sending = 'false';
@@ -5343,8 +5339,8 @@
             const now = Date.now();
             const windowMs = 2 * 60 * 1000;
             if (now - created > windowMs) return showToast('撤回时间已过（仅支持发送后2分钟内撤回）', 'error');
-            await supabaseClient.from('messages').update({ content: '[已撤回]', media_url: null, media_type: null }).eq('id', messageId);
-            updateMessageInUI({ id: messageId, sender: mySender, content: '[已撤回]', media_url: null, media_type: null });
+            const result = await callServerAction(null, 'recall-message', { session: dmSession(), message_id: messageId });
+            updateMessageInUI(result.message);
         } catch (e) { console.error('recallMessage', e); showToast('撤回失败', 'error'); }
     }
 
@@ -5363,8 +5359,10 @@
             if (newContent === null || newContent.trim() === '') return;
             if (newContent.trim() === cleanContent.trim()) return;
             const finalContent = newContent.trim();
-            await supabaseClient.from('messages').update({ content: finalContent, edited_at: beijingISOString() }).eq('id', messageId);
-            updateMessageInUI({ id: messageId, sender: mySender, content: finalContent, edited_at: beijingISOString() });
+            const result = await callServerAction(null, 'edit-message', {
+                session: dmSession(), message_id: messageId, content: finalContent
+            });
+            updateMessageInUI(result.message);
             showToast('消息已编辑', 'success');
         } catch (e) { console.error('editMessage', e); showToast('编辑失败', 'error'); }
     }
@@ -6603,7 +6601,7 @@
                 .eq('user_name', user)
                 .order('created_at', { ascending: false });
             if (error) throw error;
-            myRoomsCache = [...new Set((data || []).map(r => r.room_code))];
+            myRoomsCache = await existingRoomCodes((data || []).map(r => r.room_code));
         } catch (e) {
             console.warn('加载我的房间失败:', e);
         }
