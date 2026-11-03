@@ -1357,6 +1357,8 @@
     // 两次绘制叠加就会出现「旧格式和新格式一起闪」。同一时刻只允许一次，后来的合并成一次补跑。
     let mobileListBusy = false;
     let mobileListPending = false;
+    // 手动下拉刷新时置 true：跳过「先画缓存、再画网络」的两段绘制，只提交一次，彻底消掉旧/新格式同屏闪
+    let mobileForceFresh = false;
     /** 手机端房间列表：微信式 —— 最新一条消息预览 + 时间，按最新消息时间倒序 */
     async function renderMobileRoomList() {
         if (mobileListBusy) { mobileListPending = true; return; }
@@ -1413,15 +1415,17 @@
 
             // 首屏用上一次已知的最新消息排序；首次进入则最多等 1.5 秒，避免"先旧顺序再重排"闪一下
             const latest = Object.assign({}, mobileLatestCache);
-            if (!Object.keys(latest).length) {
-                await Promise.all(codes.map(c => Promise.race([
-                    latestMessageOf(c)
-                        .then(m => { if (m) latest[c] = m; })
-                        .catch(() => {}),
-                    new Promise(resolve => setTimeout(resolve, 1500))
-                ])));
+            if (!mobileForceFresh) {
+                if (!Object.keys(latest).length) {
+                    await Promise.all(codes.map(c => Promise.race([
+                        latestMessageOf(c)
+                            .then(m => { if (m) latest[c] = m; })
+                            .catch(() => {}),
+                        new Promise(resolve => setTimeout(resolve, 1500))
+                    ])));
+                }
+                paintMobileList(latest);
             }
-            paintMobileList(latest);
             // 后台刷新：只有真来了新消息才重绘
             const fresh = {};
             await Promise.all(codes.map(c => Promise.race([
@@ -1437,7 +1441,7 @@
             mobileLatestCache = Object.assign({}, fresh);
             // 3.7.19：落本地快照，下次冷启动先用它画
             localCacheSet(LOCAL_CACHE_ROOMS, 'm:' + user, { codes, nameMap, joinedAt, latest: mobileLatestCache, savedAt: Date.now() });
-            if (changed) paintMobileList(fresh);
+            if (changed || mobileForceFresh) paintMobileList(fresh);
         } catch (e) {
             console.warn('手机房间列表加载失败:', e);
             if (!listEl.dataset.ready) listEl.innerHTML = '<div class="mrv-empty">加载失败，请下拉刷新重试</div>';
@@ -1500,7 +1504,9 @@
                 page.classList.add('refreshing');
                 textEl.textContent = '正在刷新…';
                 setHeight(44);
+                mobileForceFresh = true;
                 Promise.resolve(renderMobileRoomList()).catch(() => {}).finally(() => {
+                    mobileForceFresh = false;
                     setTimeout(() => {
                         refreshing = false;
                         page.classList.remove('refreshing');
