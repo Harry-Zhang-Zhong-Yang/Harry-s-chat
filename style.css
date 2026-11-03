@@ -3,13 +3,20 @@
         --safe-bottom: env(safe-area-inset-bottom, 0px);
         --toast-shadow: 0 18px 42px rgba(16, 24, 40, 0.18);
       }
+      /* 3.7.34：华文新魏只作用于中文汉字/中文标点，英文、数字、引号、反引号继续用系统正文字体。
+         之前整段套用新魏，它的 ASCII 引号字形看起来就是“反着的”，这才是引号问题的根因。 */
+      @font-face {
+        font-family: "XinweiCJK";
+        src: local("华文新魏"), local("STXinwei");
+        unicode-range: U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FE30-FE4F, U+FF00-FFEF;
+      }
       * { box-sizing: border-box; }
       html, body {
         margin: 0;
         min-height: 100%;
         background: var(--bg, #f5f5f5);
         color: var(--text-main, #18181b);
-        font-family: "STXinwei", "华文新魏", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-family: "XinweiCJK", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
         -webkit-tap-highlight-color: transparent;
       }
       body { overscroll-behavior-y: contain; }
@@ -318,7 +325,7 @@
             text-size-adjust: 100%;
         }
         body { 
-            font-family: "STXinwei", "华文新魏", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+            font-family: "XinweiCJK", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
             background: var(--app-bg);
             color: var(--text-main);
             height: 100vh; height: 100dvh; width: 100vw;
@@ -1647,7 +1654,7 @@
             display: flex;
             flex-direction: column;
             color: var(--text-main);
-            font-family: "STXinwei", "华文新魏", -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-family: "XinweiCJK", -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             -webkit-overflow-scrolling: touch;
             padding-top: env(safe-area-inset-top, 0px);
             padding-bottom: env(safe-area-inset-bottom, 0px);
