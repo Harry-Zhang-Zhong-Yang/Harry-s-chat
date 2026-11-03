@@ -602,8 +602,10 @@
         .msg-wrapper.media-only .msg-content > div:first-child { line-height: 0; }
         .msg-wrapper.media-only .msg-content { position: relative; }
 
-        /* 长消息折叠：默认只露前 ~300px，底部渐隐；点「展开全文」看全文 */
-        .msg-collapsed > .msg-content > div {
+        /* 长消息折叠：默认只露前 ~300px，底部渐隐；点「展开全文」看全文。
+           注意：.msg-content 在 message-row > message-stack 里，不是 .msg-wrapper 的直接子元素，
+           所以这里必须用后代选择器，否则折叠规则永远命不中。 */
+        .msg-collapsed .msg-content > div {
             max-height: 300px;
             overflow: hidden;
             -webkit-mask-image: linear-gradient(to bottom, #000 68%, transparent 100%);
@@ -614,10 +616,14 @@
             margin-top: 2px;
             padding: 2px 0;
             font-size: 12px;
+            font-family: inherit;
             line-height: 1.4;
             color: var(--btn-color);
+            background: none;
+            border: 0;
             cursor: pointer;
             user-select: none;
+            -webkit-user-select: none;
             opacity: 0.9;
         }
         .right .msg-expand-btn { align-self: flex-end; }
