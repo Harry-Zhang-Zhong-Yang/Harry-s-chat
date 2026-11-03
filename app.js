@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.31";
+    const CHAT_APP_VERSION = "3.7.32";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -1353,8 +1353,25 @@
         listEl.dataset.ready = '1';
     }
 
+    // 3.7.32：列表渲染加互斥锁。下拉刷新 + 15 秒定时刷新 + 进房刷新可能同时触发，
+    // 两次绘制叠加就会出现「旧格式和新格式一起闪」。同一时刻只允许一次，后来的合并成一次补跑。
+    let mobileListBusy = false;
+    let mobileListPending = false;
     /** 手机端房间列表：微信式 —— 最新一条消息预览 + 时间，按最新消息时间倒序 */
     async function renderMobileRoomList() {
+        if (mobileListBusy) { mobileListPending = true; return; }
+        mobileListBusy = true;
+        try {
+            await renderMobileRoomListCore();
+        } finally {
+            mobileListBusy = false;
+            if (mobileListPending) {
+                mobileListPending = false;
+                setTimeout(() => { renderMobileRoomList(); }, 0);
+            }
+        }
+    }
+    async function renderMobileRoomListCore() {
         const listEl = document.getElementById('mrv-list');
         if (!listEl) return;
         const user = getLoggedInUser();
@@ -1436,19 +1453,22 @@
         }
     }, 15000);
 
-    // ===== 手机消息页：下拉刷新（3.7.31）=====
+    // ===== 手机消息页：下拉刷新（3.7.32 改成占位条，列表整体下移）=====
     (function initMobilePullToRefresh() {
         const page = document.getElementById('mrv-page-msgs');
         if (!page) return;
+        const listEl = document.getElementById('mrv-list');
         const ptr = document.createElement('div');
         ptr.className = 'mrv-ptr';
         ptr.innerHTML = '<span class="mrv-ptr-spin"></span><span class="mrv-ptr-text">下拉刷新</span>';
-        page.appendChild(ptr);
+        // 放在列表上方、参与正常布局：拉动时占位条撑开，列表跟着下移，文字不再被裁一半
+        if (listEl) page.insertBefore(ptr, listEl); else page.appendChild(ptr);
         const textEl = ptr.querySelector('.mrv-ptr-text');
         let startY = 0;
         let pulling = false;
         let refreshing = false;
         let delta = 0;
+        const setHeight = (h) => { ptr.style.height = Math.max(0, h) + 'px'; };
         page.addEventListener('touchstart', (e) => {
             if (refreshing || e.touches.length !== 1 || page.scrollTop > 0) return;
             startY = e.touches[0].clientY;
@@ -1462,12 +1482,12 @@
                 pulling = false;
                 delta = 0;
                 page.classList.remove('pulling');
-                ptr.style.transform = '';
+                setHeight(0);
                 return;
             }
             delta = Math.min(move * 0.55, 72);
             page.classList.add('pulling');
-            ptr.style.transform = `translate(-50%, ${delta - 26}px)`;
+            setHeight(delta);
             textEl.textContent = delta > 52 ? '松开刷新' : '下拉刷新';
             if (move > 12 && e.cancelable) e.preventDefault();
         }, { passive: false });
@@ -1479,16 +1499,17 @@
                 refreshing = true;
                 page.classList.add('refreshing');
                 textEl.textContent = '正在刷新…';
+                setHeight(44);
                 Promise.resolve(renderMobileRoomList()).catch(() => {}).finally(() => {
                     setTimeout(() => {
                         refreshing = false;
                         page.classList.remove('refreshing');
-                        ptr.style.transform = '';
+                        setHeight(0);
                         textEl.textContent = '下拉刷新';
                     }, 400);
                 });
             } else {
-                ptr.style.transform = '';
+                setHeight(0);
             }
             delta = 0;
         };
@@ -2218,15 +2239,14 @@
 
         try {
             // ====== 进房：已取消「申请 / 审批 / 投票」 ======
-            // 2026-10-31 按需求移除加入审批：登录用户进房即成为成员。
-            // 仍然必须走 ensureMembership —— 成员身份要落库，否则房间列表查不到、
-            // 再次进入又会被判成非成员（历史上踩过：写成员失败静默）。
-            await ensureMembership(currentRoomCode, mySender);
+            // 3.7.32：先把房间页面切出来（立刻响应点击），成员写入放到后台。
+            // 之前 await ensureMembership 挡在前面，弱网点房间要等一两秒才有反应。
             stopJoinWaitWatcher();
             hideApplyScreen();
             document.getElementById('login-area').style.display = 'none';
             showRoomLoading();
             setRoomTitle(currentRoomCode);
+            await ensureMembership(currentRoomCode, mySender);
             await actuallyEnterRoom(prevRoomCode);
             refreshAiNames(); // 不阻塞进房
         } catch (e) {
@@ -2921,6 +2941,8 @@
                         oldestLoadedAt = painted.length ? painted[0].created_at : null;
                         noMoreHistory = cachedMsgs.length < FIRST_FETCH_LIMIT;
                         if (!isSpeedMode) fetchAndApplyUserAvatars(painted.map(m => m.sender));
+                        // 3.7.32：本地缓存已经铺满首屏，立刻收起加载提示（网络结果回来再静默校正）
+                        requestAnimationFrame(() => hideRoomLoading());
                     }
                 }
 
@@ -4984,10 +5006,25 @@
             .replace(/^[ \t]*[-*][ \t]+/gm, '· ');
     }
 
+    /**
+     * 3.7.32：引号方向修正。模型偶尔输出 ”……“ 这种反着用的弯引号，看着像引号反过来。
+     * 只在「先出现收尾引号、后出现开头引号」时整段对调；正常写法（先 “ 后 ”）原样不动。
+     */
+    function normalizeQuoteMarks(t) {
+        const s = String(t ?? '');
+        const firstOpen = s.indexOf('\u201C');
+        const firstClose = s.indexOf('\u201D');
+        if (firstOpen >= 0 && firstClose >= 0 && firstClose < firstOpen) {
+            return s.replace(/[\u201C\u201D]/g, ch => (ch === '\u201C' ? '\u201D' : '\u201C'));
+        }
+        return s;
+    }
+
     function appendMessageToUI(id, sender, content, isNew, timestamp_str, mediaUrl = null, mediaType = null, insertAtTop = false, skipAvatarRefresh = false, fileName = null, fileSize = null) {
         // AI 成员的消息：显示层清理 markdown 残留（原始文本仍存 dataset.originalContent 之前的安全副本见下）
         const isAiSender = !!(window.__aiNames && window.__aiNames.has(sender));
         const rawContent = content;
+        content = normalizeQuoteMarks(content);
         if (isAiSender) content = stripMarkdownDisplay(content);
         // 安卓 APK：后台收到别人的新消息 → 弹系统通知
         if (isNew && !insertAtTop && sender && sender !== mySender && isNativeApp) {
