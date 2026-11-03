@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.22";
+    const CHAT_APP_VERSION = "3.7.23";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
