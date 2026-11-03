@@ -2275,3 +2275,245 @@
     :root[data-theme="a"] .admin-tabbar { background: var(--surface); }
 }
 
+/* ============================================================
+   3.7.30 · 双主题
+   A = 黑白玻璃（默认）：中性灰白渐变 + 黑白毛玻璃
+   B = 蓝紫玻璃：蓝紫渐变 + 蓝紫毛玻璃
+   ============================================================ */
+
+/* ---------- A · 黑白玻璃 ---------- */
+:root[data-theme="a"] {
+    --app-bg:
+        radial-gradient(1100px 720px at 6% -10%, #ffffff 0%, rgba(255,255,255,0) 62%),
+        radial-gradient(900px 640px at 98% 108%, #e4e4e7 0%, rgba(228,228,231,0) 58%),
+        linear-gradient(168deg, #f7f7f8 0%, #efeff1 48%, #f6f6f7 100%);
+    --page-bg: transparent;
+    --surface: rgba(255,255,255,0.46);
+    --surface-solid: rgba(255,255,255,0.84);
+    --surface-border: rgba(255,255,255,0.72);
+    --input-bg: rgba(255,255,255,0.58);
+    --input-border: rgba(30,30,40,0.14);
+    --chip-bg: rgba(255,255,255,0.55);
+    --line: rgba(20,20,30,0.09);
+    --panel-soft: rgba(255,255,255,0.5);
+    --text-main: #18181b;
+    --muted: #71717a;
+    --btn-color: #18181b;
+    --btn-bg: linear-gradient(135deg, #3f3f46 0%, #18181b 100%);
+    --bubble-color: #18181b;
+    --bubble-bg: linear-gradient(135deg, rgba(39,39,42,0.90) 0%, rgba(24,24,27,0.86) 100%);
+    --bubble-text: #fafafa;
+    --bubble-shadow: 0 8px 22px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.16);
+    --msg-others-bg: rgba(255,255,255,0.56);
+    --msg-others-border: rgba(255,255,255,0.74);
+    --ava-g1: #52525b;
+    --ava-g2: #3f3f46;
+}
+:root[data-theme="a"] #chat-bg::after {
+    background:
+        radial-gradient(38% 34% at 16% 16%, rgba(0,0,0,0.06), transparent 70%),
+        radial-gradient(34% 32% at 86% 74%, rgba(0,0,0,0.05), transparent 70%),
+        radial-gradient(30% 30% at 60% 28%, rgba(255,255,255,0.45), transparent 70%);
+}
+:root[data-theme="a"] .auth-overlay::before {
+    background:
+        radial-gradient(34% 30% at 18% 18%, rgba(0,0,0,0.06), transparent 70%),
+        radial-gradient(30% 28% at 84% 76%, rgba(0,0,0,0.05), transparent 70%),
+        radial-gradient(26% 24% at 62% 30%, rgba(255,255,255,0.55), transparent 70%);
+}
+:root[data-theme="a"] .auth-input {
+    border-color: rgba(30,30,40,0.16);
+}
+:root[data-theme="a"] .auth-input:focus {
+    border-color: rgba(24,24,27,0.5);
+    box-shadow: 0 0 0 4px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+:root[data-theme="a"] .auth-btn { box-shadow: 0 12px 26px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.22); }
+:root[data-theme="a"] .mrv-plus,
+:root[data-theme="a"] .sidebar-add { box-shadow: 0 8px 18px rgba(0,0,0,0.18); }
+:root[data-theme="a"] .admin-nav-item.active { box-shadow: 0 10px 22px rgba(0,0,0,0.22); }
+
+@media (prefers-color-scheme: dark) {
+    :root[data-theme="a"] {
+        --app-bg:
+            radial-gradient(1100px 720px at 6% -12%, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0) 62%),
+            radial-gradient(900px 620px at 92% 112%, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 58%),
+            #0b0b0c;
+        --page-bg: transparent;
+        --btn-color: #e8e8ed;
+        --btn-bg: linear-gradient(135deg, #3f3f46 0%, #18181b 100%);
+        --bubble-color: #fbfbfc;
+        --bubble-bg: linear-gradient(135deg, rgba(39,39,42,0.88) 0%, rgba(24,24,27,0.84) 100%);
+        --bubble-text: #fbfbfc;
+        --msg-others-bg: rgba(255,255,255,0.06);
+        --msg-others-border: rgba(255,255,255,0.10);
+    }
+    :root[data-theme="a"] #chat-bg::after {
+        background:
+            radial-gradient(38% 34% at 16% 16%, rgba(255,255,255,0.07), transparent 70%),
+            radial-gradient(34% 32% at 86% 74%, rgba(255,255,255,0.05), transparent 70%),
+            radial-gradient(30% 30% at 60% 28%, rgba(255,255,255,0.03), transparent 70%);
+    }
+    :root[data-theme="a"] .auth-overlay::before {
+        background:
+            radial-gradient(34% 30% at 18% 18%, rgba(255,255,255,0.06), transparent 70%),
+            radial-gradient(30% 28% at 84% 76%, rgba(255,255,255,0.04), transparent 70%),
+            radial-gradient(26% 24% at 62% 30%, rgba(255,255,255,0.03), transparent 70%);
+    }
+    :root[data-theme="a"] .auth-input {
+        border-color: rgba(255,255,255,0.16);
+        background: rgba(255,255,255,0.08);
+    }
+    :root[data-theme="a"] .auth-input::placeholder { color: rgba(255,255,255,0.45); }
+}
+
+/* ---------- B · 蓝紫玻璃 ---------- */
+:root[data-theme="b"] {
+    --app-bg:
+        radial-gradient(1050px 700px at 4% -10%, #e6e9ff 0%, rgba(230,233,255,0) 62%),
+        radial-gradient(900px 640px at 98% -6%, #ffe7f4 0%, rgba(255,231,244,0) 58%),
+        radial-gradient(1000px 720px at 84% 110%, #e0f7ff 0%, rgba(224,247,255,0) 62%),
+        linear-gradient(168deg, #f7f8ff 0%, #fbf7ff 48%, #f4fbff 100%);
+    --page-bg: transparent;
+    --surface: rgba(255,255,255,0.46);
+    --surface-solid: rgba(255,255,255,0.84);
+    --surface-border: rgba(255,255,255,0.72);
+    --input-bg: rgba(255,255,255,0.58);
+    --input-border: rgba(112,120,170,0.14);
+    --chip-bg: rgba(255,255,255,0.55);
+    --line: rgba(80,90,140,0.09);
+    --panel-soft: rgba(255,255,255,0.5);
+    --text-main: #18181b;
+    --muted: #71717a;
+    --btn-color: #5b5be0;
+    --btn-bg: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    --bubble-color: #6d5ef0;
+    --bubble-bg: linear-gradient(135deg, rgba(96,102,230,0.88) 0%, rgba(142,94,246,0.80) 100%);
+    --bubble-text: #ffffff;
+    --bubble-shadow: 0 8px 22px rgba(88,84,200,0.22), inset 0 1px 0 rgba(255,255,255,0.32);
+    --msg-others-bg: rgba(255,255,255,0.56);
+    --msg-others-border: rgba(255,255,255,0.74);
+    --font-display: inherit;
+    --scrollbar: rgba(0,0,0,0.18);
+    --ava-g1: #6d6ef0;
+    --ava-g2: #8b5cf6;
+}
+:root[data-theme="b"] #chat-bg::after {
+    background:
+        radial-gradient(38% 34% at 16% 16%, rgba(120,140,255,0.20), transparent 70%),
+        radial-gradient(34% 32% at 86% 74%, rgba(255,150,200,0.16), transparent 70%),
+        radial-gradient(30% 30% at 60% 28%, rgba(120,220,255,0.14), transparent 70%);
+    animation: auroraDrift 22s ease-in-out infinite alternate;
+    filter: blur(26px);
+    pointer-events: none;
+}
+:root[data-theme="b"] .auth-overlay::before {
+    background:
+        radial-gradient(34% 30% at 18% 18%, rgba(120,140,255,0.22), transparent 70%),
+        radial-gradient(30% 28% at 84% 76%, rgba(255,150,200,0.16), transparent 70%),
+        radial-gradient(26% 24% at 62% 30%, rgba(120,220,255,0.14), transparent 70%);
+}
+:root[data-theme="b"] .auth-input {
+    background: rgba(255,255,255,0.72);
+    border-color: rgba(99,102,241,0.18);
+}
+:root[data-theme="b"] .auth-input::placeholder { color: rgba(60,66,100,0.55); }
+:root[data-theme="b"] .auth-input:focus {
+    border-color: rgba(99,102,241,0.55);
+    box-shadow: 0 0 0 4px rgba(99,102,241,0.14), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+:root[data-theme="b"] .auth-btn,
+:root[data-theme="b"] .mrv-plus,
+:root[data-theme="b"] .sidebar-add { box-shadow: 0 10px 24px rgba(99,102,241,0.24); }
+:root[data-theme="b"] .admin-nav-item.active { box-shadow: 0 10px 22px rgba(99,102,241,0.24); }
+:root[data-theme="b"] .mrv-item:hover,
+:root[data-theme="b"] .sidebar-room-item:hover { background: var(--chip-bg); border-color: var(--surface-border); }
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    :root[data-theme="b"] .auth-card {
+        background: var(--surface-solid);
+        -webkit-backdrop-filter: blur(30px) saturate(1.35);
+        backdrop-filter: blur(30px) saturate(1.35);
+        border: 1px solid var(--surface-border);
+        border-radius: 24px;
+        box-shadow: 0 24px 60px rgba(70,80,160,0.18), inset 0 1px 0 rgba(255,255,255,0.65);
+    }
+    :root[data-theme="b"] .msg-wrapper:not(.media-only).left .msg-content {
+        background: var(--msg-others-bg);
+        -webkit-backdrop-filter: blur(16px) saturate(1.35);
+        backdrop-filter: blur(16px) saturate(1.35);
+        border: 1px solid var(--msg-others-border);
+        box-shadow: 0 6px 18px rgba(90,100,170,0.10), inset 0 1px 0 rgba(255,255,255,0.45);
+    }
+    :root[data-theme="b"] .msg-wrapper:not(.media-only).right .msg-content {
+        background: var(--bubble-bg);
+        -webkit-backdrop-filter: blur(14px) saturate(1.15);
+        backdrop-filter: blur(14px) saturate(1.15);
+        border: 1px solid rgba(255,255,255,0.30);
+        box-shadow: var(--bubble-shadow);
+        color: var(--bubble-text);
+    }
+    :root[data-theme="b"] .admin-login-card,
+    :root[data-theme="b"] .admin-sidebar,
+    :root[data-theme="b"] .admin-tab-body {
+        background: var(--surface);
+        -webkit-backdrop-filter: blur(26px) saturate(1.35);
+        backdrop-filter: blur(26px) saturate(1.35);
+        border-color: var(--surface-border);
+    }
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    :root[data-theme="b"] .msg-wrapper:not(.media-only).left .msg-content { background: var(--surface-solid); }
+    :root[data-theme="b"] .msg-wrapper:not(.media-only).right .msg-content { background: var(--bubble-bg); color: var(--bubble-text); }
+}
+
+@media (prefers-color-scheme: dark) {
+    :root[data-theme="b"] {
+        color-scheme: dark;
+        --app-bg:
+            radial-gradient(1100px 720px at 6% -12%, rgba(99,102,241,0.20) 0%, rgba(99,102,241,0) 62%),
+            radial-gradient(900px 620px at 96% 108%, rgba(236,72,153,0.16) 0%, rgba(236,72,153,0) 58%),
+            radial-gradient(800px 520px at 58% 42%, rgba(34,211,238,0.08) 0%, rgba(34,211,238,0) 60%),
+            #0a0b16;
+        --page-bg: transparent;
+        --text-main: #f4f4f5;
+        --muted: #9a9aa3;
+        --line: rgba(255,255,255,0.09);
+        --surface: rgba(255,255,255,0.07);
+        --surface-solid: rgba(28,28,35,0.88);
+        --surface-border: rgba(255,255,255,0.12);
+        --input-bg: rgba(255,255,255,0.08);
+        --input-border: rgba(255,255,255,0.12);
+        --chip-bg: rgba(255,255,255,0.09);
+        --panel-soft: rgba(255,255,255,0.05);
+        --btn-color: #a5b4fc;
+        --btn-bg: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        --bubble-color: #fbfbfc;
+        --bubble-bg: linear-gradient(135deg, rgba(99,102,241,0.55) 0%, rgba(139,92,246,0.45) 100%);
+        --bubble-text: #fbfbfc;
+        --bubble-shadow: 0 1px 4px rgba(0,0,0,0.55);
+        --msg-others-bg: rgba(255,255,255,0.06);
+        --msg-others-border: rgba(255,255,255,0.10);
+        --scrollbar: rgba(255,255,255,0.22);
+        --ava-g1: #55555e;
+        --ava-g2: #35353c;
+    }
+    :root[data-theme="b"] #chat-bg::after {
+        background:
+            radial-gradient(38% 34% at 16% 16%, rgba(99,102,241,0.22), transparent 70%),
+            radial-gradient(34% 32% at 86% 74%, rgba(236,72,153,0.14), transparent 70%),
+            radial-gradient(30% 30% at 60% 28%, rgba(34,211,238,0.10), transparent 70%);
+    }
+    :root[data-theme="b"] .auth-overlay::before {
+        background:
+            radial-gradient(34% 30% at 18% 18%, rgba(99,102,241,0.18), transparent 70%),
+            radial-gradient(30% 28% at 84% 76%, rgba(236,72,153,0.12), transparent 70%),
+            radial-gradient(26% 24% at 62% 30%, rgba(34,211,238,0.10), transparent 70%);
+    }
+    :root[data-theme="b"] .auth-input {
+        background: rgba(255,255,255,0.08);
+        border-color: rgba(255,255,255,0.16);
+    }
+    :root[data-theme="b"] .auth-input::placeholder { color: rgba(255,255,255,0.45); }
+}
+
