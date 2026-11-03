@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.30";
+    const CHAT_APP_VERSION = "3.7.31";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -353,9 +353,41 @@
         });
     })();
 
+    // ===== 手机返回手势 / 右滑：逐层退出，不再一划就把网页或 App 退掉 =====
+    // 进房间、开设置、个人信息、全局设置、后台管理都压一层历史记录；
+    // 右滑/返回键先退当前界面，再退回房间列表，最后才允许离开页面。
+    const navGuards = [];
+    let navPopSuppress = 0;
+    function pushNavGuard(kind, close) {
+        if (!isMobileDevice()) return;
+        if (navGuards.some(g => g.kind === kind)) return;
+        navGuards.push({ kind, close });
+        try { history.pushState({ navGuard: kind }, '', location.href); } catch (e) { /* ignore */ }
+    }
+    function consumeNavGuard(kind) {
+        if (!isMobileDevice()) return;
+        const idx = navGuards.map(g => g.kind).lastIndexOf(kind);
+        if (idx < 0) return;
+        navGuards.splice(idx, 1);
+        navPopSuppress += 1;
+        try { history.back(); } catch (e) { navPopSuppress = Math.max(0, navPopSuppress - 1); }
+    }
+    window.addEventListener('popstate', function () {
+        if (navPopSuppress > 0) { navPopSuppress -= 1; return; }
+        const guard = navGuards.pop();
+        if (guard) {
+            try { guard.close(); } catch (e) { console.warn('[nav] 关闭界面失败:', e); }
+            return;
+        }
+        const chatBox = document.getElementById('chat-container');
+        if (chatBox && chatBox.style.display === 'flex') window.leaveRoom(true);
+    });
+
     function showRoomLoading() {
         document.getElementById('login-area').style.display = 'none';
         document.getElementById('chat-container').style.display = 'flex';
+        // 手机端：进房间压一层历史记录，右滑/返回先退房间而不是退出页面
+        if (!isDesktopLayout()) pushNavGuard('room', () => window.leaveRoom(true));
         // 电脑端（宽屏）：微信 PC 版布局 —— 左侧房间栏 + 右侧聊天区
         if (isDesktopLayout()) {
             document.body.classList.add('in-chat-desktop');
@@ -488,6 +520,16 @@
         const peer = (a === me) ? b : (b === me ? a : b);
         return String(peer || '').trim();
     }
+    /** 房间显示名：私信房一律只显示对方名字（库里遗留的「私信 · 小哈」不再露出） */
+    function roomDisplayName(code, rawName) {
+        const raw = String(rawName || '').trim();
+        const cleaned = raw.replace(/^私信\s*[·•:：-]?\s*/, '').trim();
+        if (isDmRoom(code)) {
+            const peer = dmPeerOf(code);
+            if (peer) return peer;
+        }
+        return cleaned || String(code || '');
+    }
     // ---- 侧栏渲染节流/去重状态（修「左侧房间列表一直闪」）----
     let sidebarLoading = false;        // 主查询在飞
     let sidebarPending = false;        // 在飞期间又被要求刷新 → 结束后补一次
@@ -508,8 +550,9 @@
         const avaEl = document.getElementById('sidebar-avatar');
         if (nameEl) nameEl.textContent = user;
         if (avaEl) {
-            avaEl.textContent = String(user).slice(0, 1).toUpperCase();
-            avaEl.style.background = hashGradient(user);
+            const shownName = user || localStorage.getItem('chat_logged_user') || '';
+            avaEl.textContent = shownName ? String(shownName).slice(0, 1).toUpperCase() : '·';
+            avaEl.style.background = hashGradient(shownName);
         }
         // 侧栏头像用自定义头像（有缓存则替换为图片）
         renderOwnAvatar();
@@ -605,7 +648,7 @@
             // .catch() 只挡得住"请求失败"，挡不住"请求挂起"（反代不稳时会挂住），
             // 只要任意一个不返回，Promise.all 永不 resolve → sidebarRoomsData 永不赋值
             // → renderSidebarList 永不调用 → 列表永远停在上面那 3 条骨架屏（用户看到的"白框"）。
-            sidebarRoomsData = codes.map(c => ({ code: c, name: nameMap[c] || c, memberCount: countMap[c] || 1, latest: prevLatest[c] || null, joinedAt: joinedAt[c] }));
+            sidebarRoomsData = codes.map(c => ({ code: c, name: roomDisplayName(c, nameMap[c]), memberCount: countMap[c] || 1, latest: prevLatest[c] || null, joinedAt: joinedAt[c] }));
             // 【消灭"闪一下旧顺序"】首屏不先用 joinedAt 画一版再重排：
             // 已有上一轮最新消息的直接按正确顺序一次画出；首次进入则最多等 1.5 秒补齐后再画。
             const latestMap = {};
@@ -982,6 +1025,7 @@
         const modal = document.getElementById('persona-modal');
         if (!modal) return;
         modal.style.display = 'flex';
+        pushNavGuard('persona', () => { if (modal) modal.style.display = 'none'; });
         const list = document.getElementById('persona-list');
         list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">加载中…</div>';
         const personas = await loadAiPersonas(true);
@@ -1006,6 +1050,7 @@
     window.closePersonaPanel = function() {
         const m = document.getElementById('persona-modal');
         if (m) m.style.display = 'none';
+        consumeNavGuard('persona');
     };
 
     window.startDmWithPersona = async function(personaId) {
@@ -1055,6 +1100,7 @@
         const modal = document.getElementById('dm-modal');
         if (!modal) return;
         modal.style.display = 'flex';
+        pushNavGuard('dm', () => { if (modal) modal.style.display = 'none'; });
         const list = document.getElementById('dm-list');
         list.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">加载中…</div>';
         const me = getLoggedInUser();
@@ -1100,6 +1146,7 @@
     window.closeDmPanel = function() {
         const m = document.getElementById('dm-modal');
         if (m) m.style.display = 'none';
+        consumeNavGuard('dm');
     };
 
     window.enterDm = function(code) {
@@ -1109,6 +1156,8 @@
     };
 
     /** 房间内 AI 成员条：把当前房间的 AI 成员显性展示（用户要的"圆桌可见"） */
+    let roomMemberNames = [];   // 当前房间全部成员（含 AI），供 @ 候选与在线人数使用
+    let roomAiNames = [];       // 当前房间 AI 姓名
     async function renderAiMembersBar() {
         const bar = document.getElementById('ai-members-bar');
         if (!bar || !supabaseClient) return;
@@ -1127,6 +1176,12 @@
                 if (m.member_type === 'human') return false;
                 return pByName.has(m.user_name);
             });
+            roomMemberNames = (memRes.data || []).map(m => m.user_name).filter(Boolean);
+            roomAiNames = aiMembers.map(m => {
+                const p = (m.persona_id && pById.get(m.persona_id)) || pByName.get(m.user_name) || {};
+                return p.name || m.user_name;
+            });
+            updateOnlineCount();
             if (!aiMembers.length) { bar.style.display = 'none'; return; }
             bar.style.display = 'flex';
             bar.innerHTML = '<span class="ai-members-label">AI 成员</span>' + aiMembers.map(m => {
@@ -1216,12 +1271,12 @@
         area.style.display = 'flex';
         area.classList.add('show-room-view');
         document.getElementById('chat-container').style.display = 'none';
-        const user = getLoggedInUser();
+        const user = getLoggedInUser() || localStorage.getItem('chat_logged_user') || '';
         const nameEl = document.getElementById('mrv-username');
         const avaEl = document.getElementById('mrv-avatar');
         if (nameEl) nameEl.textContent = user || '';
         if (avaEl) {
-            avaEl.textContent = String(user || '?').slice(0, 1).toUpperCase();
+            avaEl.textContent = user ? String(user).slice(0, 1).toUpperCase() : '·';
             avaEl.style.background = hashGradient(user || '');
         }
         if (user) fetchAndApplyUserAvatars([user]); // 有自定义头像则替换首字母
@@ -1281,12 +1336,13 @@
         });
         const html = sorted.map(c => {
             const m = latest[c];
-            const preview = m ? `${m.sender}: ${mrvPreviewText(m)}` : `房间 ${c}`;
+            const displayName = roomDisplayName(c, nameMap[c]);
+            const preview = m ? `${m.sender}: ${mrvPreviewText(m)}` : `房间 ${displayName}`;
             const time = m ? mrvFmtTime(m.created_at) : '';
             return `
                 <div class="mrv-item" onclick="window.mrvEnter('${escapeHtml(c).replace(/'/g, '&#39;')}')">
-                    <span class="mrv-badge" style="background:${hashGradient(c)}">${escapeHtml((nameMap[c] || c).slice(0, 1).toUpperCase())}</span>
-                    <span class="mrv-item-text"><b>${escapeHtml(nameMap[c] || c)}</b><small>${escapeHtml(preview)}</small></span>
+                    <span class="mrv-badge" style="background:${hashGradient(c)}">${escapeHtml(displayName.slice(0, 1).toUpperCase())}</span>
+                    <span class="mrv-item-text"><b>${escapeHtml(displayName)}</b><small>${escapeHtml(preview)}</small></span>
                     ${time ? `<span class="mrv-item-time">${time}</span>` : ''}
                 </div>`;
         }).join('');
@@ -1379,6 +1435,66 @@
             renderMobileRoomList();
         }
     }, 15000);
+
+    // ===== 手机消息页：下拉刷新（3.7.31）=====
+    (function initMobilePullToRefresh() {
+        const page = document.getElementById('mrv-page-msgs');
+        if (!page) return;
+        const ptr = document.createElement('div');
+        ptr.className = 'mrv-ptr';
+        ptr.innerHTML = '<span class="mrv-ptr-spin"></span><span class="mrv-ptr-text">下拉刷新</span>';
+        page.appendChild(ptr);
+        const textEl = ptr.querySelector('.mrv-ptr-text');
+        let startY = 0;
+        let pulling = false;
+        let refreshing = false;
+        let delta = 0;
+        page.addEventListener('touchstart', (e) => {
+            if (refreshing || e.touches.length !== 1 || page.scrollTop > 0) return;
+            startY = e.touches[0].clientY;
+            pulling = true;
+            delta = 0;
+        }, { passive: true });
+        page.addEventListener('touchmove', (e) => {
+            if (!pulling || refreshing) return;
+            const move = e.touches[0].clientY - startY;
+            if (move <= 0 || page.scrollTop > 0) {
+                pulling = false;
+                delta = 0;
+                page.classList.remove('pulling');
+                ptr.style.transform = '';
+                return;
+            }
+            delta = Math.min(move * 0.55, 72);
+            page.classList.add('pulling');
+            ptr.style.transform = `translate(-50%, ${delta - 26}px)`;
+            textEl.textContent = delta > 52 ? '松开刷新' : '下拉刷新';
+            if (move > 12 && e.cancelable) e.preventDefault();
+        }, { passive: false });
+        const finish = () => {
+            if (!pulling) return;
+            pulling = false;
+            page.classList.remove('pulling');
+            if (delta > 52 && getLoggedInUser()) {
+                refreshing = true;
+                page.classList.add('refreshing');
+                textEl.textContent = '正在刷新…';
+                Promise.resolve(renderMobileRoomList()).catch(() => {}).finally(() => {
+                    setTimeout(() => {
+                        refreshing = false;
+                        page.classList.remove('refreshing');
+                        ptr.style.transform = '';
+                        textEl.textContent = '下拉刷新';
+                    }, 400);
+                });
+            } else {
+                ptr.style.transform = '';
+            }
+            delta = 0;
+        };
+        page.addEventListener('touchend', finish);
+        page.addEventListener('touchcancel', finish);
+    })();
 
     window.mrvEnter = function(code) {
         code = String(code || '').trim();
@@ -2183,7 +2299,7 @@
                 .insert([{ room_code: currentRoomCode, room_name: currentRoomCode }]);
             if (insertError && insertError.code !== '23505') throw insertError;
         } else {
-            setRoomTitle(room.room_name || currentRoomCode);
+            setRoomTitle(roomDisplayName(currentRoomCode, room.room_name));
         }
 
     }
@@ -3326,7 +3442,10 @@
                 }
             }
         } catch (e) { /* presence state unavailable */ }
-        el.innerText = `在线 ${presenceActive ? Math.max(1, count) : Math.max(0, count)} 人`;
+        // 3.7.31：AI 成员也算在线人数（否则只有 AI 的圆桌/私信房一直显示 0 人）
+        const aiCount = Array.isArray(roomAiNames) ? roomAiNames.length : 0;
+        const total = Math.max(presenceActive ? Math.max(1, count) : count, 0) + aiCount;
+        el.innerText = `在线 ${currentRoomCode ? Math.max(1, total) : total} 人`;
     }
 
     async function setPresenceActive(active) {
@@ -4706,7 +4825,8 @@
                 __img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;';
                 el.appendChild(__img);
             } else {
-                el.innerHTML = escapeHtml(String(mySender || '?').slice(0, 1));
+                const shownName = mySender || getLoggedInUser() || localStorage.getItem('chat_logged_user') || '';
+                el.innerHTML = shownName ? escapeHtml(String(shownName).slice(0, 1).toUpperCase()) : '·';
             }
         };
         setPreview(document.getElementById('profile-avatar-preview'));
@@ -5689,19 +5809,28 @@
 
 
     // 聊天设置弹窗（右上角）：仅房间成员、聊天相关项
+    function closeSettingsModalSilently() {
+        const modal = document.getElementById('settings-modal');
+        if (modal) modal.style.display = 'none';
+    }
     window.toggleSettings = function(e) {
         const modal = document.getElementById('settings-modal');
         // If called with an event (overlay click), only close when clicking the overlay itself
         if (e) {
             if (e.target === modal) {
-                modal.style.display = 'none';
+                closeSettingsModalSilently();
+                consumeNavGuard('settings');
             }
             return;
         }
-        modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
         if (modal.style.display === 'flex') {
-            renderRoomMembers();
+            closeSettingsModalSilently();
+            consumeNavGuard('settings');
+            return;
         }
+        modal.style.display = 'flex';
+        renderRoomMembers();
+        pushNavGuard('settings', closeSettingsModalSilently);
     };
 
     // 全局设置页（左下角"设置"）：覆盖整个聊天区域
@@ -5720,11 +5849,16 @@
         if (pollingToggle) pollingToggle.checked = isPollingEnabled;
         page.style.display = 'block';
         page.scrollTop = 0;
+        pushNavGuard('global-settings', () => {
+            const p = document.getElementById('global-settings-page');
+            if (p) p.style.display = 'none';
+        });
     };
 
     window.closeGlobalSettings = function() {
         const page = document.getElementById('global-settings-page');
         if (page) page.style.display = 'none';
+        consumeNavGuard('global-settings');
     };
 
     // 个人信息页（微信式）：头像 / 账号 / 密码
@@ -5736,11 +5870,16 @@
         if (nameEl) nameEl.textContent = mySender || getLoggedInUser() || '';
         page.style.display = 'block';
         page.scrollTop = 0;
+        pushNavGuard('profile', () => {
+            const p = document.getElementById('profile-page');
+            if (p) p.style.display = 'none';
+        });
     };
 
     window.closeProfilePage = function() {
         const page = document.getElementById('profile-page');
         if (page) page.style.display = 'none';
+        consumeNavGuard('profile');
     };
 
     // ============================================
@@ -6167,11 +6306,16 @@
         const pwd = document.getElementById('admin-pwd-input');
         pwd.value = '';
         setTimeout(() => pwd.focus(), 100);
+        pushNavGuard('admin', () => {
+            const m = document.getElementById('admin-modal');
+            if (m) m.classList.remove('show');
+        });
     };
 
     window.closeAdminPanel = function() {
         document.getElementById('admin-modal').classList.remove('show');
         adminPasswordMemory = ''; // 面板一关密码即丢，重开必须重登
+        consumeNavGuard('admin');
     };
 
     window.adminTryLogin = async function() {
@@ -6950,7 +7094,12 @@
         event.target.value = '';
     };
 
-    window.leaveRoom = function() {
+    window.leaveRoom = function(fromPop) {
+        // 手机返回：有历史守卫时先交给系统逐层退（设置→房间→列表），不直接整页退出
+        if (!fromPop && isMobileDevice() && navGuards.length) {
+            try { history.back(); return; } catch (e) { /* 继续走正常退出 */ }
+        }
+        navGuards.length = 0;
         // 如果在暗房里，退出暗房回到正常房间，不退出整个房间
         if (continuationToken) {
             endContinuation();
@@ -6967,6 +7116,8 @@
         localStorage.removeItem('chat_auth_expiry');
         currentRoomCode = "";
         mySender = "";
+        roomMemberNames = [];
+        roomAiNames = [];
         messagesCache = [];
         oldestLoadedAt = null;
         noMoreHistory = false;
@@ -7014,6 +7165,8 @@
         } catch (e) { /* ignore */ }
         // 近期消息发送者
         (messagesCache || []).forEach(m => { if (m && m.sender) names.add(m.sender); });
+        // 本房间全部成员（含 AI 成员，来自 room_members）
+        (roomMemberNames || []).forEach(n => { if (n) names.add(n); });
         names.delete(mySender);
         return [...names];
     }
@@ -7029,7 +7182,7 @@
     function renderMentionPopup() {
         if (!mentionPopup) return;
         mentionPopup.innerHTML = `
-            <div class="mention-tip">↑↓ 选择 · Enter/Tab 确认 · Esc 关闭</div>
+            <div class="mention-tip">@所有人 可一次提醒全房间 · ↑↓ 选择 · Enter/Tab 确认</div>
             ${mentionState.items.map((name, i) => `
                 <div class="mention-item${i === mentionState.index ? ' active' : ''}" data-name="${escapeHtml(name)}">
                     <span class="mention-ava" style="background:${hashGradient(name)}">${escapeHtml(String(name).slice(0, 1).toUpperCase())}</span>
@@ -7045,10 +7198,11 @@
         const match = before.match(/@([^\s@]{0,20})$/);
         if (!match) { hideMentionPopup(); return; }
         const query = match[1].toLowerCase();
-        const candidates = getMentionCandidates()
+        const candidates = ['所有人', ...getMentionCandidates()]
+            .filter((n, i, arr) => arr.indexOf(n) === i)
             .filter(n => n.toLowerCase().includes(query))
             .sort((a, b) => a.length - b.length)
-            .slice(0, 6);
+            .slice(0, 8);
         if (!candidates.length) { hideMentionPopup(); return; }
         mentionState.active = true;
         mentionState.items = candidates;
