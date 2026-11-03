@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.20";
+    const CHAT_APP_VERSION = "3.7.21";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -342,7 +342,11 @@
         if (isNativeApp) { a.style.display = 'none'; return; }
         // 3.7.16 自检发现 cdn.jsdelivr.net 在本机被重置（连接 reset），改为与应用同源的 Pages 托管
         // （APK 已随 web 一起提交到仓库根目录，实测 GET 200、字节数与安装包一致）。
-        const base = 'https://harry-s-chat.pages.dev/Harry%E7%9A%84%E8%81%8A%E5%A4%A9%E5%AE%A4-v' + CHAT_APP_VERSION + '.apk';
+        // 3.7.21 修复：APK 文件名不能跟着网页版本号拼。3.7.17 起只改网页没重打 APK，
+        // `...-v3.7.20.apk` 在 Pages 上会落到 SPA 兜底页（200 + text/html），点了等于下载网页。
+        // 这里固定在「最后一次真正打包」的 APK 上；下次重打 APK 只改这个常量。
+        const APK_FILE = 'Harry%E7%9A%84%E8%81%8A%E5%A4%A9%E5%AE%A4-v3.7.16.apk';
+        const base = 'https://harry-s-chat.pages.dev/' + APK_FILE;
         a.href = base;
         a.addEventListener('click', () => {
             showToast('正在下载安卓 App，请等待1-2分钟，在通知栏可查看进度', 'info', 4000);
