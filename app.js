@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.32";
+    const CHAT_APP_VERSION = "3.7.33";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -17,6 +17,33 @@
     // 不含任何自定义头，会导致登录被浏览器直接拦下（2026-10-24 实测踩坑）。
     const USING_PROXY = SUPABASE_URL.indexOf('supabase.co') === -1;
     const PROXY_HEADERS = {};
+
+    // 3.7.32：全站同步进度条。只要有用户发起的网络等待（进房、发送、服务端动作）就显示，
+    // 避免"点了没反应"；自动 15 秒兜底收起，不会永久挂在顶部。
+    let __appSyncN = 0;
+    let __appSyncTimer = null;
+    function appSyncStart() {
+        __appSyncN++;
+        let el = document.getElementById('app-sync');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'app-sync';
+            document.body.appendChild(el);
+        }
+        el.classList.add('on');
+        clearTimeout(__appSyncTimer);
+        __appSyncTimer = setTimeout(appSyncEndAll, 15000);
+    }
+    function appSyncEnd() {
+        __appSyncN = Math.max(0, __appSyncN - 1);
+        if (__appSyncN === 0) appSyncEndAll();
+    }
+    function appSyncEndAll() {
+        __appSyncN = 0;
+        clearTimeout(__appSyncTimer);
+        const el = document.getElementById('app-sync');
+        if (el) el.classList.remove('on');
+    }
     try {
         supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             global: { headers: PROXY_HEADERS }
@@ -2913,7 +2940,17 @@
      * 加载历史记录逻辑
      * @param {boolean} isInitial - 是否为初始加载（如果是，则只显示最新的30条）
      */
+    // 3.7.32：给进房历史加载套一层同步条（只对首屏 isInitial 显示，滚动加载更早消息不闪）
     async function loadHistory(isInitial = true) {
+        if (isInitial === false) return _loadHistoryRaw(isInitial);
+        appSyncStart();
+        try {
+            return await _loadHistoryRaw(isInitial);
+        } finally {
+            appSyncEnd();
+        }
+    }
+    async function _loadHistoryRaw(isInitial = true) {
         if (continuationToken) {
             await loadContinuationHistory(isInitial);
             return;
@@ -6827,7 +6864,16 @@
     // ============================================
     function getLoggedInUser() { return localStorage.getItem('chat_logged_user') || ''; }
 
+    // 3.7.32：服务端动作统一挂同步条（发送消息、建房、登录校验等都会有明确等待态）
     async function callServerAction(endpoint, action, payload) {
+        appSyncStart();
+        try {
+            return await _callServerActionRaw(endpoint, action, payload);
+        } finally {
+            appSyncEnd();
+        }
+    }
+    async function _callServerActionRaw(endpoint, action, payload) {
         const url = endpoint || (SUPABASE_URL + '/functions/v1/verify-auth');
         // 国内网络访问 Supabase 官方入口可能长时间挂起，加 15 秒超时避免界面永久卡在"登录中…"
         let controller = null, timedOut = false;
