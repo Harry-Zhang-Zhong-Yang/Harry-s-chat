@@ -1,4 +1,4 @@
-const CACHE_NAME = 'harrys-chat-v99';
+const CACHE_NAME = 'harrys-chat-v100';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
