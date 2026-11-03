@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.29";
+    const CHAT_APP_VERSION = "3.7.30";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -1851,7 +1851,7 @@
             }
         } catch (e) { /* ignore */ }
 
-        // ===== 主题初始化：A(石墨极简,默认) / B(奶油纸感) =====
+        // ===== 主题初始化：A(黑白玻璃,默认) / B(蓝紫玻璃) =====
         const savedStyle = localStorage.getItem('chat_theme_style');
         document.documentElement.dataset.theme = (savedStyle === 'b') ? 'b' : 'a';
         // 深色模式已移除：强制浅色并清理旧开关残留
@@ -6882,7 +6882,7 @@
         // 切换主题时清除自定义气泡颜色，让主题渐变生效
         if (localStorage.getItem('chat_theme_color')) resetBubbleColor(true);
         syncThemeCards();
-        showToast(theme === 'b' ? '已切换到「奶油纸感」主题' : '已切换到「石墨极简」主题', 'success');
+        showToast(theme === 'b' ? '已切换到「蓝紫玻璃」主题' : '已切换到「黑白玻璃」主题', 'success');
     };
 
     function resetBubbleColor(silent) {
@@ -6890,7 +6890,7 @@
         document.documentElement.style.removeProperty('--bubble-bg');
         localStorage.removeItem('chat_theme_color');
         const sel = document.getElementById('color-selector');
-        if (sel) sel.value = (document.documentElement.dataset.theme === 'b') ? '#c2783c' : '#18181b';
+        if (sel) sel.value = (document.documentElement.dataset.theme === 'b') ? '#6d5ef0' : '#18181b';
         if (!silent) showToast('已恢复默认气泡颜色', 'success');
     }
     window.resetBubbleColor = resetBubbleColor;
