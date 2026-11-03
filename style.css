@@ -1932,19 +1932,29 @@
 /* ============ 3.7.18 · 黑白 + 雾面玻璃（默认主题 A） ============ */
 /* 底仍是黑/白，只把顶栏、输入条、侧栏、弹窗换成磨砂玻璃；消息气泡保持实底，低端机不卡。 */
 :root[data-theme="a"] {
+    /* 3.7.29 · 浅色玻璃 + 柔和渐变背景（不再是纯白） */
     --app-bg:
-        radial-gradient(1200px 700px at 8% -12%, #ffffff 0%, rgba(255,255,255,0) 62%),
-        radial-gradient(900px 620px at 92% 112%, #e6e6ea 0%, rgba(230,230,234,0) 58%),
-        #f2f2f4;
+        radial-gradient(1050px 700px at 4% -10%, #e6e9ff 0%, rgba(230,233,255,0) 62%),
+        radial-gradient(900px 640px at 98% -6%, #ffe7f4 0%, rgba(255,231,244,0) 58%),
+        radial-gradient(1000px 720px at 84% 110%, #e0f7ff 0%, rgba(224,247,255,0) 62%),
+        linear-gradient(168deg, #f7f8ff 0%, #fbf7ff 48%, #f4fbff 100%);
     --page-bg: transparent;
-    --surface: rgba(255,255,255,0.55);
-    --surface-solid: rgba(252,252,253,0.86);
+    --surface: rgba(255,255,255,0.46);
+    --surface-solid: rgba(255,255,255,0.84);
     --surface-border: rgba(255,255,255,0.72);
-    --input-bg: rgba(255,255,255,0.62);
-    --input-border: rgba(0,0,0,0.06);
+    --input-bg: rgba(255,255,255,0.58);
+    --input-border: rgba(112,120,170,0.14);
     --chip-bg: rgba(255,255,255,0.55);
-    --line: rgba(0,0,0,0.06);
+    --line: rgba(80,90,140,0.09);
     --panel-soft: rgba(255,255,255,0.5);
+    --btn-color: #5b5be0;
+    --btn-bg: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    --bubble-color: #6d5ef0;
+    --bubble-bg: linear-gradient(135deg, rgba(96,102,230,0.88) 0%, rgba(142,94,246,0.80) 100%);
+    --bubble-text: #ffffff;
+    --bubble-shadow: 0 8px 22px rgba(88,84,200,0.22), inset 0 1px 0 rgba(255,255,255,0.32);
+    --msg-others-bg: rgba(255,255,255,0.56);
+    --msg-others-border: rgba(255,255,255,0.74);
 }
 /* 背景铺一层极淡的灰白光斑，玻璃才有东西可"糊"，不会糊成一片死白 */
 :root[data-theme="a"] #chat-bg::after {
@@ -1952,18 +1962,23 @@
     position: absolute;
     inset: -20%;
     background:
-        radial-gradient(42% 38% at 18% 12%, rgba(0,0,0,0.05), transparent 70%),
-        radial-gradient(36% 34% at 84% 78%, rgba(0,0,0,0.045), transparent 70%),
-        radial-gradient(30% 28% at 62% 22%, rgba(255,255,255,0.55), transparent 70%);
-    filter: blur(18px);
+        radial-gradient(38% 34% at 16% 16%, rgba(120,140,255,0.20), transparent 70%),
+        radial-gradient(34% 32% at 86% 74%, rgba(255,150,200,0.16), transparent 70%),
+        radial-gradient(30% 30% at 60% 28%, rgba(120,220,255,0.14), transparent 70%);
+    filter: blur(26px);
+    animation: auroraDrift 22s ease-in-out infinite alternate;
     pointer-events: none;
+}
+@keyframes auroraDrift {
+    from { transform: translate3d(-1.5%, -1%, 0) scale(1.02); }
+    to { transform: translate3d(1.5%, 1.5%, 0) scale(1.06); }
 }
 @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
     :root[data-theme="a"] #nav-bar,
     :root[data-theme="a"] #input-area {
-        background: rgba(255,255,255,0.52);
-        -webkit-backdrop-filter: blur(24px) saturate(1.25);
-        backdrop-filter: blur(24px) saturate(1.25);
+        background: rgba(255,255,255,0.40);
+        -webkit-backdrop-filter: blur(28px) saturate(1.45);
+        backdrop-filter: blur(28px) saturate(1.45);
         box-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 10px 30px rgba(17,24,39,0.06);
     }
     :root[data-theme="a"] #room-sidebar {
@@ -1982,10 +1997,27 @@
         box-shadow: 0 30px 80px rgba(17,24,39,0.14), inset 0 1px 0 rgba(255,255,255,0.9);
     }
     :root[data-theme="a"] #message-input {
-        background: rgba(255,255,255,0.7);
+        background: rgba(255,255,255,0.58);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+    /* 3.7.29 · 消息气泡也吃毛玻璃：左侧留白玻璃，右侧紫蓝玻璃；媒体消息不参与 */
+    :root[data-theme="a"] .msg-wrapper:not(.media-only).left .msg-content {
+        background: var(--msg-others-bg);
+        -webkit-backdrop-filter: blur(16px) saturate(1.35);
+        backdrop-filter: blur(16px) saturate(1.35);
+        border: 1px solid var(--msg-others-border);
+        box-shadow: 0 6px 18px rgba(90,100,170,0.10), inset 0 1px 0 rgba(255,255,255,0.45);
+    }
+    :root[data-theme="a"] .msg-wrapper:not(.media-only).right .msg-content {
+        background: var(--bubble-bg);
+        -webkit-backdrop-filter: blur(14px) saturate(1.15);
+        backdrop-filter: blur(14px) saturate(1.15);
+        border: 1px solid rgba(255,255,255,0.30);
+        box-shadow: var(--bubble-shadow);
+        color: var(--bubble-text);
     }
 }
-/* 老 WebView 没有 backdrop-filter：退成高不透明白，保证可读 */
+/* 老 WebView 没有 backdrop-filter：退成高不透明底，保证可读 */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     :root[data-theme="a"] #nav-bar,
     :root[data-theme="a"] #input-area { background: rgba(255,255,255,0.94); }
@@ -1993,6 +2025,11 @@
     :root[data-theme="a"] .modal-content,
     :root[data-theme="a"] .extn-modal-card,
     :root[data-theme="a"] .auth-card { background: #ffffff; }
+    :root[data-theme="a"] .msg-wrapper:not(.media-only).left .msg-content { background: var(--surface-solid); }
+    :root[data-theme="a"] .msg-wrapper:not(.media-only).right .msg-content {
+        background: var(--bubble-bg);
+        color: var(--bubble-text);
+    }
 }
 
 /* ============ 3.7.23 · 深色玻璃（跟随系统 · 只作用于主题 A） ============ */
@@ -2002,9 +2039,10 @@
     :root[data-theme="a"] {
         color-scheme: dark;
         --app-bg:
-            radial-gradient(1200px 700px at 8% -12%, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0) 62%),
-            radial-gradient(900px 620px at 92% 112%, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 58%),
-            #0b0b0c;
+            radial-gradient(1100px 720px at 6% -12%, rgba(99,102,241,0.20) 0%, rgba(99,102,241,0) 62%),
+            radial-gradient(900px 620px at 96% 108%, rgba(236,72,153,0.16) 0%, rgba(236,72,153,0) 58%),
+            radial-gradient(800px 520px at 58% 42%, rgba(34,211,238,0.08) 0%, rgba(34,211,238,0) 60%),
+            #0b0b0f;
         --page-bg: transparent;
         --bg-color: #0b0b0c;
         --text-main: #f4f4f5;
@@ -2018,10 +2056,10 @@
         --chip-bg: rgba(255,255,255,0.09);
         --chip-text: #b5b5be;
         --panel-soft: rgba(255,255,255,0.05);
-        --btn-color: #e8e8ed;
-        --btn-bg: linear-gradient(180deg, rgba(255,255,255,0.20) 0%, rgba(255,255,255,0.12) 100%);
+        --btn-color: #a5b4fc;
+        --btn-bg: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
         --bubble-color: #fbfbfc;
-        --bubble-bg: linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.11) 100%);
+        --bubble-bg: linear-gradient(135deg, rgba(99,102,241,0.55) 0%, rgba(139,92,246,0.45) 100%);
         --bubble-text: #fbfbfc;
         --bubble-shadow: 0 1px 4px rgba(0,0,0,0.55);
         --msg-others-bg: rgba(255,255,255,0.06);
@@ -2097,9 +2135,143 @@
     }
     :root[data-theme="a"] #chat-bg::after {
         background:
-            radial-gradient(42% 38% at 18% 12%, rgba(255,255,255,0.07), transparent 70%),
-            radial-gradient(36% 34% at 84% 78%, rgba(255,255,255,0.05), transparent 70%),
-            radial-gradient(30% 28% at 62% 22%, rgba(255,255,255,0.03), transparent 70%);
+            radial-gradient(38% 34% at 16% 16%, rgba(99,102,241,0.22), transparent 70%),
+            radial-gradient(34% 32% at 86% 74%, rgba(236,72,153,0.14), transparent 70%),
+            radial-gradient(30% 30% at 60% 28%, rgba(34,211,238,0.10), transparent 70%);
     }
+}
+
+/* ============ 3.7.29 · 主页 / 登录 / 后台统一玻璃皮 ============ */
+/* 登录页：渐变背景 + 毛玻璃卡片，不再是一块纯白板 */
+:root[data-theme="a"] .auth-overlay::before {
+    content:""; position:absolute; inset:-12%; pointer-events:none;
+    background:
+        radial-gradient(34% 30% at 18% 18%, rgba(120,140,255,0.22), transparent 70%),
+        radial-gradient(30% 28% at 84% 76%, rgba(255,150,200,0.16), transparent 70%),
+        radial-gradient(26% 24% at 62% 30%, rgba(120,220,255,0.14), transparent 70%);
+    filter: blur(30px);
+}
+:root[data-theme="a"] .auth-card {
+    position:relative;
+    background: var(--surface-solid);
+    backdrop-filter: blur(30px) saturate(1.35);
+    -webkit-backdrop-filter: blur(30px) saturate(1.35);
+    border: 1px solid var(--surface-border);
+    border-radius: 24px;
+    box-shadow: 0 24px 60px rgba(70,80,160,0.18), inset 0 1px 0 rgba(255,255,255,0.65);
+}
+:root[data-theme="a"] .auth-avatar {
+    background: var(--btn-bg);
+    border-radius: 20px;
+    box-shadow: 0 10px 24px rgba(99,102,241,0.28), inset 0 1px 0 rgba(255,255,255,0.35);
+}
+:root[data-theme="a"] .auth-input {
+    background: rgba(255,255,255,0.72);
+    border: 1px solid rgba(99,102,241,0.18);
+    border-radius: 12px;
+    box-shadow: inset 0 1px 2px rgba(30,40,80,0.05);
+}
+:root[data-theme="a"] .auth-input::placeholder { color: rgba(60,66,100,0.55); }
+:root[data-theme="a"] .auth-input:focus {
+    border-color: rgba(99,102,241,0.55);
+    box-shadow: 0 0 0 4px rgba(99,102,241,0.14), inset 0 1px 0 rgba(255,255,255,0.6);
+}
+:root[data-theme="a"] .auth-btn {
+    background: var(--btn-bg);
+    border-radius: 12px;
+    box-shadow: 0 12px 26px rgba(99,102,241,0.26), inset 0 1px 0 rgba(255,255,255,0.30);
+}
+:root[data-theme="a"] .auth-btn:hover { transform: translateY(-1px); }
+
+/* 主页：桌面端不再是一条 430px 的手机窄条 */
+@media (min-width: 900px) {
+    #login-area.show-room-view { align-items:center; padding:24px; }
+    #login-area.show-room-view #mobile-room-view {
+        max-width: 760px;
+        height: min(760px, 100%);
+        border-radius: 26px;
+        overflow: hidden;
+        background: var(--surface);
+        border: 1px solid var(--surface-border);
+        box-shadow: 0 26px 70px rgba(70,80,160,0.16), inset 0 1px 0 rgba(255,255,255,0.55);
+        backdrop-filter: blur(30px) saturate(1.4);
+        -webkit-backdrop-filter: blur(30px) saturate(1.4);
+    }
+    #login-area.show-room-view .mrv-topbar { padding: 18px 22px 12px; }
+    #login-area.show-room-view .mrv-list { padding: 0 16px 16px; }
+    #login-area.show-room-view .mrv-tabbar { border-radius: 0 0 26px 26px; }
+}
+:root[data-theme="a"] .mrv-item:hover,
+:root[data-theme="a"] .sidebar-room-item:hover {
+    background: var(--chip-bg);
+    border-color: var(--surface-border);
+}
+:root[data-theme="a"] .mrv-plus,
+:root[data-theme="a"] .sidebar-add {
+    background: var(--btn-bg);
+    color: #fff;
+    box-shadow: 0 8px 18px rgba(99,102,241,0.24);
+}
+
+/* 后台管理：侧栏 / 内容区 / 登录卡全部换成玻璃 */
+:root[data-theme="a"] .admin-modal { background: var(--app-bg); }
+:root[data-theme="a"] .admin-login-card {
+    background: var(--surface-solid);
+    backdrop-filter: blur(30px) saturate(1.35);
+    -webkit-backdrop-filter: blur(30px) saturate(1.35);
+    border: 1px solid var(--surface-border);
+    border-radius: 22px;
+    box-shadow: 0 26px 70px rgba(70,80,160,0.18), inset 0 1px 0 rgba(255,255,255,0.60);
+}
+:root[data-theme="a"] .admin-sidebar {
+    background: var(--surface);
+    backdrop-filter: blur(28px) saturate(1.4);
+    -webkit-backdrop-filter: blur(28px) saturate(1.4);
+    border-right: 1px solid var(--surface-border);
+}
+:root[data-theme="a"] .admin-tab-body {
+    background: var(--surface);
+    backdrop-filter: blur(26px) saturate(1.35);
+    -webkit-backdrop-filter: blur(26px) saturate(1.35);
+    border: 1px solid var(--surface-border);
+    border-radius: 18px;
+    box-shadow: 0 14px 34px rgba(70,80,160,0.10), inset 0 1px 0 rgba(255,255,255,0.45);
+}
+:root[data-theme="a"] .admin-table th {
+    background: var(--surface-solid);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+:root[data-theme="a"] .admin-toolbar select,
+:root[data-theme="a"] .admin-toolbar input,
+:root[data-theme="a"] .admin-pw-form input {
+    background: var(--input-bg);
+    border-color: var(--surface-border);
+    border-radius: 10px;
+}
+:root[data-theme="a"] .admin-op,
+:root[data-theme="a"] .admin-load-more,
+:root[data-theme="a"] .admin-back-btn,
+:root[data-theme="a"] .admin-toolbar button {
+    background: var(--surface-solid);
+    border-color: var(--surface-border);
+    border-radius: 10px;
+}
+:root[data-theme="a"] .admin-table tbody tr { transition: background .15s ease; }
+:root[data-theme="a"] .admin-table tbody tr:hover { background: var(--chip-bg); }
+:root[data-theme="a"] .admin-nav-item { border-radius: 12px; }
+:root[data-theme="a"] .admin-nav-item.active { box-shadow: 0 10px 22px rgba(99,102,241,0.24); }
+/* 桌面端修正：全局 input/button 是 width:100%，后台工具栏和表格操作按钮被撑成整行，
+   这里只覆盖桌面，手机端仍保留原来的纵向大按钮布局。 */
+@media (min-width: 769px) {
+    .admin-toolbar input,
+    .admin-toolbar select { width: auto; flex: 1 1 180px; min-width: 0; margin: 0; }
+    .admin-toolbar button { width: auto; flex: 0 0 auto; margin: 0; min-height: 36px; padding: 8px 14px; }
+    .admin-op, .admin-back-btn { width: auto; margin: 0; min-height: 32px; }
+    .admin-load-more { width: 100%; margin: 10px 0 0; }
+}
+@media (max-width: 768px) {
+    :root[data-theme="a"] .admin-tab-body { border-radius: 14px; }
+    :root[data-theme="a"] .admin-tabbar { background: var(--surface); }
 }
 
