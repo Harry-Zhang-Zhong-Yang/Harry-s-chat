@@ -602,14 +602,15 @@
         .msg-wrapper.media-only .msg-content > div:first-child { line-height: 0; }
         .msg-wrapper.media-only .msg-content { position: relative; }
 
-        /* 长消息折叠：默认只露前 ~300px，底部渐隐；点「展开全文」看全文。
-           注意：.msg-content 在 message-row > message-stack 里，不是 .msg-wrapper 的直接子元素，
-           所以这里必须用后代选择器，否则折叠规则永远命不中。 */
+        /* 长消息折叠：默认只露前 ~300px；点「展开全文」看全文。
+           注意 1：.msg-content 在 message-row > message-stack 里，不是 .msg-wrapper 的直接子元素，
+           所以这里必须用后代选择器，否则折叠规则永远命不中。
+           注意 2（3.7.27）：不再用 mask-image 做渐隐。气泡带 backdrop-filter，安卓 WebView 上
+           mask 会让底部那截渲染成黑块（3.7.26 实测「上面白、下面黑」），这里改成硬截断，
+           底部由「展开全文」按钮说明，不会再出现黑条。 */
         .msg-collapsed .msg-content > div {
             max-height: 300px;
             overflow: hidden;
-            -webkit-mask-image: linear-gradient(to bottom, #000 68%, transparent 100%);
-            mask-image: linear-gradient(to bottom, #000 68%, transparent 100%);
         }
         .msg-expand-btn {
             align-self: flex-start;
