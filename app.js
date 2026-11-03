@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.24";
+    const CHAT_APP_VERSION = "3.7.25";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -5018,17 +5018,25 @@
             chatBox.appendChild(wrapper);
         }
 
-        // 长消息折叠：正文超过 800 字默认收起，点「展开全文」再显示；
+        // 长消息折叠：按真实渲染高度判断（超过 300px 才折叠），点「展开全文」看全文；
         // 展开/收起前后按 scrollHeight 差补偿，避免跳屏（chatgpt 挑刺点 #1732）。
         const contentBody = wrapper.querySelector('.msg-content > div');
         if (contentBody && !isRecalled && !mediaHtml) {
-            const plainText = String(displayContent || '').replace(/<[^>]+>/g, '');
-            if (plainText.length > 800) {
+            const plainTextLength = (contentBody.textContent || '').trim().length;
+            // 聊天区隐藏时 scrollHeight 会是 0，此时用字数兜底，避免该折叠的消息漏掉按钮。
+            const bodyHeight = contentBody.scrollHeight;
+            const needCollapse = bodyHeight > 300 || (bodyHeight === 0 && plainTextLength > 800);
+            if (needCollapse) {
                 wrapper.classList.add('msg-collapsed');
-                const expandBtn = document.createElement('span');
+                const expandBtn = document.createElement('button');
+                expandBtn.type = 'button';
                 expandBtn.className = 'msg-expand-btn';
-                expandBtn.setAttribute('role', 'button');
-                expandBtn.textContent = `展开全文（${plainText.length} 字）`;
+                expandBtn.setAttribute('aria-expanded', 'false');
+                expandBtn.textContent = `展开全文（${plainTextLength} 字）`;
+                // 长按多选是在 wrapper 上绑定的，按钮上按下时别把事件冒上去，免得误触选中。
+                ['pointerdown', 'touchstart', 'mousedown'].forEach(type => {
+                    expandBtn.addEventListener(type, event => event.stopPropagation());
+                });
                 expandBtn.onclick = (event) => {
                     event.stopPropagation();
                     const box = document.getElementById('chat-box');
@@ -5037,7 +5045,8 @@
                     const atBottom = box ? (prevTop + box.clientHeight >= prevHeight - 5) : false;
                     wrapper.classList.toggle('msg-collapsed');
                     const expanded = !wrapper.classList.contains('msg-collapsed');
-                    expandBtn.textContent = expanded ? '收起' : `展开全文（${plainText.length} 字）`;
+                    expandBtn.textContent = expanded ? '收起' : `展开全文（${plainTextLength} 字）`;
+                    expandBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
                     if (box) {
                         const newHeight = box.scrollHeight;
                         box.scrollTop = atBottom ? newHeight : prevTop + (newHeight - prevHeight);
