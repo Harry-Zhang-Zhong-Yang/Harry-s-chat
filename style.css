@@ -9,7 +9,7 @@
         min-height: 100%;
         background: var(--bg, #f5f5f5);
         color: var(--text-main, #18181b);
-        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-family: "STXinwei", "华文新魏", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
         -webkit-tap-highlight-color: transparent;
       }
       body { overscroll-behavior-y: contain; }
@@ -318,7 +318,7 @@
             text-size-adjust: 100%;
         }
         body { 
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+            font-family: "STXinwei", "华文新魏", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
             background: var(--app-bg);
             color: var(--text-main);
             height: 100vh; height: 100dvh; width: 100vw;
@@ -401,8 +401,10 @@
                         radial-gradient(720px 420px at -6% 108%, rgba(255,255,255,0.18), transparent 55%);
             pointer-events: none;
         }
-        #room-loading { position:absolute; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; background:transparent; color:var(--muted); font-size:14px; }
+        /* 3.7.32：加载提示改成顶部独立胶囊（实底 + 阴影），不再透明压在消息上 */
+        #room-loading { position:absolute; left:50%; top:calc(clamp(52px, 7vh, 62px) + env(safe-area-inset-top, 0px) + 10px); transform:translateX(-50%); z-index:200; display:flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px; background:var(--surface-solid); border:1px solid var(--surface-border); box-shadow:0 10px 26px rgba(16,24,40,0.14); color:var(--text-main); font-size:12.5px; pointer-events:none; }
         #room-loading.hidden { display:none; }
+        #room-loading .loading-spinner { width:16px; height:16px; border-width:2px; }
         #room-loading .spinner { width: 36px; height: 36px; border: 3px solid var(--line); border-top-color: var(--btn-color); border-radius: 50%; animation: spin 0.7s linear infinite; }
         .loading-spinner { width:28px; height:28px; border:3px solid var(--line); border-top-color:var(--btn-color); border-radius:50%; animation:spin .8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -461,8 +463,9 @@
             padding-left: max(clamp(12px, 2vw, 18px), env(safe-area-inset-left, 0px));
             padding-right: max(clamp(12px, 2vw, 18px), env(safe-area-inset-right, 0px));
         }
-        #back-btn { font-size: clamp(21px, 2.4vw, 24px); cursor: pointer; padding: 5px; transition: transform .16s cubic-bezier(.22,.9,.32,1.35), background .16s, color .16s; user-select: none; min-width: 40px; min-height: 40px; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-main); background: var(--chip-bg); border: 1px solid var(--surface-border); box-shadow: 0 1px 2px rgba(16,24,40,0.05); }
-        #back-btn:active { transform: scale(0.84) rotate(-9deg); background: var(--btn-bg); color: #fff; }
+        /* 3.7.32：返回键回到「一个箭头」的样子，不再用突兀的玻璃方块 */
+        #back-btn { font-size: clamp(22px, 2.4vw, 25px); cursor: pointer; padding: 4px; transition: transform .16s cubic-bezier(.22,.9,.32,1.35), opacity .16s, color .16s; user-select: none; min-width: 40px; min-height: 40px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; color: var(--text-main); background: transparent; border: 0; box-shadow: none; border-radius: 0; -webkit-tap-highlight-color: transparent; }
+        #back-btn:active { transform: scale(.88) rotate(-6deg); opacity: .55; }
         #room-title-wrap { position:absolute; left:50%; transform:translateX(-50%); max-width:48%; display:flex; align-items:center; justify-content:center; gap:8px; pointer-events:none; }
         #room-title { max-width:100%; font-weight: 600; font-size: clamp(14px, 1.6vw, 16px); color: var(--text-main); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-display); letter-spacing: 0.01em; }
         .nav-icon { width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 0; margin: 0; background: transparent; color: var(--muted); border: 0; border-radius: 50%; font-size: 24px; font-weight: 400; line-height: 1; cursor: pointer; transition: background 0.12s, color 0.12s, transform 0.12s; display: flex; align-items: center; justify-content: center; }
@@ -972,8 +975,8 @@
             max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
             position: relative; box-shadow: var(--shadow-4); animation: popIn 0.28s var(--ease-spring);
         }
-        .settings-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
-        .settings-header h3 { font-size:20px; font-weight:600; color:var(--text-main); }
+        .settings-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--line); }
+        .settings-header h3 { font-size:19px; font-weight:700; letter-spacing:.01em; color:var(--text-main); }
         .close-settings {
             position: static; width:32px; height:32px; display:flex; align-items:center; justify-content:center;
             font-size:24px; cursor:pointer; color:var(--muted); border:0; background:var(--chip-bg);
@@ -982,14 +985,15 @@
         .close-settings:hover { background:var(--chip-bg); filter:brightness(0.94); color:var(--text-main);
         }
         .setting-item { margin-bottom: 20px; }
-        .settings-section { margin:16px 0 0; padding:0 12px; background:var(--surface-solid); border:1px solid var(--line); border-radius:10px; }
-        .settings-section-title { padding:10px 0 4px; color:var(--muted); font-size:12px; }
-        .settings-row-item { min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; border-bottom:1px solid var(--line); background:var(--surface-solid); }
+        /* 3.7.32：设置分组改成统一的玻璃卡片，间距/标题/行高收紧 */
+        .settings-section { margin:0 0 12px; padding:0 14px; background:var(--surface); border:1px solid var(--surface-border); border-radius:14px; box-shadow:inset 0 1px 0 rgba(255,255,255,.55); }
+        .settings-section-title { padding:12px 0 6px; color:var(--muted); font-size:11.5px; font-weight:700; letter-spacing:.06em; }
+        .settings-row-item { min-height:46px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--line); background:transparent; }
         .settings-row-item:last-child { border-bottom:0; }
-        .settings-row-item > label:first-child { margin:0; color:var(--text-main); font-size:15px; }
+        .settings-row-item > label:first-child { margin:0; color:var(--text-main); font-size:14.5px; }
         .settings-row-item input[type="color"] { width:42px; height:28px; padding:0; border:0; background:transparent; }
-        .settings-row-button { border:0; background:transparent; color:var(--text-main); padding:0; margin:0; text-align:left; font-weight:400; }
-        .settings-row-button::after { content:'›'; color:var(--muted); float:right; font-size:22px; line-height:15px; }
+        .settings-row-button { border:0; background:transparent; color:var(--text-main); padding:11px 0; margin:0; text-align:left; font-size:14.5px; font-weight:500; width:auto; }
+        .settings-row-button::after { content:'›'; color:var(--muted); float:right; font-size:20px; line-height:15px; }
         .profile-avatar-preview { width:44px; height:44px; flex:0 0 44px; border-radius:50%; object-fit:cover; background:var(--chip-bg); color:var(--chip-text); display:grid; place-items:center; font-size:18px; font-weight:600; overflow:hidden; }
         .profile-avatar-action { display:flex; align-items:center; gap:12px; border:0; background:transparent; color:var(--text-main); padding:0; margin:0; font-weight:400; }
         .profile-avatar-action::after { content:'›'; color:var(--muted); font-size:22px; line-height:15px; }
@@ -1130,17 +1134,14 @@
         .mrv-topbar b { font-size:19px; color:var(--text-main); }
         .mrv-plus { width:34px; min-height:34px; height:34px; padding:0; margin:0; border:none; border-radius:50%; background:var(--chip-bg); color:var(--text-main); font-size:19px; font-weight:700; cursor:pointer; line-height:1; }
         .mrv-plus:active { background:var(--btn-bg); color:#fff; }
-        .mrv-list { padding:8px 10px 12px; }
-        /* 3.7.31：消息页顶部留白 + 下拉刷新提示 */
+        .mrv-list { padding:8px 10px 12px; contain:layout paint; }
+        /* 3.7.32：下拉刷新占位条 —— 参与正常布局，撑开时列表整体下移，文字完整可见 */
         .mrv-ptr {
-            position:absolute; left:50%; top:6px; transform:translate(-50%, -26px);
-            display:flex; align-items:center; gap:6px; padding:5px 12px;
-            font-size:11.5px; color:var(--muted); border-radius:999px;
-            background:var(--surface); border:1px solid var(--surface-border);
-            box-shadow:0 4px 12px rgba(16,24,40,0.10);
-            opacity:0; transition:opacity .18s ease; pointer-events:none; z-index:5;
+            height:0; overflow:hidden; flex-shrink:0;
+            display:flex; align-items:center; justify-content:center; gap:6px; padding:0 10px;
+            font-size:11.5px; color:var(--muted);
+            transition:height .16s ease;
         }
-        .mrv-page.pulling .mrv-ptr, .mrv-page.refreshing .mrv-ptr { opacity:1; }
         .mrv-ptr-spin { width:12px; height:12px; border-radius:50%; border:2px solid var(--line); border-top-color:var(--btn-color); }
         .mrv-page.refreshing .mrv-ptr-spin { animation:mrvPtrSpin .7s linear infinite; }
         @keyframes mrvPtrSpin { to { transform:rotate(360deg); } }
@@ -1639,7 +1640,7 @@
             display: flex;
             flex-direction: column;
             color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-family: "STXinwei", "华文新魏", -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
             -webkit-overflow-scrolling: touch;
             padding-top: env(safe-area-inset-top, 0px);
             padding-bottom: env(safe-area-inset-bottom, 0px);
