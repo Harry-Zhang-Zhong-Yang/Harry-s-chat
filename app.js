@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.21";
+    const CHAT_APP_VERSION = "3.7.22";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -344,8 +344,8 @@
         // （APK 已随 web 一起提交到仓库根目录，实测 GET 200、字节数与安装包一致）。
         // 3.7.21 修复：APK 文件名不能跟着网页版本号拼。3.7.17 起只改网页没重打 APK，
         // `...-v3.7.20.apk` 在 Pages 上会落到 SPA 兜底页（200 + text/html），点了等于下载网页。
-        // 这里固定在「最后一次真正打包」的 APK 上；下次重打 APK 只改这个常量。
-        const APK_FILE = 'Harry%E7%9A%84%E8%81%8A%E5%A4%A9%E5%AE%A4-v3.7.16.apk';
+        // 3.7.22：已用 3.7.22 网页资源重打 APK（把玻璃界面打进安装包），固定指向这个真包。
+        const APK_FILE = 'Harry%E7%9A%84%E8%81%8A%E5%A4%A9%E5%AE%A4-v3.7.22.apk';
         const base = 'https://harry-s-chat.pages.dev/' + APK_FILE;
         a.href = base;
         a.addEventListener('click', () => {
