@@ -14,19 +14,19 @@
     /* ---------------- 常量与工具 ---------------- */
 
     const WORLD = 4400;              // 世界边长
-    const FOOD_COUNT = 1000;         // 食物总数（与原版密度一致）
+    const FOOD_COUNT = 2000;         // 食物总数（比原版密，成长/分裂节奏更快）
     const VIRUS_COUNT = 24;          // 刺球总数
     const MAX_CELLS = 16;            // 单人最多分身
     const START_MASS = 20;           // 出生质量（开局即可分裂一次）
     const DEFAULT_MASS = 10;         // 原版 defaultPlayerMass：减速曲线/最小分裂的基准
-    const MIN_EJECT_MASS = 30;       // 可吐孢子的最小质量（吐完仍大于出生质量）
-    const EJECT_COST = 20;           // 吐孢子消耗（原版 fireFood）
-    const EJECT_MASS = 20;           // 孢子质量（原版 fireFood）
+    const MIN_EJECT_MASS = 25;       // 可吐孢子的最小质量（门槛降低，W 更早可用）
+    const EJECT_COST = 16;           // 吐孢子消耗
+    const EJECT_MASS = 14;           // 孢子质量（吃回来略亏，避免刷质量）
     const MERGE_DELAY = 15000;       // 分身合体冷却（原版 MERGE_TIMER = 15s）
     const FOOD_RESPAWN = 8000;       // 食物重生
     const VIRUS_RESPAWN = 25000;     // 刺球重生
     const VIRUS_MASS = 110;          // 刺球质量（原版 100~150）
-    const FOOD_MASS = 1;
+    const FOOD_MASS = 2;             // 每颗豆的质量（原版 1，这里加量让分裂节奏更快）
     const EJECT_TTL = 25000;         // 孢子存活时长
     const MAX_EJECTS = 180;
     const STALE_MS = 6000;           // 远端玩家过期
@@ -42,7 +42,7 @@
     const EJECT_SPEED = 1500;        // 吐孢子初速
     const EJECT_DECEL = 1800;        // 孢子减速
     const MIN_DISTANCE = 50;         // 靠近目标点时的刹车距离
-    const PUSH_AWAY_SPEED = 66;      // 不能合体时的互推速度（1.1px/帧，所以分身会重叠成一团）
+    const PUSH_AWAY_SPEED = 600;     // 不能合体时的分离速度上限（按重叠深度推开，分身会明显分开）
     const SLOW_BASE = 4.5;           // 原版 slowBase
 
     const COLORS = [
@@ -184,6 +184,8 @@
         deadCells: new Map(),      // "pid:cellId" -> 过期时间（防重复吞噬）
 
         aim: { x: WORLD / 2, y: WORLD / 2 },
+        mouse: { x: 0, y: 0, on: false },  // 光标屏幕坐标（每帧换算成目标点）
+        touch: { dx: 0, dy: 0, on: false }, // 手机拖拽方向（同样每帧换算，按住就持续前进）
         cam: { x: WORLD / 2, y: WORLD / 2 },
         scale: 1,
 
@@ -339,7 +341,9 @@
                     i = -1;
                     break;
                 }
-                const push = PUSH_AWAY_SPEED * dt;
+                // 按重叠深度分离，而不是固定速度互推：分身才不会永远糊成一个球
+                const depth = sum - d;
+                const push = Math.min(depth * 0.5, PUSH_AWAY_SPEED * dt);
                 a.x -= nx * push; a.y -= ny * push;
                 b.x += nx * push; b.y += ny * push;
             }
@@ -373,7 +377,7 @@
                 if (Math.hypot(f.x - c.x, f.y - c.y) < cr) {
                     c.m += FOOD_MASS;
                     G.eatenFood.set(f.id, tnow + FOOD_RESPAWN);
-                    if (ownerPid === G.pid) G.recentFood.set(f.id, tnow + FOOD_RESPAWN);
+                    if (ownerPid === G.pid) { G.recentFood.set(f.id, tnow + FOOD_RESPAWN); G.myFood = (G.myFood || 0) + 1; }
                 }
             }
             for (let i = G.ejects.length - 1; i >= 0; i--) {
@@ -784,6 +788,20 @@
         const tnow = Date.now();
 
         if (G.phase === 'playing') {
+            // 鼠标模式：目标点 = 球群中心 + 光标相对屏幕中心的偏移（原版行为）。
+            // 光标停在屏幕边缘时球会持续前进，而不是跑到某个固定坐标就停住。
+            if (G.mouse.on && G.me.cells.length) {
+                const own0 = centerOf(G.me.cells);
+                G.aim.x = own0.x + (G.mouse.x - G.vw / 2) / G.scale;
+                G.aim.y = own0.y + (G.mouse.y - G.vh / 2) / G.scale;
+            } else if (G.touch.on && G.me.cells.length) {
+                // 手机：按住拖拽方向每帧重算目标点，松手才停
+                const own1 = centerOf(G.me.cells);
+                const len1 = Math.hypot(G.touch.dx, G.touch.dy) || 1;
+                const reach1 = 620 / Math.max(0.35, G.scale);
+                G.aim.x = own1.x + (G.touch.dx / len1) * reach1;
+                G.aim.y = own1.y + (G.touch.dy / len1) * reach1;
+            }
             const prev = centerOf(G.me.cells);
             moveCells(G.me.cells, G.aim, dt);
             resolveCells(G.me.cells, dt, now);
@@ -1350,16 +1368,21 @@
 
     function drawRemotes(ctx) {
         for (const r of G.remotes.values()) {
+            let big = null;
+            for (const c of r.cells) if (!big || c.m > big.m) big = c;
             for (const c of r.cells) {
                 if (!visible(c.x, c.y, radiusOf(c.m) + 60)) continue;
-                drawCell(ctx, c.x, c.y, c.m, r.color, r.name, false);
+                // 只在最大的球体上写名字，分身多的时候不容易糊成一片
+                drawCell(ctx, c.x, c.y, c.m, r.color, c === big ? r.name : '', false);
             }
         }
     }
 
     function drawMe(ctx) {
+        let big = null;
+        for (const c of G.me.cells) if (!big || c.m > big.m) big = c;
         for (const c of G.me.cells) {
-            drawCell(ctx, c.x, c.y, c.m, G.color, G.name, true);
+            drawCell(ctx, c.x, c.y, c.m, G.color, c === big ? G.name : '', true);
         }
     }
 
@@ -1675,14 +1698,21 @@
     /* ---------------- 输入 ---------------- */
 
     function setAimFromScreen(clientX, clientY) {
-        const rect = G.canvas.getBoundingClientRect();
-        const sx = clientX - rect.left;
-        const sy = clientY - rect.top;
-        G.aim.x = G.cam.x + (sx - rect.width / 2) / G.scale;
-        G.aim.y = G.cam.y + (sy - rect.height / 2) / G.scale;
+        // 记录光标屏幕坐标，真正的目标点每帧按镜头重新计算（见 tick）。
+        // 原版行为：光标停在屏幕边缘时球会一直往前走，而不是跑到某个固定世界坐标就刹住。
+        G.mouse.x = clientX;
+        G.mouse.y = clientY;
+        G.mouse.on = true;
+        G.touch.on = false;
+        G.aim.x = G.cam.x + (clientX - G.vw / 2) / G.scale;
+        G.aim.y = G.cam.y + (clientY - G.vh / 2) / G.scale;
     }
 
     function centerAim(dirX, dirY) {
+        G.mouse.on = false;
+        G.touch.dx = dirX;
+        G.touch.dy = dirY;
+        G.touch.on = true;
         let total = 0, cx = 0, cy = 0;
         for (const c of G.me.cells) { cx += c.x * c.m; cy += c.y * c.m; total += c.m; }
         if (!total) return;
@@ -1715,14 +1745,20 @@
             const rect = canvas.getBoundingClientRect();
             centerAim(e.clientX - rect.left - rect.width / 2, e.clientY - rect.top - rect.height / 2);
         };
+        const onTouchEnd = function (e) {
+            if (e.pointerType === 'mouse') return;
+            G.touch.on = false;
+        };
         const onKey = function (e) {
             if (!G.open) return;
-            const tag = (document.activeElement && document.activeElement.tagName) || '';
-            if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-            if (e.code === 'Space') {
+            // 别用 e.key 判断：中文输入法激活时 key 会变成 Process/Unidentified（keyCode 229），
+            // 所以统一用 e.code / keyCode，保证中英文输入法下都能分裂、吐球。
+            const isSpace = e.code === 'Space' || e.keyCode === 32;
+            const isW = e.code === 'KeyW' || e.keyCode === 87 || e.key === 'w' || e.key === 'W';
+            if (isSpace) {
                 e.preventDefault();
                 if (!e.repeat) doSplit();
-            } else if (e.key === 'w' || e.key === 'W') {
+            } else if (isW) {
                 e.preventDefault();
                 if (!e.repeat) doEject();
             } else if (e.key === 'Escape') {
@@ -1734,6 +1770,8 @@
         canvas.addEventListener('pointermove', onPointerMove);
         canvas.addEventListener('pointerdown', onPointerDown);
         canvas.addEventListener('pointermove', onPointerTouchMove);
+        canvas.addEventListener('pointerup', onTouchEnd);
+        canvas.addEventListener('pointercancel', onTouchEnd);
         window.addEventListener('keydown', onKey);
         window.addEventListener('resize', onResize);
         if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
@@ -1742,6 +1780,8 @@
             canvas.removeEventListener('pointermove', onPointerMove);
             canvas.removeEventListener('pointerdown', onPointerDown);
             canvas.removeEventListener('pointermove', onPointerTouchMove);
+            canvas.removeEventListener('pointerup', onTouchEnd);
+            canvas.removeEventListener('pointercancel', onTouchEnd);
             window.removeEventListener('keydown', onKey);
             window.removeEventListener('resize', onResize);
             if (window.visualViewport) window.visualViewport.removeEventListener('resize', onResize);
@@ -1856,6 +1896,11 @@
         buildDom();
         bindInput();
         bindButtons();
+        // 游戏是全屏遮罩，但底下的聊天输入框/房间号输入框可能还留着焦点，
+        // 会让键盘事件全被输入框吃掉（W、空格都无反应），这里主动收回焦点。
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
         // 人机模式每次开局都换一张地图，联机模式用房间号保证同房间同一张图
         buildWorld(G.mode === 'online' ? 'room:' + G.room : 'bot:' + Date.now());
         resize();
@@ -1879,6 +1924,21 @@
     window.AgarArena = {
         open: openGame,
         close: closeGame,
+        // 调试用：只读快照，方便本地测试脚本核对位移/速度
+        _debug: function () {
+            return {
+                phase: G.phase,
+                mouse: { x: Math.round(G.mouse.x), y: Math.round(G.mouse.y), on: G.mouse.on },
+                aim: { x: Math.round(G.aim.x), y: Math.round(G.aim.y) },
+                cam: { x: Math.round(G.cam.x), y: Math.round(G.cam.y) },
+                scale: Math.round(G.scale * 100) / 100,
+                eaten: G.eatenFood.size,
+                myFood: G.myFood || 0,
+                cells: G.me.cells.map(function (c) {
+                    return { x: Math.round(c.x), y: Math.round(c.y), m: Math.round(c.m * 10) / 10, speed: Math.round(c.speed) };
+                })
+            };
+        },
         difficultyLabels: function () {
             return { easy: DIFFICULTY.easy.label, normal: DIFFICULTY.normal.label, hard: DIFFICULTY.hard.label };
         }
