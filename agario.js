@@ -46,10 +46,10 @@
     const SPEED_DECEL = 1800;        // 冲刺减速
     const EJECT_SPEED = 560;         // 吐孢子初速（约飞 100px，原版 1500 会甩出 600 多px）
     const EJECT_DECEL = 1600;        // 孢子减速
+    const EJECT_REPEAT_MS = 90;      // 按住 W 时的连吐间隔
     const MIN_DISTANCE = 50;         // 靠近目标点时的刹车距离
     const PUSH_AWAY_SPEED = 600;     // 不能合体时的分离速度上限（按重叠深度推开，分身会明显分开）
     const MERGE_PULL_SPEED = 420;    // 冷却结束后分身互相靠拢的速度（不然同速同向会永远保持距离）
-    const SLOW_BASE = 4.5;           // 原版 slowBase
 
     const COLORS = [
         '#ff6b6b', '#f76707', '#fcc419', '#94d82d', '#40c057', '#20c997',
@@ -117,21 +117,29 @@
 
     // 原版 util.massToRadius
     const radiusOf = (m) => 4 + Math.sqrt(m) * 6;
-    // 原版 Player.move：质量越大越慢，按 log(质量, 4.5) 衰减
+    /* 原版速度曲线：v = 100 / mass^0.439（对正式版 Agar.io 的逆向拟合）。
+     * 之前用的是老 clone 的 log(质量, 4.5) 衰减，大球偏快一倍左右：
+     * 20→100 质量时正式版只剩 49% 速度，老公式还有 58%。
+     * 这里乘 1.44 让开局（20 质量）的绝对速度和之前保持一致。 */
     function slowDownOf(m) {
-        const v = Math.log(m) / Math.log(SLOW_BASE) - Math.log(DEFAULT_MASS) / Math.log(SLOW_BASE) + 1;
+        const v = 1.44 * Math.pow(Math.max(m, 1) / START_MASS, 0.439);
         return v < 1 ? 1 : v;
     }
-    // 合体冷却：质量越大等得稍久（5~13 秒），但不会像原版固定 15 秒那样干等
+    // 当前质量下的实际移动速度（分裂冲刺的参照速度要用它，不能用常量 MIN_SPEED）
+    function runSpeedOf(m) {
+        return MIN_SPEED / slowDownOf(m);
+    }
+    // 合体冷却：质量越大等得稍久（5~13 秒）。正式版是 30 秒 + 质量×7/300，
+    // 实测太长，这里保留更快的节奏，只保证冷却结束一定会合上
     function mergeDelayFor(m) {
         return MERGE_DELAY_MIN + Math.min(8000, m * MERGE_DELAY_PER_MASS);
     }
     /* 分裂冲刺初速：本体和分身都朝同一个目标点飞，只有分身带冲刺速度，
-     * 所以两者的相对位移 = (v - MIN_SPEED)² / (2 × SPEED_DECEL)，
+     * 所以两者的相对位移 = (v - 本体速度)² / (2 × SPEED_DECEL)，
      * 用这个式子按目标间距反推 v。 */
     function splitSpeedFor(m) {
         const sep = clamp(radiusOf(m) * SPLIT_SEP_PER_R, SPLIT_SEP_MIN, SPLIT_SEP_MAX);
-        return clamp(MIN_SPEED + Math.sqrt(2 * SPEED_DECEL * sep), 900, 1500);
+        return clamp(runSpeedOf(m) + Math.sqrt(2 * SPEED_DECEL * sep), 900, 1500);
     }
     const colorFor = (pid) => COLORS[hashStr(pid) % COLORS.length];
 
@@ -215,6 +223,8 @@
         lastHud: 0,
         cellSeq: 0,
         ejectSeq: 0,
+        ejectHold: false,                 // 按住 W 连续吐孢子（正式版是按住持续吐）
+        ejectNextAt: 0,
 
         canvas: null,
         ctx: null,
@@ -426,13 +436,13 @@
         }
     }
 
-    /* 原版 gameloop 每秒一次：总质量 > 50 时，每个球体每秒掉 0.1% 质量 */
+    /* 正式版规则：总质量超过 50 后，每个球体每秒掉 0.2% 质量（逆向数据） */
     function decayMass(cells, dt) {
         let total = 0;
         for (const c of cells) total += c.m;
         if (total <= 50) return;
         for (const c of cells) {
-            if (c.m * 0.999 > DEFAULT_MASS) c.m -= c.m * 0.001 * dt;
+            if (c.m * 0.998 > DEFAULT_MASS) c.m -= c.m * 0.002 * dt;
         }
     }
 
@@ -465,7 +475,8 @@
             }
             for (const v of G.viruses) {
                 if (G.virusRespawn.has(v.id)) continue;
-                if (c.m <= VIRUS_MASS) continue;
+                // 攻略实测：约 150 质量以下撞刺球不会炸（130 以下甚至能藏进刺球里）
+                if (c.m <= VIRUS_MASS * 1.36) continue;
                 // 刺球按「两圆相碰」判定：之前要求球心进入自身半径，
                 // 但靠近光标时会提前刹车，正对着刺球走永远撞不到，只有路过才会爆。
                 if (Math.hypot(v.x - c.x, v.y - c.y) < radiusOf(c.m) + radiusOf(VIRUS_MASS) - 8) {
@@ -771,7 +782,7 @@
         }
 
         // 4) 自己够大时绕开刺球
-        if (diff.avoidVirus && big.m > VIRUS_MASS * 1.2) {
+        if (diff.avoidVirus && big.m > VIRUS_MASS * 1.4) {
             for (const v of G.viruses) {
                 if (G.virusRespawn.has(v.id)) continue;
                 const d = Math.hypot(v.x - big.x, v.y - big.y);
@@ -886,6 +897,11 @@
             eatWorldFor(G.me.cells, tnow, G.pid);
             eatRemote();
             decayMass(G.me.cells, dt);
+            // 按住 W 连续吐孢子（正式版就是按住一直吐，这里限速 90ms 一次）
+            if (G.ejectHold && now >= G.ejectNextAt) {
+                doEject();
+                G.ejectNextAt = now + EJECT_REPEAT_MS;
+            }
             const cur = centerOf(G.me.cells);
             if (dt > 0) {
                 G.pvx = (cur.x - prev.x) / dt;
@@ -1760,6 +1776,7 @@
             spawn(START_MASS);
         }
         G.phase = 'playing';
+        G.ejectHold = false;
         const lobby = document.getElementById('agar-lobby');
         if (lobby) lobby.style.display = 'none';
         hideDead();
@@ -1844,10 +1861,18 @@
                 if (!e.repeat) doSplit();
             } else if (isW) {
                 e.preventDefault();
-                if (!e.repeat) doEject();
+                // 第一次按下立即吐一个，之后交给 tick 里的连吐逻辑
+                if (!e.repeat && !G.ejectHold) {
+                    doEject();
+                    G.ejectHold = true;
+                    G.ejectNextAt = performance.now() + EJECT_REPEAT_MS;
+                }
             } else if (e.key === 'Escape') {
                 closeGame();
             }
+        };
+        const onKeyUp = function (e) {
+            if (e.code === 'KeyW' || e.keyCode === 87 || e.key === 'w' || e.key === 'W') G.ejectHold = false;
         };
         const onResize = function () { resize(); };
 
@@ -1857,6 +1882,8 @@
         canvas.addEventListener('pointerup', onTouchEnd);
         canvas.addEventListener('pointercancel', onTouchEnd);
         window.addEventListener('keydown', onKey);
+        window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('blur', onKeyUp);
         window.addEventListener('resize', onResize);
         if (window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
 
@@ -1867,6 +1894,8 @@
             canvas.removeEventListener('pointerup', onTouchEnd);
             canvas.removeEventListener('pointercancel', onTouchEnd);
             window.removeEventListener('keydown', onKey);
+            window.removeEventListener('keyup', onKeyUp);
+            window.removeEventListener('blur', onKeyUp);
             window.removeEventListener('resize', onResize);
             if (window.visualViewport) window.visualViewport.removeEventListener('resize', onResize);
         });
