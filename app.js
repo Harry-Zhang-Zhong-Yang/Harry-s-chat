@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.41";
+    const CHAT_APP_VERSION = "3.7.42";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -306,7 +306,7 @@
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
         navigator.serviceWorker.register('/sw.js').then((reg) => {
             // 每 60 秒检查一次 SW 更新，有新版立即激活（sw.js 内 skipWaiting + clients.claim）
-            setInterval(() => reg.update().catch(() => {}), 60000);
+            setInterval(() => { if (reg && reg.update) reg.update().catch(() => {}); }, 60000);
         }).catch((e) => console.warn('[sw] 注册失败:', e.message));
     }
 

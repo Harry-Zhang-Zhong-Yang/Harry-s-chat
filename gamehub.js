@@ -161,7 +161,7 @@
                     '<div class="gh-grid" style="margin-top:12px;">' + roomCards + '</div>' +
                 '</div>' +
 
-                '<div class="gh-tip">球球大作战支持手机触控：拖动屏幕移动，双指/按钮分裂</div>' +
+                '<div class="gh-tip">手机上按住屏幕拖动移动，右下角按钮分裂 / 吐孢子</div>' +
             '</div>';
 
         document.body.appendChild(hub);

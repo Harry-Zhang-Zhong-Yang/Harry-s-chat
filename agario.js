@@ -20,9 +20,10 @@
     const START_MASS = 20;           // 出生质量（开局即可分裂一次）
     const DEFAULT_MASS = 10;         // 原版 defaultPlayerMass：减速曲线/最小分裂的基准
     const MIN_EJECT_MASS = 25;       // 可吐孢子的最小质量（门槛降低，W 更早可用）
-    const EJECT_COST = 16;           // 吐孢子消耗
-    const EJECT_MASS = 14;           // 孢子质量（吃回来略亏，避免刷质量）
-    const MERGE_DELAY = 15000;       // 分身合体冷却（原版 MERGE_TIMER = 15s）
+    const EJECT_COST = 12;           // 吐孢子消耗
+    const EJECT_MASS = 10;           // 孢子质量（吃回来略亏，避免刷质量）
+    const MERGE_DELAY_MIN = 5000;    // 合体冷却基础值（原版固定 15s，等太久，改成随质量小幅增加）
+    const MERGE_DELAY_PER_MASS = 20; // 每点质量增加 20ms 冷却
     const FOOD_RESPAWN = 8000;       // 食物重生
     const VIRUS_RESPAWN = 25000;     // 刺球重生
     const VIRUS_MASS = 110;          // 刺球质量（原版 100~150）
@@ -37,12 +38,17 @@
      *   6.25px/帧 → 375px/s；20px/帧 → 1200px/s；0.5px/帧² → 1800px/s²
      */
     const MIN_SPEED = 375;           // 基础速度
-    const SPLIT_SPEED = 1200;        // 分裂冲刺初速
+    // 分裂冲刺：原版固定初速 20px/帧，小球被甩出 190px 像瞬移、大球却几乎没拉开。
+    // 这里按「分身间距 ≈ 4.5 个自身半径」反推初速，大小球的分裂观感一致。
+    const SPLIT_SEP_PER_R = 4.5;
+    const SPLIT_SEP_MIN = 90;
+    const SPLIT_SEP_MAX = 380;
     const SPEED_DECEL = 1800;        // 冲刺减速
-    const EJECT_SPEED = 1500;        // 吐孢子初速
-    const EJECT_DECEL = 1800;        // 孢子减速
+    const EJECT_SPEED = 560;         // 吐孢子初速（约飞 100px，原版 1500 会甩出 600 多px）
+    const EJECT_DECEL = 1600;        // 孢子减速
     const MIN_DISTANCE = 50;         // 靠近目标点时的刹车距离
     const PUSH_AWAY_SPEED = 600;     // 不能合体时的分离速度上限（按重叠深度推开，分身会明显分开）
+    const MERGE_PULL_SPEED = 420;    // 冷却结束后分身互相靠拢的速度（不然同速同向会永远保持距离）
     const SLOW_BASE = 4.5;           // 原版 slowBase
 
     const COLORS = [
@@ -116,6 +122,17 @@
         const v = Math.log(m) / Math.log(SLOW_BASE) - Math.log(DEFAULT_MASS) / Math.log(SLOW_BASE) + 1;
         return v < 1 ? 1 : v;
     }
+    // 合体冷却：质量越大等得稍久（5~13 秒），但不会像原版固定 15 秒那样干等
+    function mergeDelayFor(m) {
+        return MERGE_DELAY_MIN + Math.min(8000, m * MERGE_DELAY_PER_MASS);
+    }
+    /* 分裂冲刺初速：本体和分身都朝同一个目标点飞，只有分身带冲刺速度，
+     * 所以两者的相对位移 = (v - MIN_SPEED)² / (2 × SPEED_DECEL)，
+     * 用这个式子按目标间距反推 v。 */
+    function splitSpeedFor(m) {
+        const sep = clamp(radiusOf(m) * SPLIT_SEP_PER_R, SPLIT_SEP_MIN, SPLIT_SEP_MAX);
+        return clamp(MIN_SPEED + Math.sqrt(2 * SPEED_DECEL * sep), 900, 1500);
+    }
     const colorFor = (pid) => COLORS[hashStr(pid) % COLORS.length];
 
     // 球体渐变的明暗色（amt > 0 提亮，< 0 压暗）
@@ -167,6 +184,7 @@
         lobbyPlayers: [],
 
         food: [],
+        foodGrid: null,            // 食物空间网格（吃豆时只查附近分桶，避免每帧全量遍历）
         viruses: [],
         eatenFood: new Map(),      // id -> 重生时间(ms)
         virusRespawn: new Map(),   // id -> 重生时间(ms)
@@ -238,6 +256,43 @@
         G.virusRespawn.clear();
         G.deadCells.clear();
         G.ejects = [];
+        buildFoodGrid();
+    }
+
+    /* 食物空间网格：2000 颗豆按 160px 分桶。
+     * 玩家 + 8 个 bot 每帧都要判定吃豆，全量遍历是 3 万多次距离计算，
+     * 手机上会明显掉帧；分桶后每个球只检查覆盖到的几个桶。 */
+    const FOOD_GRID = 160;
+
+    function buildFoodGrid() {
+        const cols = Math.ceil(WORLD / FOOD_GRID);
+        const buckets = new Array(cols * cols);
+        for (const f of G.food) {
+            const gx = clamp(Math.floor(f.x / FOOD_GRID), 0, cols - 1);
+            const gy = clamp(Math.floor(f.y / FOOD_GRID), 0, cols - 1);
+            const k = gy * cols + gx;
+            if (!buckets[k]) buckets[k] = [];
+            buckets[k].push(f);
+        }
+        G.foodGrid = { cols: cols, buckets: buckets };
+    }
+
+    // 遍历圆形（x, y, r）覆盖到的所有食物
+    function eachFoodNear(x, y, r, cb) {
+        const grid = G.foodGrid;
+        if (!grid) return;
+        const cols = grid.cols;
+        const x0 = clamp(Math.floor((x - r) / FOOD_GRID), 0, cols - 1);
+        const x1 = clamp(Math.floor((x + r) / FOOD_GRID), 0, cols - 1);
+        const y0 = clamp(Math.floor((y - r) / FOOD_GRID), 0, cols - 1);
+        const y1 = clamp(Math.floor((y + r) / FOOD_GRID), 0, cols - 1);
+        for (let gy = y0; gy <= y1; gy++) {
+            for (let gx = x0; gx <= x1; gx++) {
+                const bucket = grid.buckets[gy * cols + gx];
+                if (!bucket) continue;
+                for (const f of bucket) cb(f);
+            }
+        }
     }
 
     function spawn(mass) {
@@ -255,6 +310,12 @@
             for (const v of G.viruses) {
                 if (G.virusRespawn.has(v.id)) continue;
                 gap = Math.min(gap, Math.hypot(v.x - x, v.y - y) - radiusOf(VIRUS_MASS));
+            }
+            // 联机模式还要避开场上其他玩家，避免一出生就贴脸
+            for (const r of G.remotes.values()) {
+                for (const c of r.cells) {
+                    gap = Math.min(gap, Math.hypot(c.x - x, c.y - y) - radiusOf(c.m));
+                }
             }
             if (gap > best) { best = gap; bx = x; by = y; }
             if (gap > 700) break;
@@ -330,17 +391,27 @@
                 const sum = ra + rb;
                 const dx = b.x - a.x, dy = b.y - a.y;
                 const d = Math.hypot(dx, dy);
-                if (d >= sum) continue;
                 const nx = d > 0.001 ? dx / d : 1, ny = d > 0.001 ? dy / d : 0;
-                if (a.mergeAt <= now && b.mergeAt <= now) {
-                    const big = a.m >= b.m ? a : b;
-                    const small = big === a ? b : a;
-                    big.m += small.m;
-                    const k = cells.indexOf(small);
-                    if (k >= 0) cells.splice(k, 1);
-                    i = -1;
-                    break;
+                const ready = a.mergeAt <= now && b.mergeAt <= now;
+                if (ready) {
+                    // 冷却结束后不再互推，允许两球叠在一起完成合体（移动中也能合上）
+                    if (d <= sum + 8) {
+                        const big = a.m >= b.m ? a : b;
+                        const small = big === a ? b : a;
+                        big.m += small.m;
+                        const k = cells.indexOf(small);
+                        if (k >= 0) cells.splice(k, 1);
+                        i = -1;
+                        break;
+                    }
+                    // 冷却结束后互相靠拢：两个同质量分身朝同一目标点移动时速度完全相同，
+                    // 不靠拢就会永远保持距离，看起来像「等半天都不合并」。
+                    const pull = Math.min((d - sum) * 0.6, MERGE_PULL_SPEED * dt);
+                    a.x += nx * pull; a.y += ny * pull;
+                    b.x -= nx * pull; b.y -= ny * pull;
+                    continue;
                 }
+                if (d >= sum) continue;
                 // 按重叠深度分离，而不是固定速度互推：分身才不会永远糊成一个球
                 const depth = sum - d;
                 const push = Math.min(depth * 0.5, PUSH_AWAY_SPEED * dt);
@@ -372,18 +443,19 @@
         for (const c of list) {
             if (cells.indexOf(c) < 0) continue;   // 刚刚被刺球炸掉/合体掉了
             const cr = radiusOf(c.m);
-            for (const f of G.food) {
-                if (G.eatenFood.has(f.id)) continue;
-                if (Math.hypot(f.x - c.x, f.y - c.y) < cr) {
-                    c.m += FOOD_MASS;
-                    G.eatenFood.set(f.id, tnow + FOOD_RESPAWN);
-                    if (ownerPid === G.pid) { G.recentFood.set(f.id, tnow + FOOD_RESPAWN); G.myFood = (G.myFood || 0) + 1; }
-                }
-            }
+            const cr2 = cr * cr;
+            eachFoodNear(c.x, c.y, cr, function (f) {
+                if (G.eatenFood.has(f.id)) return;
+                const fdx = f.x - c.x, fdy = f.y - c.y;
+                if (fdx * fdx + fdy * fdy >= cr2) return;
+                c.m += FOOD_MASS;
+                G.eatenFood.set(f.id, tnow + FOOD_RESPAWN);
+                if (ownerPid === G.pid) { G.recentFood.set(f.id, tnow + FOOD_RESPAWN); G.myFood = (G.myFood || 0) + 1; }
+            });
             for (let i = G.ejects.length - 1; i >= 0; i--) {
                 const e = G.ejects[i];
-                // 原版：自己刚吐出的孢子还在飞行时不能立刻吃回来
-                if (e.owner === ownerPid && e.born && tnow - e.born < 400) continue;
+                // 自己刚吐出的孢子在 2.5 秒内不能吃回来（否则 W 等于没吐，也喂不到别人）
+                if (e.owner === ownerPid && e.born && tnow - e.born < 2500) continue;
                 if (c.m <= e.m * 1.1) continue;
                 if (Math.hypot(e.x - c.x, e.y - c.y) >= cr) continue;
                 c.m += e.m;
@@ -394,9 +466,14 @@
             for (const v of G.viruses) {
                 if (G.virusRespawn.has(v.id)) continue;
                 if (c.m <= VIRUS_MASS) continue;
-                if (Math.hypot(v.x - c.x, v.y - c.y) < cr) {
+                // 刺球按「两圆相碰」判定：之前要求球心进入自身半径，
+                // 但靠近光标时会提前刹车，正对着刺球走永远撞不到，只有路过才会爆。
+                if (Math.hypot(v.x - c.x, v.y - c.y) < radiusOf(c.m) + radiusOf(VIRUS_MASS) - 8) {
                     G.virusRespawn.set(v.id, tnow + VIRUS_RESPAWN);
                     if (ownerPid === G.pid) G.recentVirus.set(v.id, tnow + VIRUS_RESPAWN);
+                    // 正式版吃刺球会把刺球的质量加给自己，再炸成多个分身；
+                    // 这里之前只炸不给分，等于撞刺球纯亏，补上。
+                    c.m += VIRUS_MASS;
                     splatCells(cells, c, ownerPid === G.pid ? MAX_CELLS : 8);
                     break;
                 }
@@ -414,9 +491,10 @@
         const pieces = Math.min(room + 1, 8);
         const share = c.m / pieces;
         const now = performance.now();
+        const burst = splitSpeedFor(share);
         c.m = share;
-        c.speed = SPLIT_SPEED;
-        c.mergeAt = now + MERGE_DELAY;
+        c.speed = burst;
+        c.mergeAt = now + mergeDelayFor(share);
         for (let i = 1; i < pieces; i++) {
             const ang = (Math.PI * 2 * i) / pieces;
             G.cellSeq += 1;
@@ -424,8 +502,8 @@
                 id: G.cellSeq,
                 x: c.x, y: c.y,
                 m: share,
-                speed: SPLIT_SPEED,
-                mergeAt: now + MERGE_DELAY
+                speed: burst,
+                mergeAt: now + mergeDelayFor(share)
             });
         }
     }
@@ -737,15 +815,15 @@
             if (Math.floor(c.m / DEFAULT_MASS) < 2) continue;
             const half = c.m / 2;
             c.m = half;
-            c.mergeAt = now + MERGE_DELAY;
+            c.mergeAt = now + mergeDelayFor(half);
             G.cellSeq += 1;
             bot.cells.push({
                 id: G.cellSeq,
                 x: c.x,
                 y: c.y,
                 m: half,
-                speed: SPLIT_SPEED,
-                mergeAt: now + MERGE_DELAY
+                speed: splitSpeedFor(half),
+                mergeAt: now + mergeDelayFor(half)
             });
         }
     }
@@ -1168,16 +1246,16 @@
             if (Math.floor(c.m / DEFAULT_MASS) < 2) continue;
             const half = c.m / 2;
             c.m = half;
-            c.mergeAt = now + MERGE_DELAY;
+            c.mergeAt = now + mergeDelayFor(half);
             G.cellSeq += 1;
-            // 原版：新球生成在同一个位置，靠 SPLIT_SPEED 朝鼠标方向冲刺甩出去
+            // 原版：新球生成在同一个位置，靠冲刺初速朝鼠标方向甩出去
             G.me.cells.push({
                 id: G.cellSeq,
                 x: c.x,
                 y: c.y,
                 m: half,
-                speed: SPLIT_SPEED,
-                mergeAt: now + MERGE_DELAY
+                speed: splitSpeedFor(half),
+                mergeAt: now + mergeDelayFor(half)
             });
         }
         syncNow();
@@ -1201,9 +1279,9 @@
                 vy: dir.y * EJECT_SPEED,
                 m: EJECT_MASS,
                 c: G.color,
+                owner: G.pid,
                 until: now + EJECT_TTL,
-                born: now,
-                owner: G.pid
+                born: now
             });
         }
         if (G.ejects.length > MAX_EJECTS) G.ejects.splice(0, G.ejects.length - MAX_EJECTS);
@@ -1748,6 +1826,12 @@
         const onTouchEnd = function (e) {
             if (e.pointerType === 'mouse') return;
             G.touch.on = false;
+            // 松手就停在原地：否则目标点还留在 620px 外，球会自己继续滑一段
+            if (G.me.cells.length) {
+                const own = centerOf(G.me.cells);
+                G.aim.x = own.x;
+                G.aim.y = own.y;
+            }
         };
         const onKey = function (e) {
             if (!G.open) return;
@@ -1934,6 +2018,11 @@
                 scale: Math.round(G.scale * 100) / 100,
                 eaten: G.eatenFood.size,
                 myFood: G.myFood || 0,
+                viruses: G.viruses.map(function (v) {
+                    return { id: v.id, x: Math.round(v.x), y: Math.round(v.y), alive: !G.virusRespawn.has(v.id) };
+                }),
+                world: WORLD,
+                ejects: G.ejects.map(function (e) { return { x: Math.round(e.x), y: Math.round(e.y), v: Math.round(Math.hypot(e.vx || 0, e.vy || 0)) }; }),
                 cells: G.me.cells.map(function (c) {
                     return { x: Math.round(c.x), y: Math.round(c.y), m: Math.round(c.m * 10) / 10, speed: Math.round(c.speed) };
                 })
