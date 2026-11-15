@@ -270,6 +270,7 @@
             <span id="room-title">正在加载...</span>
         </div>
         <div class="nav-actions" style="display:flex; gap:10px; align-items:center;">
+            <span id="typing-indicator" class="typing-indicator" aria-live="polite" style="display:none;"></span>
             <button id="online-count" class="online-count" aria-live="polite" onclick="window.toggleSettings()" title="查看房间成员">在线 1 人</button>
             <button id="settings-btn" class="nav-icon" onclick="window.toggleSettings()" aria-label="设置">⋯</button>
         </div>
@@ -335,6 +336,21 @@
                     <div class="game-option-info">
                         <div class="game-option-name">井字棋</div>
                         <div class="game-option-desc">三连棋趣味对战</div>
+                    </div>
+                </div>
+                <div class="game-option" onclick="window.openAgarGame()">
+                    <div class="game-option-icon">🟠</div>
+                    <div class="game-option-info">
+                        <div class="game-option-name">球球大作战</div>
+                        <div class="game-option-desc">同房间多人对战 · 分裂吃球</div>
+                        <div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;">
+                            <button onclick="event.stopPropagation();window.openAgarGame({mode:'bot',difficulty:'easy'})"
+                                style="padding:3px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:inherit;font-size:11px;cursor:pointer;">人机·简单</button>
+                            <button onclick="event.stopPropagation();window.openAgarGame({mode:'bot',difficulty:'normal'})"
+                                style="padding:3px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:inherit;font-size:11px;cursor:pointer;">人机·普通</button>
+                            <button onclick="event.stopPropagation();window.openAgarGame({mode:'bot',difficulty:'hard'})"
+                                style="padding:3px 9px;border-radius:999px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:inherit;font-size:11px;cursor:pointer;">人机·困难</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -640,8 +656,17 @@
 </div>
 
 <div id="msg-context-menu" class="context-menu" onclick="event.stopPropagation()"></div>
+<script>
+    // 球球大作战联机配置：聊天室站点没有自己的 /sb 反代，
+    // 直接复用聊天室的 Netlify 反代（anon key 本身是公开的，app.js 里也硬编码了）
+    window.AGAR_CFG = {
+        sbBase: 'https://thriving-muffin-0bb5e1.netlify.app/sb',
+        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M'
+    };
+</script>
 <script src="app.js" defer></script>
 <script src="game.js" defer></script>
+<script src="agario.js" defer></script>
     <script>
         // 主样式已解析完成，解除启动期隐藏（见 head 中的 app-boot 遮罩）
         document.documentElement.classList.remove('app-boot');

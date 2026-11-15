@@ -1,4 +1,4 @@
-const CACHE_NAME = 'harrys-chat-v110';
+const CACHE_NAME = 'harrys-chat-v114';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -6,7 +6,8 @@ const STATIC_ASSETS = [
     '/app.js',
     '/supabase.min.js',
     '/manifest.json',
-    '/game.js'
+    '/game.js',
+    '/agario.js'
 ];
 
 async function generateAndCacheIcon(size) {

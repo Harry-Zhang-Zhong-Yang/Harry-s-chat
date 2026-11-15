@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.36";
+    const CHAT_APP_VERSION = "3.7.39";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -7371,15 +7371,25 @@
         return;
     }
 
-    // 订阅 broadcast typing（尝试）
+    // 订阅 broadcast typing：AI 在打字时显示「正在输入…」
+    let typingIndicatorTimer = null;
+    function showTypingIndicator(user) {
+        const el = document.getElementById('typing-indicator');
+        if (!el || !user) return;
+        el.textContent = `${user} 正在输入…`;
+        el.style.display = '';
+        if (typingIndicatorTimer) clearTimeout(typingIndicatorTimer);
+        typingIndicatorTimer = setTimeout(() => {
+            el.style.display = 'none';
+        }, 8000);
+    }
     try {
         if (roomSubscription) {
             roomSubscription.on('broadcast', { event: 'typing' }, (payload) => {
-                if (payload?.payload?.room !== currentRoomCode) return;
-                const user = payload.payload.user;
-                if (user === mySender) return;
-                const el = document.getElementById('online-count');
-                if (!el) return;
+                const data = payload?.payload || {};
+                if (data.room !== currentRoomCode) return;
+                if (!data.user || data.user === mySender) return;
+                showTypingIndicator(data.user);
             });
         }
     } catch (e) { /* best-effort */ }

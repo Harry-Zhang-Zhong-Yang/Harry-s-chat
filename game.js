@@ -554,6 +554,11 @@ window.reopenGameBoard = function() {
 
 function handleGameContent(content) {
     if (!content) return null;
+    const agarMatch = content.match(/^\[AGAR_INVITE:([^\]]+)\]$/);
+    if (agarMatch) {
+        const [, roomCode] = agarMatch;
+        return { type: 'agar_invite', roomCode };
+    }
     const inviteMatch = content.match(/^\[GAME_INVITE:([^:]+):([^:]+):([^\]]+)\]$/);
     if (inviteMatch) {
         const [, gameId, gameName, icon] = inviteMatch;
@@ -580,6 +585,21 @@ function handleGameContent(content) {
         return { type: 'cancel', gameId };
     }
     return null;
+}
+
+function renderAgarInviteCard(gameId, sender) {
+    return `
+        <div class="game-invite-card" data-game-id="${escapeHtml(gameId)}">
+            <div class="game-invite-header">
+                <div class="game-invite-icon">🟠</div>
+                <div class="game-invite-info">
+                    <div class="game-invite-name">球球大作战</div>
+                    <div class="game-invite-sender">${escapeHtml(sender)} 邀请你一起玩</div>
+                </div>
+            </div>
+            <button class="game-accept-btn" onclick="event.stopPropagation();window.joinAgarGame()">加入战局</button>
+        </div>
+    `;
 }
 
 function renderGameInviteCard(wrapper, gameId, gameName, icon, sender) {
@@ -637,6 +657,12 @@ function handleGameMessageInUI(wrapper, sender, content) {
 
     const msgContent = wrapper.querySelector('.msg-content');
     if (!msgContent) return false;
+
+    if (gameData.type === 'agar_invite') {
+        msgContent.innerHTML = renderAgarInviteCard(gameData.roomCode, sender);
+        wrapper.classList.add('game-message');
+        return true;
+    }
 
     if (gameData.type === 'invite') {
         msgContent.innerHTML = renderGameInviteCard(wrapper, gameData.gameId, gameData.gameName, gameData.icon, sender);

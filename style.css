@@ -484,6 +484,8 @@
         .nav-icon:hover { background: var(--chip-bg); color: var(--text-main); }
         .nav-icon:active { transform: scale(0.92); background: var(--chip-bg); }
         .online-count { width: auto; padding: 0 4px; margin: 0; background: transparent; color: var(--muted); border: 0; font-size: 12px; font-weight: 400; white-space: nowrap; min-height: 36px; display: flex; align-items: center; }
+        .typing-indicator { color: var(--muted); font-size: 12px; white-space: nowrap; max-width: 40vw; overflow: hidden; text-overflow: ellipsis; animation: typingPulse 1.4s ease-in-out infinite; }
+        @keyframes typingPulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
         /* --- 聊天框内容层 --- */
         #chat-box { 
