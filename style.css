@@ -1864,6 +1864,18 @@
             background: radial-gradient(circle at 35% 35%, #fff, #d5d5d5);
             box-shadow: 2px 3px 6px rgba(0,0,0,0.3);
         }
+        /* 最后一手：金色描边，方便看清对手刚下在哪 */
+        .game-piece.last-move {
+            box-shadow: 0 0 0 2px rgba(255, 193, 7, 0.95), 0 0 10px rgba(255, 193, 7, 0.5);
+        }
+        /* 胜利连线：绿色脉冲 */
+        .game-piece.win-piece {
+            animation: gameWinPulse 1.1s ease-in-out infinite;
+        }
+        @keyframes gameWinPulse {
+            0%, 100% { box-shadow: 0 0 0 2px rgba(46, 204, 113, 0.9), 0 0 8px rgba(46, 204, 113, 0.45); }
+            50% { box-shadow: 0 0 0 3px rgba(46, 204, 113, 1), 0 0 16px rgba(46, 204, 113, 0.75); }
+        }
 
         .game-fs-bottom {
             padding: clamp(10px, 2vw, 14px) clamp(12px, 2.5vw, 16px);

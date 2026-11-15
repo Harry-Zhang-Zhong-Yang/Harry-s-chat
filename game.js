@@ -170,7 +170,7 @@ window.acceptGame = async function(gameId, gameName, icon, host) {
 };
 
 const MIN_CELL = 16;
-const MAX_CELL_GOMOKU = 32;
+const MAX_CELL_GOMOKU = 38;
 const MAX_CELL_TICTACTOE = 80;
 
 function calcCellSize(size) {
@@ -352,6 +352,7 @@ window.gameCellClick = async function(row, col) {
     if (activeGame.board[row][col] !== null) return;
 
     activeGame.board[row][col] = activeGame.myPiece;
+    activeGame.lastMove = { r: row, c: col };
     renderGamePieces();
     if (activeGame.name === '井字棋') {
         checkTicTacToeWin();
@@ -388,10 +389,14 @@ function renderGamePieces() {
         const r = parseInt(cell.dataset.row);
         const c = parseInt(cell.dataset.col);
         const piece = activeGame.board[r][c];
+        // 最后一手 / 胜利连线高亮
+        const isLast = activeGame.lastMove && activeGame.lastMove.r === r && activeGame.lastMove.c === c;
+        const isWinCell = !!(activeGame.winCells && activeGame.winCells.some(p => p[0] === r && p[1] === c));
+        const extra = (isLast ? ' last-move' : '') + (isWinCell ? ' win-piece' : '');
         if (piece === 'black') {
-            cell.innerHTML = `<div class="game-piece black" style="width:${pieceSize}px;height:${pieceSize}px;"></div>`;
+            cell.innerHTML = `<div class="game-piece black${extra}" style="width:${pieceSize}px;height:${pieceSize}px;"></div>`;
         } else if (piece === 'white') {
-            cell.innerHTML = `<div class="game-piece white" style="width:${pieceSize}px;height:${pieceSize}px;"></div>`;
+            cell.innerHTML = `<div class="game-piece white${extra}" style="width:${pieceSize}px;height:${pieceSize}px;"></div>`;
         } else {
             const isStar = cell.classList.contains('star-point');
             cell.innerHTML = isStar ? '<span class="star-dot"></span>' : '';
@@ -423,16 +428,19 @@ function checkWinAndHandle(row, col) {
     const directions = [[0,1],[1,0],[1,1],[1,-1]];
     for (const [dr, dc] of directions) {
         let count = 1;
+        const line = [[row, col]];
         for (let i = 1; i < 5; i++) {
             const r = row + dr * i, c = col + dc * i;
-            if (r >= 0 && r < size && c >= 0 && c < size && activeGame.board[r][c] === piece) count++; else break;
+            if (r >= 0 && r < size && c >= 0 && c < size && activeGame.board[r][c] === piece) { count++; line.push([r, c]); } else break;
         }
         for (let i = 1; i < 5; i++) {
             const r = row - dr * i, c = col - dc * i;
-            if (r >= 0 && r < size && c >= 0 && c < size && activeGame.board[r][c] === piece) count++; else break;
+            if (r >= 0 && r < size && c >= 0 && c < size && activeGame.board[r][c] === piece) { count++; line.push([r, c]); } else break;
         }
         if (count >= 5) {
             activeGame.status = 'over';
+            activeGame.winCells = line;
+            renderGamePieces();
             const winner = piece === activeGame.myPiece ? mySender : activeGame.opponent;
             const resultText = `[GAME_RESULT:${activeGame.id}:${winner}]`;
             supabaseClient.from('messages').insert([{
@@ -456,6 +464,8 @@ function checkTicTacToeWin() {
         const [a, b2, c] = line;
         if (b[a[0]][a[1]] && b[a[0]][a[1]] === b[b2[0]][b2[1]] && b[a[0]][a[1]] === b[c[0]][c[1]]) {
             activeGame.status = 'over';
+            activeGame.winCells = [a, b2, c];
+            renderGamePieces();
             const winner = b[a[0]][a[1]] === activeGame.myPiece ? mySender : activeGame.opponent;
             const resultText = `[GAME_RESULT:${activeGame.id}:${winner}]`;
             supabaseClient.from('messages').insert([{
@@ -494,6 +504,23 @@ function showGameOver(iWon) {
     cells.forEach(c => { c.style.pointerEvents = 'none'; c.style.cursor = 'default'; });
     const giveupBtn = document.getElementById('game-giveup-btn');
     if (giveupBtn) giveupBtn.style.display = 'none';
+
+    // 结束后给一个直接重开邀请的入口，省得关掉再点一次
+    const bottom = document.querySelector('#game-board-modal .game-fs-bottom');
+    if (bottom && !document.getElementById('game-again-btn') && activeGame) {
+        const gameName = activeGame.name;
+        const gameIcon = activeGame.icon;
+        const again = document.createElement('button');
+        again.id = 'game-again-btn';
+        again.className = 'game-fs-btn';
+        again.textContent = '🔄 再来一局';
+        again.onclick = function () {
+            window.closeGameBoard();
+            if (typeof window.startGame === 'function') window.startGame(gameName, gameIcon);
+        };
+        bottom.appendChild(again);
+    }
+
     setTimeout(() => { activeGame = null; }, 5000);
 }
 
@@ -685,6 +712,7 @@ function handleGameMessageInUI(wrapper, sender, content) {
         if (activeGame && activeGame.id === gameData.gameId && activeGame.status === 'playing') {
             if (gameData.player !== mySender) {
                 activeGame.board[gameData.row][gameData.col] = (gameData.player === activeGame.host ? 'black' : 'white');
+                activeGame.lastMove = { r: gameData.row, c: gameData.col };
                 renderGamePieces();
                 activeGame.currentTurn = mySender;
                 updateTurnIndicator();
