@@ -185,10 +185,7 @@
         color: COLORS[0],
 
         connected: false,
-        syncBusy: false,
-        pollTimer: 0,
-        pollTick: 0,
-        lastHeartbeat: 0,
+        netSeq: 0,                 // 发送端自增帧号（服务端按它对账，只要更新的帧）
         lobbyPlayers: [],
 
         food: [],
@@ -520,10 +517,17 @@
     }
 
     /* 通用的「我吃你」判定：球心进入对方球体且质量大 15% 就能吞掉。
-     * report=true 时记录吞人事件，联机模式下会随包发给对方。 */
-    function eatBetween(cells, ownerPid, victimPid, victimCells, report) {
+     * report=true 时记录吞人事件，联机模式下会随包发给对方。
+     *
+     * slack：判定半径的放宽量（像素）。
+     *   本地判定（自己吃别人 / bot 互吃）传 0，手感按原版。
+     *   远端球的位置是插值出来的，永远比真身慢一个 RTT，
+     *   严格按球心判定会出现「明明画面推到了嘴边却没吃掉」，
+     *   所以联机吃人时把边界放宽一点做补偿。 */
+    function eatBetween(cells, ownerPid, victimPid, victimCells, report, slack) {
+        const pad = slack || 0;
         for (const c of cells) {
-            const cr = radiusOf(c.m);
+            const cr = radiusOf(c.m) + pad;
             for (let i = victimCells.length - 1; i >= 0; i--) {
                 const rc = victimCells[i];
                 if (!rc) continue;
@@ -539,9 +543,12 @@
 
     // 玩家吃别人（联机玩家 + 本地 bot 都在 G.remotes 里）
     function eatRemote() {
+        // 远端球是插值出来的，位置滞后 ≈ 插值延迟；
+        // 按这个延迟折算成「这段时间里对方可能跑多远」的一半作为补偿。
+        const slack = G.mode === 'online' ? interpDelay() * 0.001 * MIN_SPEED * 0.5 : 0;
         for (const r of G.remotes.values()) {
             if (!r.cells.length) continue;
-            eatBetween(G.me.cells, G.pid, r.pid, r.cells, G.mode === 'online');
+            eatBetween(G.me.cells, G.pid, r.pid, r.cells, G.mode === 'online', slack);
         }
     }
 
@@ -914,7 +921,7 @@
             if (G.phase === 'playing' && !G.me.cells.length) die();
         }
         moveEjects(dt);
-        smoothRemotes(dt);
+        if (G.mode === 'online') netStep(now); else smoothRemotes(dt);
         cullRemotes(now);
     }
 
@@ -924,12 +931,28 @@
         showDead();
     }
 
-    /* ---------------- 同步 ----------------
-     * 线上由 Cloudflare Worker 把 /sb/* 反代到 Supabase，并注入 apikey，
-     * 所以浏览器里没有密钥。每人每秒上报一次自己的整包状态，
-     * 同时拉取同房间其他人的整包状态并合并。
-     * 「吞食物 / 吃玩家 / 刺球爆裂 / 孢子」都用最近 2 秒重复携带的方式同步，
-     * 单次丢包也不会造成不同步。
+    /* ---------------- 网络层（可插拔，长轮询优先） ----------------
+     * 硬约束：线上走 Netlify 边缘反代（netlify-proxy/netlify.toml 的
+     * [[redirects]] status=200），反代不支持 WebSocket，所以 Supabase
+     * Realtime 用不了，只剩 HTTP。
+     *
+     * 之前是「每秒发一次当前状态」，两个毛病：
+     *   1) 同步频率 = 轮询间隔，而每轮 HTTP 要吃掉一整个 RTT
+     *      （国内经反代到 Supabase 约 200~400ms），1Hz 就是天花板；
+     *   2) 两个采样点之间没有任何信息，接收端只能拿补间函数硬糊，
+     *      看上去就是别人的球在原地漂，而且吃人判定用的还是滞后坐标。
+     *
+     * 现在换成标准的「快照插值」（snapshot interpolation）：
+     *   发送端  本地每 100ms 采一帧位置（10Hz）进环形缓冲；
+     *           上一轮请求一回来就把最近 3 帧打包发出去（自定速 ≈ RTT 一次）。
+     *   服务端  agar-room 长轮询：房间一有新写入立刻返回，没有就挂住最长 20s，
+     *           并且只回传 client_seq 比客户端已知值更新的行，下行很小。
+     *   接收端  把每帧按服务端时间塞进时间轴，渲染时刻取 now - INTERP_DELAY，
+     *           在相邻两帧之间线性插值 → 观感 10Hz，且永不回跳。
+     *
+     * 净效果：网络上仍是 ~3Hz 的报文，观感 10Hz；延迟 1000ms → ~350ms。
+     * 传输层可插拔：AGAR_CFG.transport = 'hold' | 'poll'，默认自动（长轮询
+     * 拿不到就自动降级成 PostgREST 短轮询，游戏不会因为函数没部署而开不了）。
      */
 
     const TABLE = 'agario_state';
@@ -937,14 +960,67 @@
     //   独立站走 Cloudflare Worker 的 /sb 反代（不需要 key，Worker 注入）
     //   聊天室站点走 Netlify 反代，需要页面自己带上 anon key
     const AGAR_CFG = (typeof window !== 'undefined' && window.AGAR_CFG) || {};
-    const SB_BASE = String(AGAR_CFG.sbBase || '/sb').replace(/\/+$/, '') + '/rest/v1';
+    const SB_BASE = String(AGAR_CFG.sbBase || '/sb').replace(/\/+$/, '');
     const SB_KEY = AGAR_CFG.anonKey || '';
-    const EVENT_KEEP = 2200;
-    const POLL_MS = 1000;
-    const POLL_LOBBY_EVERY = 2;      // 大厅里每 2 个 tick（2 秒）拉一次
-    const ROW_ALIVE_MS = 12000;      // 超过该时长没更新的行视为离线
+    const REST_BASE = SB_BASE + '/rest/v1';
+    const FN_BASE = SB_BASE + '/functions/v1';
+
+    const EVENT_KEEP = 2000;         // 事件在包里重复携带的时长（丢一次不致命）
+    const MAX_EVENT_FOOD = 64;       // 单包最多携带多少条「吃掉食物」
+    const MAX_EVENT_EATS = 24;       // 单包最多携带多少条「玩家互吃」
+
+    const SAMPLE_MS = 100;           // 本地采样间隔 → 10Hz
+    const SAMPLE_KEEP = 30;          // 环形缓冲上限（3 秒）
+    const SEND_SAMPLES = 4;          // 每次上传携带的帧数（覆盖一次丢包，RTT 400ms 仍够 10Hz）
+    const SEND_MIN_MS = 200;         // 上传最小间隔（真正的节奏由 RTT 决定）
+    const LOBBY_SEND_MS = 1000;      // 大厅阶段只发心跳
+    const POLL_MS = 300;             // 降级短轮询的间隔
+    const HOLD_MS = 20000;           // 长轮询挂起上限（与 Edge Function 对齐）
+    const INTERP_MIN_MS = 180;       // 插值延迟下限
+    const INTERP_MAX_MS = 600;       // 插值延迟上限
+    const TRACK_KEEP_MS = 2000;      // 时间轴上保留多久的帧
+    const TRACK_MAX_PTS = 40;
+    const CELL_GONE_MS = 180;        // 帧里消失超过这个时长就不再画这颗球
+    const LOBBY_REFRESH_MS = 500;
+
+    const NET = {
+        active: 'hold',                  // hold | poll
+        running: false,
+        abort: null,
+        version: 0,
+        seen: Object.create(null),       // pid -> 已知 client_seq
+        sampleBuf: [],                   // 本地位置环形缓冲
+        lastSampleAt: 0,
+        lastSendAt: 0,
+        sending: false,
+        rtt: 300,                        // 滑动平均 RTT
+        offset: 0,                       // serverNow - Date.now()
+        tracks: new Map(),               // pid -> { pid,name,color,lastT,map }
+        lobbyAt: 0,
+        fails: 0
+    };
+
+    function agarHeaders(extra) {
+        const h = extra || {};
+        if (SB_KEY) {
+            h['apikey'] = SB_KEY;
+            h['Authorization'] = 'Bearer ' + SB_KEY;
+        }
+        return h;
+    }
+
+    function readJson(res) {
+        return res.text().then(function (text) {
+            let data = null;
+            try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }
+            if (data && typeof data === 'object') data.__status = res.status;
+            else data = { __status: res.status, __text: text };
+            return data;
+        });
+    }
 
     // 极简 PostgREST 客户端：只实现游戏需要的 upsert / select / delete
+    // 长轮询不可用时走这条路（降级），另外退场时删自己那一行也用它。
     function dbFrom(table) {
         const state = {
             action: 'select',
@@ -959,7 +1035,7 @@
             const params = state.filters.slice();
             if (state.action === 'select') params.push('select=' + encodeURIComponent(state.cols || '*'));
             if (state.onConflict) params.push('on_conflict=' + encodeURIComponent(state.onConflict));
-            const url = SB_BASE + '/' + table + (params.length ? '?' + params.join('&') : '');
+            const url = REST_BASE + '/' + table + (params.length ? '?' + params.join('&') : '');
             const headers = { Prefer: state.prefer };
             if (SB_KEY) {
                 headers['apikey'] = SB_KEY;
@@ -1013,7 +1089,19 @@
 
     const db = { from: dbFrom };
 
-    function buildPacket() {
+    /* ---- 发送端：采样 + 定速上传 ---- */
+
+    function sampleNow() {
+        NET.sampleBuf.push({
+            at: Date.now(),
+            cells: G.me.cells.map(function (c) {
+                return [c.id, Math.round(c.x), Math.round(c.y), Math.round(c.m * 10) / 10];
+            })
+        });
+        while (NET.sampleBuf.length > SAMPLE_KEEP) NET.sampleBuf.shift();
+    }
+
+    function collectEvents() {
         const now = Date.now();
         const food = [];
         G.recentFood.forEach(function (until, id) {
@@ -1028,81 +1116,254 @@
         G.recentEats = G.recentEats.filter(function (e) { return now - e.at < EVENT_KEEP; });
         G.recentEjectEaten = G.recentEjectEaten.filter(function (e) { return now - e.at < EVENT_KEEP; });
         return {
-            pid: G.pid,
-            name: G.name,
-            color: G.color,
-            ts: now,
-            cells: G.me.cells.map(function (c) {
-                return { id: c.id, x: Math.round(c.x), y: Math.round(c.y), m: Math.round(c.m * 10) / 10 };
-            }),
-            food: food,
-            virus: virus,
-            eats: G.recentEats.map(function (e) { return [e.victim, e.cellId]; }),
-            ejectEaten: G.recentEjectEaten.map(function (e) { return e.id; }),
-            ejects: G.ejects
+            f: food.slice(-MAX_EVENT_FOOD),
+            v: virus,
+            e: G.recentEats.slice(-MAX_EVENT_EATS).map(function (x) { return [x.victim, x.cellId]; }),
+            q: G.recentEjectEaten.slice(-MAX_EVENT_EATS).map(function (x) { return x.id; }),
+            j: G.ejects
                 .filter(function (e) { return e.owner === G.pid; })
                 .map(function (e) {
                     return {
-                        id: e.id,
-                        x: Math.round(e.x), y: Math.round(e.y),
-                        vx: Math.round(e.vx), vy: Math.round(e.vy),
+                        id: e.id, x: Math.round(e.x), y: Math.round(e.y),
+                        vx: Math.round(e.vx || 0), vy: Math.round(e.vy || 0),
                         m: e.m, c: e.c, until: e.until
                     };
                 })
         };
     }
 
-    function applyRemoteState(p) {
-        if (!p || p.pid === G.pid) return;
-        let r = G.remotes.get(p.pid);
-        if (!r) {
-            r = { pid: p.pid, name: p.name || '玩家', color: p.color || colorFor(p.pid), cells: [], lastTs: 0 };
-            G.remotes.set(p.pid, r);
+    function sendFrame(body) {
+        if (NET.active === 'hold') {
+            return fetch(FN_BASE + '/agar-room', {
+                method: 'POST',
+                headers: agarHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(body)
+            }).then(readJson).then(function (r) {
+                // Edge Function 还没部署 / 反代没转发 functions，降级直连 PostgREST
+                if (!r || r.__status === 404 || r.__status === 405) {
+                    NET.active = 'poll';
+                    return sendFrame(body);
+                }
+                if (r.ok) NET.fails = 0;
+                return r;
+            });
         }
-        r.name = p.name || r.name;
-        r.color = p.color || r.color;
-        r.lastTs = performance.now();
-
-        const incoming = p.cells || [];
-        const old = new Map();
-        for (const c of r.cells) old.set(c.id, c);
-        const next = [];
-        for (const c of incoming) {
-            if (G.deadCells.has(p.pid + ':' + c.id)) continue;
-            const prev = old.get(c.id);
-            if (prev) {
-                prev.tx = c.x; prev.ty = c.y; prev.tm = c.m;
-                next.push(prev);
-            } else {
-                next.push({ id: c.id, x: c.x, y: c.y, tx: c.x, ty: c.y, m: c.m, tm: c.m });
-            }
-        }
-        r.cells = next;
+        // 降级路径：直接写 agario_state，postgrest 的 upsert
+        const row = {
+            room_code: body.room,
+            player_id: body.pid,
+            name: body.name,
+            color: body.color,
+            client_seq: body.seq,
+            payload: { t: body.now, s: body.s, ev: body.ev },
+            updated_at: new Date(body.now).toISOString()
+        };
+        return db.from(TABLE)
+            .upsert(row, { onConflict: 'room_code,player_id' })
+            .then(function () { return { ok: true, serverNow: Date.now() }; });
     }
 
-    function applyPacket(p) {
-        if (!p || !p.pid || p.pid === G.pid) return;
+    function netSend(nowPerf) {
+        if (NET.sending || !G.open || G.mode !== 'online') return;
+        const now = Date.now();
+        const inLobby = G.phase === 'lobby';
+        // 大厅阶段没人看你的球，1 秒一次心跳足够。
+        // 对局中真实的发送节奏由「上一轮请求什么时候回来」决定（≈RTT），
+        // 最小间隔只做限速，防止 RTT 突然掉到很低时把请求打爆。
+        const minGap = inLobby ? LOBBY_SEND_MS : SEND_MIN_MS;
+        if (now - NET.lastSendAt < minGap) return;
+        const batch = NET.sampleBuf.slice(-SEND_SAMPLES);
+        if (!batch.length) return;
+
+        NET.lastSendAt = now;
+        NET.sending = true;
+        G.netSeq = (G.netSeq || 0) + 1;
+
+        const body = {
+            room: G.room,
+            pid: G.pid,
+            name: G.name,
+            color: G.color,
+            seq: G.netSeq,
+            now: now,
+            // 只要相对偏移，服务端会换算成绝对服务器时间 → 不需要时钟同步
+            s: batch.map(function (sp) { return [Math.max(0, now - sp.at), sp.cells]; }),
+            ev: collectEvents()
+        };
+
+        const t0 = performance.now();
+        sendFrame(body).then(function (r) {
+            const rtt = performance.now() - t0;
+            NET.rtt = NET.rtt * 0.7 + Math.min(rtt, 2000) * 0.3;
+            if (r && r.serverNow) NET.offset = r.serverNow - Date.now();
+            if (r && typeof r.v === 'number') NET.version = r.v;
+        }).catch(function () {
+            NET.fails += 1;
+        }).then(function () {
+            NET.sending = false;
+        });
+    }
+
+    /* ---- 接收端：长轮询 / 短轮询 ---- */
+
+    function seenParam() {
+        const parts = [];
+        for (const pid in NET.seen) parts.push(pid + '.' + NET.seen[pid]);
+        return parts.join(',');
+    }
+
+    function holdOnce() {
+        const url = FN_BASE + '/agar-room'
+            + '?room=' + encodeURIComponent(G.room)
+            + '&pid=' + encodeURIComponent(G.pid)
+            + '&v=' + NET.version
+            + '&seen=' + encodeURIComponent(seenParam());
+        const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        NET.abort = ctrl;
+        const opts = { headers: agarHeaders() };
+        if (ctrl) opts.signal = ctrl.signal;
+        const guard = setTimeout(function () { if (ctrl) ctrl.abort(); }, HOLD_MS + 8000);
+        return fetch(url, opts).then(readJson).then(function (r) {
+            clearTimeout(guard);
+            if (!r || r.__status === 404 || r.__status === 405 || r.__status >= 500) {
+                NET.active = 'poll';
+                return null;
+            }
+            NET.fails = 0;
+            return r;
+        }, function (e) {
+            clearTimeout(guard);
+            if (e && e.name === 'AbortError' && NET.running) return null;   // 正常的超时重发
+            throw e;
+        });
+    }
+
+    function pollOnce() {
+        return db.from(TABLE)
+            .select('player_id,name,color,client_seq,payload,updated_at')
+            .eq('room_code', G.room)
+            .then(function (res) {
+                if (!res || res.error) return null;
+                const now = Date.now();
+                const players = [];
+                (res.data || []).forEach(function (row) {
+                    const seq = Number(row.client_seq) || 0;
+                    if (seq <= (NET.seen[row.player_id] || 0)) return;
+                    const payload = row.payload || {};
+                    players.push({
+                        pid: row.player_id,
+                        name: row.name || '',
+                        color: row.color || '',
+                        seq: seq,
+                        t: Number(payload.t) || now,
+                        s: payload.s || [],
+                        ev: payload.ev || null
+                    });
+                });
+                return { ok: true, now: now, v: 0, players: players };
+            });
+    }
+
+    async function netPollLoop() {
+        while (NET.running && G.open && G.mode === 'online') {
+            try {
+                let r = null;
+                if (NET.active === 'hold') {
+                    r = await holdOnce();
+                    if (r) applyNetResult(r);
+                    else await new Promise(function (k) { setTimeout(k, 400); });
+                } else {
+                    r = await pollOnce();
+                    if (r) applyNetResult(r);
+                    await new Promise(function (k) { setTimeout(k, POLL_MS); });
+                }
+            } catch (e) {
+                if (!NET.running) break;
+                NET.fails += 1;
+                // 连续失败就降到短轮询，别让长轮询把客户端耗死
+                if (NET.fails >= 3 && NET.active === 'hold') NET.active = 'poll';
+                await new Promise(function (k) { setTimeout(k, 800); });
+            }
+        }
+    }
+
+    function applyNetResult(r) {
+        if (!r) return;
+        if (r.now) NET.offset = r.now - Date.now();
+        if (typeof r.v === 'number' && r.v) NET.version = r.v;
+        const list = r.players || [];
+        for (let i = 0; i < list.length; i++) {
+            const p = list[i];
+            if (!p || !p.pid) continue;
+            if (p.seq) NET.seen[p.pid] = p.seq;
+            if (p.pid === G.pid) continue;          // 自己的快照本地就有，不回放
+            ingestPlayer(p);
+        }
+    }
+
+    /* ---- 时间轴：每个球的采样点序列 ---- */
+
+    function ingestPlayer(p) {
+        let tr = NET.tracks.get(p.pid);
+        if (!tr) {
+            tr = {
+                pid: p.pid,
+                name: p.name || '玩家',
+                color: p.color || colorFor(p.pid),
+                lastT: 0,
+                map: new Map()                       // cellId -> [{t,x,y,m}, ...]
+            };
+            NET.tracks.set(p.pid, tr);
+        }
+        if (p.name) tr.name = p.name;
+        if (p.color) tr.color = p.color;
+
+        const baseT = Number(p.t) || Date.now();
+        const samples = Array.isArray(p.s) ? p.s : [];
+        for (let si = 0; si < samples.length; si++) {
+            const s = samples[si];
+            if (!Array.isArray(s) || s.length < 2) continue;
+            const t = Number(s[0]) || baseT;      // 服务端已经换算成绝对时间
+            const cells = Array.isArray(s[1]) ? s[1] : [];
+            for (let ci = 0; ci < cells.length; ci++) {
+                const c = cells[ci];
+                if (!Array.isArray(c) || c.length < 4) continue;
+                const id = c[0];
+                let pts = tr.map.get(id);
+                if (!pts) { pts = []; tr.map.set(id, pts); }
+                const last = pts[pts.length - 1];
+                if (last && last.t >= t) continue;   // 重复帧 / 旧帧
+                pts.push({ t: t, x: c[1], y: c[2], m: c[3] });
+                if (pts.length > TRACK_MAX_PTS) pts.splice(0, pts.length - TRACK_MAX_PTS);
+                while (pts.length > 2 && pts[0].t < t - TRACK_KEEP_MS) pts.shift();
+            }
+        }
+        if (baseT > tr.lastT) tr.lastT = baseT;
+        if (p.ev) applyEvents(p.pid, p.ev);
+    }
+
+    function applyEvents(pid, ev) {
         const now = Date.now();
         const clampUntil = function (v, span) {
             const t = Number(v) || 0;
             return Math.min(t, now + span);
         };
 
-        (p.food || []).forEach(function (pair) {
+        (ev.f || []).forEach(function (pair) {
             if (!Array.isArray(pair) || pair[0] == null) return;
             const until = clampUntil(pair[1], FOOD_RESPAWN + 2000);
             if (until <= now) return;
             const cur = G.eatenFood.get(pair[0]);
             if (!cur || until > cur) G.eatenFood.set(pair[0], until);
         });
-        (p.virus || []).forEach(function (pair) {
+        (ev.v || []).forEach(function (pair) {
             if (!Array.isArray(pair) || pair[0] == null) return;
             const until = clampUntil(pair[1], VIRUS_RESPAWN + 2000);
             if (until <= now) return;
             const cur = G.virusRespawn.get(pair[0]);
             if (!cur || until > cur) G.virusRespawn.set(pair[0], until);
         });
-        (p.eats || []).forEach(function (pair) {
+        (ev.e || []).forEach(function (pair) {
             if (!Array.isArray(pair) || pair[0] == null) return;
             const victim = pair[0], cellId = pair[1];
             if (victim === G.pid) {
@@ -1112,10 +1373,10 @@
                 removeRemoteCell(victim, cellId);
             }
         });
-        (p.ejectEaten || []).forEach(function (id) {
+        (ev.q || []).forEach(function (id) {
             G.ejects = G.ejects.filter(function (e) { return e.id !== id; });
         });
-        (p.ejects || []).forEach(function (e) {
+        (ev.j || []).forEach(function (e) {
             if (!e || !e.id || G.deadEjects.has(e.id)) return;
             const until = clampUntil(e.until, EJECT_TTL + 2000);
             const cur = G.ejects.find(function (x) { return x.id === e.id; });
@@ -1124,22 +1385,22 @@
                 cur.vx = e.vx || 0; cur.vy = e.vy || 0;
                 cur.m = e.m || EJECT_MASS;
                 cur.until = until;
-                cur.owner = p.pid;
+                cur.owner = pid;
             } else {
                 G.ejects.push({
                     id: e.id, x: e.x, y: e.y,
                     vx: e.vx || 0, vy: e.vy || 0,
                     m: e.m || EJECT_MASS, c: e.c || '#ffd43b',
-                    until: until, owner: p.pid
+                    until: until, owner: pid
                 });
             }
         });
         if (G.ejects.length > MAX_EJECTS) G.ejects.splice(0, G.ejects.length - MAX_EJECTS);
-
-        applyRemoteState(p);
     }
 
     function removeRemoteCell(pid, cellId) {
+        const tr = NET.tracks.get(pid);
+        if (tr) tr.map.delete(cellId);
         const r = G.remotes.get(pid);
         if (!r) return;
         for (let i = r.cells.length - 1; i >= 0; i--) {
@@ -1157,98 +1418,170 @@
         }
     }
 
+    /* ---- 插值 ---- */
+
+    function interpDelay() {
+        // 帧在网络上花掉 RTT/2 才到，再留一点抖动余量；
+        // 发送是自定速的（间隔 ≈ RTT），所以延迟跟 RTT 走。
+        return clamp(NET.rtt * 0.7 + 120, INTERP_MIN_MS, INTERP_MAX_MS);
+    }
+
+    function pointAt(pts, rt) {
+        const n = pts.length;
+        if (!n) return null;
+        if (rt <= pts[0].t) return pts[0];
+        if (rt >= pts[n - 1].t) {
+            // 越过最新一帧：短距离线性外推，避免球突然停住；
+            // 外推超过一帧间隔就冻结，不然转弯时球会甩出去。
+            const a = pts[n - 1], b = pts[n - 2] || a;
+            const span = Math.max(1, a.t - b.t);
+            const k = clamp((rt - a.t) / span, 0, 1);
+            return { x: a.x + (a.x - b.x) * k, y: a.y + (a.y - b.y) * k, m: a.m };
+        }
+        // 二分找出满足 pts[i].t <= rt 的最大 i（此时 1 <= i <= n-2）
+        let lo = 1, hi = n - 1;
+        while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (pts[mid].t <= rt) lo = mid;
+            else hi = mid - 1;
+        }
+        const a = pts[lo - 1], b = pts[lo];
+        const span = Math.max(1, b.t - a.t);
+        const k = (rt - a.t) / span;
+        return {
+            x: a.x + (b.x - a.x) * k,
+            y: a.y + (b.y - a.y) * k,
+            m: a.m + (b.m - a.m) * k
+        };
+    }
+
+    function netInterpolate() {
+        const rt = Date.now() + NET.offset - interpDelay();
+        const live = new Set();
+        const ghost = [];
+        const nowPerf = performance.now();
+
+        for (const [pid, tr] of NET.tracks) {
+            const cells = [];
+            for (const [id, pts] of tr.map) {
+                if (!pts.length) continue;
+                const last = pts[pts.length - 1];
+                // 时间轴已经越过这颗球最后一次出现的位置 → 它被吃了或合体了
+                if (rt > last.t + CELL_GONE_MS) continue;
+                if (G.deadCells.has(pid + ':' + id)) continue;
+                const st = pointAt(pts, rt);
+                if (!st) continue;
+                cells.push({ id: id, x: st.x, y: st.y, m: st.m, tx: st.x, ty: st.y, tm: st.m });
+            }
+            if (!cells.length) {
+                // 整条轨都过期了就回收，避免 NET.tracks / NET.seen 无限增长
+                if (rt > tr.lastT + TRACK_KEEP_MS * 2) ghost.push(pid);
+                continue;
+            }
+            live.add(pid);
+            let r = G.remotes.get(pid);
+            if (!r) {
+                r = { pid: pid, name: tr.name, color: tr.color, cells: [], lastTs: nowPerf };
+                G.remotes.set(pid, r);
+            }
+            r.name = tr.name;
+            r.color = tr.color;
+            r.cells = cells;
+            r.lastTs = nowPerf;
+        }
+
+        for (const [pid] of G.remotes) {
+            if (!live.has(pid)) G.remotes.delete(pid);
+        }
+        for (let i = 0; i < ghost.length; i++) {
+            NET.tracks.delete(ghost[i]);
+            delete NET.seen[ghost[i]];
+        }
+    }
+
+    /* ---- 大厅列表 ---- */
+
+    function refreshLobby(force) {
+        const now = performance.now();
+        if (!force && now - NET.lobbyAt < LOBBY_REFRESH_MS) return;
+        NET.lobbyAt = now;
+        const list = [];
+        for (const [pid, tr] of NET.tracks) {
+            list.push({ pid: pid, name: tr.name, color: tr.color, at: tr.lastT });
+        }
+        list.push({ pid: G.pid, name: G.name, color: G.color, at: Date.now() });
+        G.lobbyPlayers = list.sort(function (a, b) { return a.at - b.at; });
+        renderLobby();
+    }
+
+    /* ---- 生命周期 ---- */
+
+    function probeTransport() {
+        const forced = String(AGAR_CFG.transport || '').toLowerCase();
+        if (forced === 'poll' || forced === 'rest') { NET.active = 'poll'; return; }
+        NET.active = 'hold';   // auto / hold：先试长轮询，404 自动降级
+    }
+
     function startSync() {
-        if (G.pollTimer || G.mode !== 'online') return;
+        if (NET.running || G.mode !== 'online') return;
+        NET.running = true;
         G.connected = true;
-        G.pollTick = 0;
+        NET.version = 0;
+        NET.seen = Object.create(null);
+        NET.tracks.clear();
+        NET.sampleBuf = [];
+        NET.lastSampleAt = 0;
+        NET.lastSendAt = 0;
+        NET.sending = false;
+        NET.fails = 0;
+        NET.rtt = 300;
+        NET.offset = 0;
+        NET.lobbyAt = 0;
+        G.remotes.clear();
         G.lobbyPlayers = [];
-        G.lastHeartbeat = 0;
+        G.netSeq = 0;
+        probeTransport();
         // 顺手清掉一小时前的残留行（异常退出不会留下幽灵玩家）
         try {
             db.from(TABLE).delete()
                 .eq('room_code', G.room)
                 .lt('updated_at', new Date(Date.now() - 3600000).toISOString());
         } catch (e) { /* ignore */ }
-        syncNow();
-        G.pollTimer = setInterval(syncNow, POLL_MS);
-        renderLobby();
+        sampleNow();
+        netSend(0);
+        netPollLoop();
+        refreshLobby(true);
     }
 
     function stopSync() {
-        if (G.pollTimer) {
-            clearInterval(G.pollTimer);
-            G.pollTimer = 0;
-        }
+        NET.running = false;
         G.connected = false;
+        if (NET.abort) {
+            try { NET.abort.abort(); } catch (e) { /* ignore */ }
+            NET.abort = null;
+        }
     }
 
-    function syncNow() {
-        if (!G.open || G.syncBusy || G.mode !== 'online') return;
-        G.syncBusy = true;
-        G.pollTick += 1;
-
-        const playing = G.phase === 'playing' || G.phase === 'dead';
-        const needPull = playing || G.pollTick % POLL_LOBBY_EVERY === 0;
-        // lastHeartbeat = 0 表示还没上报过：进场时必须立刻写一行，别人马上能看到
-        const needPush = playing || !G.lastHeartbeat || performance.now() - G.lastHeartbeat > 3000;
-
-        if (!needPull && !needPush) {
-            G.syncBusy = false;
-            return;
+    function netStep(nowPerf) {
+        if (!G.open || G.mode !== 'online') return;
+        if (nowPerf - NET.lastSampleAt >= SAMPLE_MS) {
+            NET.lastSampleAt = nowPerf;
+            sampleNow();
         }
-
-        const tasks = [];
-        if (needPush) {
-            G.lastHeartbeat = performance.now();
-            tasks.push(db.from(TABLE).upsert({
-                room_code: G.room,
-                player_id: G.pid,
-                name: G.name,
-                color: G.color,
-                payload: buildPacket(),
-                updated_at: new Date().toISOString()
-            }, { onConflict: 'room_code,player_id' }));
-        }
-        if (needPull) {
-            tasks.push(db.from(TABLE)
-                .select('player_id,name,color,payload,updated_at')
-                .eq('room_code', G.room));
-        }
-
-        Promise.all(tasks).then(function (results) {
-            if (!needPull) return;
-            const res = results[results.length - 1];
-            if (!res || res.error) {
-                if (res && res.error) console.warn('球球大作战读取失败:', res.error.message);
-                return;
-            }
-            const rows = res.data || [];
-            const now = Date.now();
-            const players = [];
-            rows.forEach(function (row) {
-                const payload = row.payload || {};
-                const seen = payload.ts || (row.updated_at ? Date.parse(row.updated_at) : 0);
-                if (!seen || now - seen > ROW_ALIVE_MS) return;
-                players.push({
-                    pid: row.player_id,
-                    name: row.name || payload.name || '玩家',
-                    color: row.color || payload.color || colorFor(row.player_id),
-                    at: seen
-                });
-                if (row.player_id === G.pid) return;
-                payload.pid = row.player_id;
-                payload.name = row.name || payload.name;
-                payload.color = row.color || payload.color;
-                applyPacket(payload);
-            });
-            G.lobbyPlayers = players.sort(function (a, b) { return a.at - b.at; });
-            renderLobby();
-        }).catch(function (e) {
-            console.warn('球球大作战同步失败:', e && e.message ? e.message : e);
-        }).finally(function () {
-            G.syncBusy = false;
-        });
+        netSend(nowPerf);
+        netInterpolate();
+        if (G.phase === 'lobby') refreshLobby(false);
     }
+
+    /* 动作发生后立刻补一帧：分裂 / 吐孢子 / 开局 / 重生这类关键节点，
+     * 等下一个定速周期（≈RTT）才发会让对方多看到半秒的旧状态。 */
+    function netKick() {
+        if (G.mode !== 'online' || !NET.running) return;
+        sampleNow();
+        NET.lastSendAt = 0;      // 绕过最小间隔限制
+        netSend(performance.now());
+    }
+
 
     /* ---------------- 操作 ---------------- */
 
@@ -1274,7 +1607,7 @@
                 mergeAt: now + mergeDelayFor(half)
             });
         }
-        syncNow();
+        netKick();
     }
 
     function doEject() {
@@ -1301,7 +1634,7 @@
             });
         }
         if (G.ejects.length > MAX_EJECTS) G.ejects.splice(0, G.ejects.length - MAX_EJECTS);
-        syncNow();
+        netKick();
     }
 
     /* ---------------- 渲染 ---------------- */
@@ -1780,14 +2113,14 @@
         const lobby = document.getElementById('agar-lobby');
         if (lobby) lobby.style.display = 'none';
         hideDead();
-        syncNow();
+        netKick();
     }
 
     function respawn() {
         spawn(START_MASS);
         G.phase = 'playing';
         hideDead();
-        syncNow();
+        netKick();
     }
 
     /* ---------------- 输入 ---------------- */
@@ -1944,8 +2277,8 @@
     function teardown() {
         G.open = false;
         G.phase = 'lobby';
-        // 联机模式退出时清掉自己那一行，别人不用等 12 秒才判定离线
-        if (G.mode === 'online' && G.connected) {
+        // 联机模式退出时清掉自己那一行，别人不用等过期才判定离线
+        if (G.mode === 'online') {
             try {
                 db.from(TABLE).delete()
                     .eq('room_code', G.room)
@@ -1953,6 +2286,15 @@
             } catch (e) { /* ignore */ }
         }
         stopSync();
+        // 长轮询可能还挂着一个 20 秒的请求，主动 abort 掉
+        if (NET.abort) {
+            try { NET.abort.abort(); } catch (e) { /* ignore */ }
+            NET.abort = null;
+        }
+        NET.running = false;
+        NET.tracks.clear();
+        NET.sampleBuf = [];
+        NET.seen = Object.create(null);
         if (G.raf) { cancelAnimationFrame(G.raf); G.raf = 0; }
         (G.listeners || []).forEach(function (fn) { try { fn(); } catch (e) { /* ignore */ } });
         G.listeners = [];
@@ -1976,7 +2318,7 @@
         G.lobbyPlayers = [];
         G.lastFrame = 0;
         G.lastHud = 0;
-        G.syncBusy = false;
+        G.netSeq = 0;
         G.scale = 1;
     }
 
@@ -2054,6 +2396,28 @@
                 ejects: G.ejects.map(function (e) { return { x: Math.round(e.x), y: Math.round(e.y), v: Math.round(Math.hypot(e.vx || 0, e.vy || 0)) }; }),
                 cells: G.me.cells.map(function (c) {
                     return { x: Math.round(c.x), y: Math.round(c.y), m: Math.round(c.m * 10) / 10, speed: Math.round(c.speed) };
+                }),
+                // —— 联机诊断字段 ——
+                mode: G.mode,
+                room: G.room,
+                myPid: G.pid,
+                netActive: NET.active,
+                netRtt: Math.round(NET.rtt),
+                netOffset: Math.round(NET.offset),
+                interpDelay: Math.round(interpDelay()),
+                lobby: G.lobbyPlayers.map(function (p) {
+                    return { pid: p.pid, name: p.name, at: p.at };
+                }),
+                remoteCount: G.remotes.size,
+                remotes: Array.from(G.remotes.values()).map(function (r) {
+                    return {
+                        pid: r.pid,
+                        name: r.name,
+                        color: r.color,
+                        cells: r.cells.map(function (c) {
+                            return { id: c.id, x: Math.round(c.x), y: Math.round(c.y), m: Math.round(c.m * 10) / 10 };
+                        })
+                    };
                 })
             };
         },

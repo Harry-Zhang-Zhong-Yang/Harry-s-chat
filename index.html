@@ -663,9 +663,16 @@
 <script>
     // 球球大作战联机配置：聊天室站点没有自己的 /sb 反代，
     // 直接复用聊天室的 Netlify 反代（anon key 本身是公开的，app.js 里也硬编码了）
+    //
+    // transport：
+    //   'hold' 长轮询（默认）。请求经 /sb/functions/v1/agar-room 转发，
+    //          反代不支持 WebSocket 也照样能挂住，延迟主要来自 RTT。
+    //   'poll' 强制走 PostgREST 短轮询（agar-room 没部署时的兜底手法）。
+    //   不填 = auto：先试长轮询，404/405/5xx 自动降级到 poll，游戏不会开不了。
     window.AGAR_CFG = {
         sbBase: 'https://thriving-muffin-0bb5e1.netlify.app/sb',
-        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M'
+        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWF4eW1uZXF5YWtleWt1bHpxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0NjE3MTMsImV4cCI6MjEwMTAzNzcxM30.8DxcRaDXRBNopYo7F0bbwvHyyC7cE4zQuxn9C2ayj4M',
+        transport: 'hold'
     };
 </script>
 <script src="app.js" defer></script>
