@@ -115,15 +115,22 @@
         };
     }
 
-    // 原版 util.massToRadius
-    const radiusOf = (m) => 4 + Math.sqrt(m) * 6;
-    /* 原版速度曲线：v = 100 / mass^0.439（对正式版 Agar.io 的逆向拟合）。
-     * 之前用的是老 clone 的 log(质量, 4.5) 衰减，大球偏快一倍左右：
-     * 20→100 质量时正式版只剩 49% 速度，老公式还有 58%。
-     * 这里乘 1.44 让开局（20 质量）的绝对速度和之前保持一致。 */
+    /* 半径曲线（逆向自《球球大作战》BobScript.dll → DrawCircle.Score2Radius）：
+     *   r = floor(sqrt(s*0.165f + 0.6f) * 50f) / 100f   （正版世界标度）
+     * 本作世界边长 4400，取缩放系数，使开局（20 质量）半径≈30.8，
+     * 与迁移前的 4+√m·6 曲线衔接；形状严格跟随正版 sqrt(a·m+b)。
+     * 数据来源见 reverse/agar/。 */
+    const RADIUS_K = 15.6;
+    const radiusOf = (m) => RADIUS_K * Math.sqrt(m * 0.165 + 0.6);
+    /* 速度曲线（逆向自《球球大作战》BobScript.dll → GameData.getSpeed）：
+     *   speed = Lerp(5f, 9f, 9f/(mass+1f) + 0.7f)，t 夹到 [0,1]
+     * 正版大球减速非常平缓：20 质量 → 9.0，5000 质量 → 7.8，只慢 ~13%。
+     * 核心博弈在「分裂-合体」：大球靠分裂变速，而不是被体积拖死。
+     * 这里保留本作世界标度（开局绝对速度 = MIN_SPEED），
+     * 但衰减形状跟随正版，不再用老的 1.44·(m/20)^0.439 指数暴降。 */
     function slowDownOf(m) {
-        const v = 1.44 * Math.pow(Math.max(m, 1) / START_MASS, 0.439);
-        return v < 1 ? 1 : v;
+        const t = clamp(9 / (Math.max(m, 1) + 1) + 0.7, 0, 1);
+        return 9 / (5 + 4 * t);      // 开局=1.0，5000 质量≈1.15（只慢 13%）
     }
     // 当前质量下的实际移动速度（分裂冲刺的参照速度要用它，不能用常量 MIN_SPEED）
     function runSpeedOf(m) {
