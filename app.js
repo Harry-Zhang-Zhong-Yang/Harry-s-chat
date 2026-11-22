@@ -1,4 +1,4 @@
-    const CHAT_APP_VERSION = "3.7.45";
+    const CHAT_APP_VERSION = "3.7.46";
     // ===== Supabase API 入口配置 =====
     // 默认直连官方地址（海外节点，国内部分网络不可达）。
     // 部署国内反代后，把下面这行改成反代地址即可让国内用户无 VPN 使用，例如：
@@ -377,6 +377,17 @@
         a.href = base;
         a.addEventListener('click', () => {
             showToast('正在下载安卓 App，请等待1-2分钟，在通知栏可查看进度', 'info', 4000);
+        });
+    })();
+
+    // 校园网一键上网 APK（SSBS）：与聊天室 App 同源托管，独立安装包
+    (function initSsbsDownloadLink() {
+        const a = document.getElementById('mrv-ssbs-download');
+        if (!a) return;
+        if (isNativeApp) { a.style.display = 'none'; return; }
+        a.href = 'https://harry-s-chat.pages.dev/ssbs-net.apk';
+        a.addEventListener('click', () => {
+            showToast('正在下载校园网上网工具，请等待1-2分钟', 'info', 4000);
         });
     })();
 
